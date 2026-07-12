@@ -65,8 +65,8 @@ checkout between resolution and launch. An explicit `--worktree` on the helper
 still overrides the recorded selector.
 
 Built-in role targets preserve the model-tier intent declared by upstream CE:
-`parent` uses the fork's parent default, `mid` uses `gpt-5.4-mini` with medium
-reasoning, and `cheap` uses the same smaller model with low reasoning. A
+`parent` uses `gpt-5.6-sol` with medium reasoning, `mid` uses `gpt-5.4-mini`
+with medium reasoning, and `cheap` uses the same smaller model with low reasoning. A
 higher-precedence project, profile, stage, or role target still wins. Changing
 a backend or model without naming a reasoning level keeps the effective
 higher-precedence target family instead of accidentally inheriting a

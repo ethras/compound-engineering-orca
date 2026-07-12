@@ -3,14 +3,14 @@ runtime: auto
 confirmation: false
 defaults:
   backend: codex
-  model: gpt-5.4
-  reasoning: high
+  model: gpt-5.6-sol
+  reasoning: medium
   effort: medium
   budget: 150
   concurrency: 1
   isolation: shared
 modelTiers:
-  parent: { backend: codex, model: gpt-5.4, reasoning: high }
+  parent: { backend: codex, model: gpt-5.6-sol, reasoning: medium }
   mid: { backend: codex, model: gpt-5.4-mini, reasoning: medium }
   cheap: { backend: codex, model: gpt-5.4-mini, reasoning: low }
 workflows:

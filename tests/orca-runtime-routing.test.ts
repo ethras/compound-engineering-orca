@@ -50,7 +50,7 @@ function resolved({ selected = "orca", confirmationRequired = false, workflowId 
     executionConfig: {
       version: "orca.execution-config/v1",
       workflowId,
-      defaults: { backend: "codex", model: "gpt-5.4", reasoning: "high", effort: "medium", concurrency: 1, isolation: "shared" },
+      defaults: { backend: "codex", model: "gpt-5.6-sol", reasoning: "medium", effort: "medium", concurrency: 1, isolation: "shared" },
       stages: {},
       ownership: {},
       provenance: { ceVersion: "3.19.0", integrationVersion: "3.19.0-orca.1", registryVersion: "ce-orca.registry/v1@3.19.0-orca.1", profile: "", profileDigest: "" },
