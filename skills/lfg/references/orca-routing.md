@@ -85,6 +85,21 @@ The helper marks the private packet source as one-shot. A compatible
 `orca-orch` validates and consumes that source before run creation; callers
 must not reuse the packet path after dispatch starts.
 
+When a workflow node needs controller-prepared scratch files (for example
+extracted session skeletons), pass their flat private directory with
+`--inputs-dir <dir>` and reference each file **by bare filename** in the
+node's `inputs` array. The directory must live outside the selected worktree
+(a `mktemp -d` scratch is the expected shape). A compatible endpoint snapshots
+the files into a private run-owned location before the run exists, copies only
+the requested names into a per-node private directory, grants that directory
+as the node's sole extra strict read root, announces the readable copies to
+the worker inside its spec, and removes every copy at terminal completion.
+Never put absolute scratch paths in prompts: an isolated strict worker cannot
+read the OS temp tree, so such paths are unreadable by design. The helper
+refuses dispatch with `controller_inputs_unsupported` when the endpoint does
+not attest `transport.controllerInputs` with `private-node-copy-v1` delivery;
+route that stage through the documented native fallback instead.
+
 The first command probes, validates, and displays the effective configuration.
 The second command re-displays that immutable result before dispatch. If the
 result requires confirmation, it returns `awaiting-confirmation` without an

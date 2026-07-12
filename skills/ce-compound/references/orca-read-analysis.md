@@ -56,6 +56,29 @@ Do not add executable command fields, credentials, environment dumps, or
 project-write instructions. The prompt may retain the native read-only
 inspection guidance. Submit through `references/orca-routing.md`.
 
+## Session-history scratch inputs
+
+The isolated strict reader cannot read the OS temp tree, so a
+`session-history/session-historian` prompt must never embed the absolute
+`$SCRATCH` extraction paths. Instead:
+
+1. Keep extraction native and unchanged (`mktemp -d -t
+   ce-compound-sessions-XXXXXX` plus the bundled extraction scripts).
+2. Dispatch the packet with `--inputs-dir "$SCRATCH"` and give the
+   session-historian node an `inputs` array listing the extracted **filenames**
+   (for example `"inputs": ["<session-id>.skeleton.txt"]`).
+3. Write the prompt against "the controller-provided input files": the endpoint
+   copies each requested file into a private per-node directory, grants it as
+   the node's only extra read root, and lists the readable absolute paths in
+   the worker's spec. Keep session metadata (source, branch, dates) in the
+   prompt as data.
+4. The endpoint deletes every staged copy at terminal completion; the
+   controller still owns `$SCRATCH` cleanup.
+
+If dispatch fails with `controller_inputs_unsupported`, the endpoint predates
+the controller-inputs transport: use the documented native session-history
+fallback for that stage and continue.
+
 ## Join
 
 `orca-runtime.mjs run` returns a hydrated `ce-orca.dispatch/v1` envelope. Use

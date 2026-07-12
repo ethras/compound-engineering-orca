@@ -232,6 +232,62 @@ describe("CE-Orca runtime routing", () => {
     await expect(fs.stat(observed.args[1])).rejects.toMatchObject({ code: "ENOENT" })
   })
 
+  test("gates controller inputs on the endpoint transport capability and forwards --inputs-dir", async () => {
+    const capabilitiesEnvelope = (controllerInputs: unknown) => JSON.stringify({
+      schema: "orca.capabilities/v1",
+      state: "healthy",
+      protocol: { version: "orca.local-protocol/v1", compatible: true, supportedRequestVersions: ["orca.execution-config/v1"] },
+      capabilities: {
+        lifecycle: { wait: true },
+        results: { artifactRead: { supported: true, maxBytes: 8_388_608 } },
+        transport: {
+          confidentialPacket: { supported: true, delivery: "in-memory-consume-v1", sourceConsumption: "explicit-one-shot-v1" },
+          ...(controllerInputs ? { controllerInputs } : {}),
+        },
+        targets: {},
+      },
+      issues: [],
+    })
+    const inputsDir = await fs.mkdtemp(path.join(os.tmpdir(), "ce-orca-inputs-"))
+    try {
+      let runArgs: string[] = []
+      const result = await runResolvedRequest({
+        resolved: resolved(),
+        workflowRegistryPath: DOC_REVIEW_REGISTRY,
+        inputsDir,
+        execFile: async (_command: string, args: string[]) => {
+          if (args[0] === "capabilities") {
+            return { stdout: capabilitiesEnvelope({ supported: true, maxFiles: 32, maxBytes: 8_388_608, delivery: "private-node-copy-v1" }), stderr: "", exitCode: 0 }
+          }
+          if (args[0] === "run-request") {
+            runArgs = [...args]
+            return { stdout: JSON.stringify(resultEnvelope()), stderr: "", exitCode: 0 }
+          }
+          return { stdout: JSON.stringify(validDocReviewResult()), stderr: "", exitCode: 0 }
+        },
+      })
+      expect(result.action).toBe("orca")
+      expect(runArgs[runArgs.indexOf("--inputs-dir") + 1]).toBe(inputsDir)
+
+      // An endpoint that does not attest private-node-copy-v1 controller
+      // inputs must fail closed before any run-request is issued.
+      let runRequestCalls = 0
+      await expect(runResolvedRequest({
+        resolved: resolved(),
+        workflowRegistryPath: DOC_REVIEW_REGISTRY,
+        inputsDir,
+        execFile: async (_command: string, args: string[]) => {
+          if (args[0] === "capabilities") return { stdout: capabilitiesEnvelope(null), stderr: "", exitCode: 0 }
+          if (args[0] === "run-request") runRequestCalls += 1
+          return { stdout: JSON.stringify(resultEnvelope()), stderr: "", exitCode: 0 }
+        },
+      })).rejects.toMatchObject({ code: "controller_inputs_unsupported" })
+      expect(runRequestCalls).toBe(0)
+    } finally {
+      await fs.rm(inputsDir, { recursive: true, force: true })
+    }
+  })
+
   test("reuses the worktree attested during resolution when dispatch has no override", async () => {
     let args: string[] = []
     await runResolvedRequest({
