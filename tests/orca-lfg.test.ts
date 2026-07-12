@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test'
-import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import {
@@ -189,15 +189,17 @@ describe('LFG Orca ownership gate', () => {
     await expect(stat(invalidOut)).rejects.toMatchObject({ code: 'ENOENT' })
   })
 
-  test('exposes child patch derivation through the bundled workflow CLI', async () => {
+  test('exposes child patch derivation through a symlinked bundled workflow CLI', async () => {
     const root = await directory()
     const resolvedPath = path.join(root, 'resolved.json')
     const outDir = path.join(root, 'derived')
     await writeFile(resolvedPath, JSON.stringify(resolvedLfg()))
     const workflow = path.join(import.meta.dir, '..', 'integrations', 'orca', 'workflows', 'lfg.mjs')
+    const symlinkedWorkflow = path.join(root, 'orca-workflow.mjs')
+    await symlink(workflow, symlinkedWorkflow)
     const child = Bun.spawn([
-      'bun',
-      workflow,
+      'node',
+      symlinkedWorkflow,
       'derive-child-patches',
       '--resolved',
       resolvedPath,

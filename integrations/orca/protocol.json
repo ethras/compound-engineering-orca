@@ -70,6 +70,7 @@
       "integrations/orca/protocol.json",
       "integrations/orca/references/execution-routing.md",
       "integrations/orca/resolve-config.mjs",
+      "integrations/orca/result-contract.mjs",
       "integrations/orca/role-registry.mjs",
       "integrations/orca/runtime-bundle.mjs",
       "integrations/orca/runtime-probe.mjs",

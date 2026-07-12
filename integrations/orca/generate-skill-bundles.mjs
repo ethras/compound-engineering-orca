@@ -81,10 +81,11 @@ function localizedDefaults(defaults, workflowId) {
 }
 
 async function expectedBundleFiles() {
-  const [registry, defaultsText, runtime, schema, routing] = await Promise.all([
+  const [registry, defaultsText, runtime, resultContract, schema, routing] = await Promise.all([
     buildRoleRegistry(REPO_ROOT),
     fs.readFile(path.join(HERE, "defaults.yaml"), "utf8"),
     fs.readFile(path.join(HERE, "runtime-bundle.mjs"), "utf8"),
+    fs.readFile(path.join(HERE, "result-contract.mjs"), "utf8"),
     fs.readFile(path.join(HERE, "execution-request.schema.json"), "utf8"),
     fs.readFile(path.join(HERE, "references", "execution-routing.md"), "utf8"),
   ])
@@ -93,6 +94,7 @@ async function expectedBundleFiles() {
   for (const workflowId of firstWaveWorkflowIds()) {
     const skillRoot = path.join(REPO_ROOT, "skills", workflowId)
     expected.set(path.join(skillRoot, "scripts", "orca-runtime.mjs"), runtime)
+    expected.set(path.join(skillRoot, "scripts", "result-contract.mjs"), resultContract)
     expected.set(path.join(skillRoot, "references", "orca-execution-request.schema.json"), schema)
     expected.set(path.join(skillRoot, "references", "orca-routing.md"), routing)
     expected.set(path.join(skillRoot, "references", "orca-role-registry.json"), canonicalJson(localizedRegistry(registry, workflowId)))

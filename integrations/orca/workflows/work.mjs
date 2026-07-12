@@ -5,13 +5,17 @@ import { pathToFileURL } from 'node:url'
 export const PACKET_SCHEMA = 'ce-orca.packet/v1'
 export const RESULT_SCHEMA = 'ce-orca.work-result/v1'
 const ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/
+const UNSAFE_FILE_PATTERN = /\0|[*?[\]{}]|[!+@]\(/
 const MAX_BATCH = 5
+const WORKER_STATUSES = ['complete', 'blocked', 'failed']
+const WORKER_STATUS_SET = new Set(WORKER_STATUSES)
+const isRecord = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 
 const workerSchema = {
   type: 'object',
   required: ['status', 'unit_id', 'changed_files', 'verification_evidence', 'behavior_change', 'blockers'],
   properties: {
-    status: { type: 'string' },
+    status: { type: 'string', enum: WORKER_STATUSES },
     unit_id: { type: 'string' },
     changed_files: { type: 'array', items: { type: 'string' } },
     verification_evidence: { type: 'object' },
@@ -21,7 +25,12 @@ const workerSchema = {
 }
 
 const normalizedFile = (value) => {
-  if (typeof value !== 'string' || !value || value.includes('\0') || path.isAbsolute(value)) return null
+  if (
+    typeof value !== 'string'
+    || !value
+    || path.isAbsolute(value)
+    || UNSAFE_FILE_PATTERN.test(value)
+  ) return null
   const normalized = path.posix.normalize(value.replaceAll('\\', '/'))
   return normalized === '.' || normalized === '..' || normalized.startsWith('../') || normalized.endsWith('/')
     ? null
@@ -29,7 +38,6 @@ const normalizedFile = (value) => {
 }
 
 const scopesOverlap = (left, right) => {
-  if (left.includes('*') || right.includes('*')) return true
   const rightSet = new Set(right)
   return left.some((entry) => rightSet.has(entry))
 }
@@ -104,11 +112,31 @@ const unitRecord = (node, status, value = null) => ({
   blockers: Array.isArray(value?.blockers) ? value.blockers : [],
 })
 
-const validCompletedWorker = (node, outcome) => {
-  const value = outcome.status === 'fulfilled' ? outcome.value?.value : null
-  if (!value || value.status !== 'complete' || value.unit_id !== node.id) return false
-  return Array.isArray(value.changed_files) && value.changed_files.every((file) => normalizedFile(file))
+const validWorkerIdentity = (node, value) =>
+  isRecord(value) && WORKER_STATUS_SET.has(value.status) && value.unit_id === node.id
+
+const validWorkerFiles = (files) =>
+  Array.isArray(files) && files.every((file) => normalizedFile(file))
+
+const validWorkerEvidence = (value) =>
+  isRecord(value.verification_evidence)
+  && typeof value.behavior_change === 'boolean'
+  && Array.isArray(value.blockers)
+  && value.blockers.every((blocker) => typeof blocker === 'string')
+
+const validWorkerValue = (node, value) =>
+  validWorkerIdentity(node, value)
+  && validWorkerFiles(value.changed_files)
+  && validWorkerEvidence(value)
+
+const normalizedWorkerValue = (node, outcome) => {
+  if (outcome.status !== 'fulfilled') return null
+  if (!isRecord(outcome.value)) return null
+  return validWorkerValue(node, outcome.value.value) ? outcome.value.value : null
 }
+
+const completedChange = (outcome, value) =>
+  value?.status === 'complete' && outcome.status === 'fulfilled' && Boolean(outcome.value.change)
 
 async function writeResult(runDir, result) {
   const target = path.join(runDir, 'ce-result.json')
@@ -134,14 +162,11 @@ export async function executeWorkBatch(packet, engine, runDir) {
     ),
   )
 
-  const units = settled.map((outcome, index) =>
-    outcome.status === 'fulfilled' && outcome.value?.value
-      ? unitRecord(packet.nodes[index], outcome.value.value.status || 'complete', outcome.value.value)
-      : unitRecord(packet.nodes[index], 'failed'),
+  const workerValues = settled.map((outcome, index) => normalizedWorkerValue(packet.nodes[index], outcome))
+  const units = workerValues.map((value, index) =>
+    unitRecord(packet.nodes[index], value?.status || 'failed', value),
   )
-  const failed = settled.some(
-    (outcome, index) => !validCompletedWorker(packet.nodes[index], outcome) || !outcome.value?.change,
-  )
+  const failed = settled.some((outcome, index) => !completedChange(outcome, workerValues[index]))
   if (failed) {
     const result = {
       schema: RESULT_SCHEMA,
@@ -157,11 +182,12 @@ export async function executeWorkBatch(packet, engine, runDir) {
 
   for (let index = 0; index < settled.length; index += 1) {
     try {
-      units[index].integration = await engine.integrateChange(settled[index].value.change)
-      if (!Array.isArray(units[index].integration?.files)) {
+      const integration = await engine.integrateChange(settled[index].value.change)
+      if (!isRecord(integration) || !Array.isArray(integration.files)) {
         throw new Error('integration did not attest actual changed files')
       }
-      units[index].changed_files = units[index].integration.files
+      units[index].integration = integration
+      units[index].changed_files = integration.files
     } catch (error) {
       units[index].status = 'failed'
       const result = {

@@ -9,6 +9,9 @@ import * as codeReview from "../integrations/orca/workflows/code-review.mjs"
 import * as simplify from "../integrations/orca/workflows/simplify-review.mjs"
 import * as debug from "../integrations/orca/workflows/debug.mjs"
 import * as compound from "../integrations/orca/workflows/compound.mjs"
+import * as docReview from "../integrations/orca/workflows/doc-review.mjs"
+import * as work from "../integrations/orca/workflows/work.mjs"
+import * as lfg from "../integrations/orca/workflows/lfg.mjs"
 
 const REPO_ROOT = path.resolve(import.meta.dir, "..")
 const temporaryRoots: string[] = []
@@ -277,6 +280,97 @@ describe("CE-Orca first-wave read adapters", () => {
     expect(prompt).toEndWith(packet.nodes[0].prompt)
   })
 
+  test("persists completed evidence before launching a dependent debug wave", async () => {
+    const directory = await runDir()
+    const packet = packetFor(debug, [
+      {
+        id: "initial-probe",
+        stage: "hypothesis-investigation",
+        role: "hypothesis-probe",
+        wave: 0,
+      },
+      {
+        id: "dependent-probe",
+        stage: "hypothesis-investigation",
+        role: "hypothesis-probe",
+        wave: 1,
+      },
+    ])
+    let dependentPrompt = ""
+    let persistedBeforeDependent: Record<string, unknown> | null = null
+    const engine = {
+      phase() {},
+      async agent(prompt: string, options: Record<string, unknown>) {
+        if (options.label === "initial-probe") return { evidence: "cache miss reproduced" }
+        dependentPrompt = prompt
+        persistedBeforeDependent = JSON.parse(await fs.readFile(
+          path.join(directory, "nodes/initial-probe.json"),
+          "utf8",
+        ))
+        return "dependent evidence"
+      },
+      async parallel(thunks: Array<() => Promise<unknown>>) {
+        return Promise.all(thunks.map((thunk) => thunk()))
+      },
+    }
+
+    const result = await debug.executeReadWorkflow({ engine, packet, runDir: directory })
+
+    expect(persistedBeforeDependent).toMatchObject({
+      status: "completed",
+      output: { evidence: "cache miss reproduced" },
+    })
+    expect(dependentPrompt).toContain("<ce-orca-prior-wave-evidence>")
+    expect(dependentPrompt).toContain('"status": "completed"')
+    expect(dependentPrompt).toContain('"artifactRef": "nodes/initial-probe.json"')
+    expect(dependentPrompt).toContain('"evidence": "cache miss reproduced"')
+    expect(result.status).toBe("completed")
+  })
+
+  test("keeps failed prior-wave probes explicit for dependent debug waves", async () => {
+    const directory = await runDir()
+    const packet = packetFor(debug, [
+      {
+        id: "failed-probe",
+        stage: "hypothesis-investigation",
+        role: "hypothesis-probe",
+        wave: 0,
+      },
+      {
+        id: "dependent-probe",
+        stage: "hypothesis-investigation",
+        role: "hypothesis-probe",
+        wave: 1,
+      },
+    ])
+    let dependentPrompt = ""
+    const engine = {
+      phase() {},
+      async agent(prompt: string, options: Record<string, unknown>) {
+        if (options.label === "failed-probe") throw new Error("no evidence")
+        dependentPrompt = prompt
+        return "dependent evidence"
+      },
+      async parallel(thunks: Array<() => Promise<unknown>>) {
+        return Promise.all(thunks.map((thunk) => thunk()))
+      },
+    }
+
+    const result = await debug.executeReadWorkflow({ engine, packet, runDir: directory })
+
+    expect(dependentPrompt).toContain('"status": "failed"')
+    expect(dependentPrompt).toContain('"artifactRef": "nodes/failed-probe.json"')
+    expect(dependentPrompt).toContain('"code": "worker_failed"')
+    expect(result.status).toBe("degraded")
+    expect(result.failures).toEqual([{
+      id: "failed-probe",
+      stage: "hypothesis-investigation",
+      role: "hypothesis-probe",
+      required: false,
+      code: "worker_failed",
+    }])
+  })
+
   test("keeps every workflow executable after a one-file Orca snapshot", async () => {
     const directory = await runDir()
     const names = ["plan", "code-review", "simplify-review", "debug", "compound"]
@@ -291,37 +385,176 @@ describe("CE-Orca first-wave read adapters", () => {
     }
   })
 
-  test("consumes planning and compounding packets from engine memory", async () => {
+  test("executes every installed workflow entrypoint with an in-memory packet", async () => {
     const directory = await runDir()
     const engineFile = path.join(directory, "engine.mjs")
-    await fs.writeFile(engineFile, [
-      "export function consumeConfidentialPacketJson() { return JSON.parse(process.env.TEST_PACKET_JSON) }",
-      "export async function run(_workflowId, callback) { return callback() }",
-      "export function phase() {}",
-      "export async function parallel(thunks) { return Promise.all(thunks.map((thunk) => thunk())) }",
-      "export async function agent() { return 'confidential result' }",
-    ].join("\n"))
+    await fs.writeFile(engineFile, `
+export function consumeConfidentialPacketJson() {
+  return JSON.parse(process.env.TEST_PACKET_JSON)
+}
 
-    for (const adapter of [plan, compound]) {
-      const source = path.join(
-        REPO_ROOT,
-        "integrations/orca/workflows",
-        adapter === plan ? "plan.mjs" : "compound.mjs",
-      )
-      const adapterRunDir = path.join(directory, adapter.WORKFLOW_ID)
-      await fs.mkdir(adapterRunDir)
-      const packet = packetFor(adapter, [{
+export async function run(_workflowId, callback) {
+  return callback()
+}
+
+export function phase() {}
+
+export async function parallel(thunks) {
+  return Promise.all(thunks.map((thunk) => thunk()))
+}
+
+export async function agent(_prompt, options) {
+  return {
+    reviewer: String(options.role),
+    findings: [],
+    residual_risks: [],
+    deferred_questions: [],
+  }
+}
+
+export async function agentWithChanges(_prompt, options) {
+  const changedFile = String(options.allowedFiles[0])
+  return {
+    value: {
+      status: "complete",
+      unit_id: String(options.label),
+      changed_files: [changedFile],
+      verification_evidence: { command: "entrypoint smoke", result: "pass" },
+      behavior_change: true,
+      blockers: [],
+    },
+    change: { files: [changedFile] },
+  }
+}
+
+export async function integrateChange(change) {
+  return { schema: "orca.change-integration/v1", files: change.files }
+}
+`.trimStart())
+
+    const readCase = (
+      skillName: string,
+      adapter: Adapter,
+      nodes: NodeInput[],
+    ) => ({
+      skillName,
+      workflowId: adapter.WORKFLOW_ID,
+      packet: packetFor(adapter, nodes),
+      resultSchema: adapter.RESULT_SCHEMA,
+      artifacts: nodes.map(({ id }) => ({
+        ref: `nodes/${id}.json`,
+        schema: "ce-orca.node-artifact/v1",
+      })),
+    })
+    const lfgStage = (id: string, extras: Record<string, unknown> = {}) => ({
+      id,
+      status: "complete",
+      runtime: "orca",
+      owner: "lfg-controller",
+      artifactRef: `artifacts/${id}.json`,
+      ...extras,
+    })
+    const cases = [
+      readCase("ce-plan", plan, [{
         id: "profile",
         stage: "project-profile",
         role: "repo-profiler",
-      }])
-      const child = Bun.spawn(["bun", source], {
+      }]),
+      readCase("ce-code-review", codeReview, [{
+        id: "correctness",
+        stage: "persona-review",
+        role: "correctness-reviewer",
+      }]),
+      readCase("ce-simplify-code", simplify, [
+        { id: "reuse", stage: "reviewer-analysis", role: "code-reuse-reviewer" },
+        { id: "quality", stage: "reviewer-analysis", role: "code-quality-reviewer" },
+        { id: "efficiency", stage: "reviewer-analysis", role: "efficiency-reviewer" },
+      ]),
+      readCase("ce-debug", debug, [{
+        id: "probe",
+        stage: "hypothesis-investigation",
+        role: "hypothesis-probe",
+      }]),
+      readCase("ce-compound", compound, [{
+        id: "profile",
+        stage: "project-profile",
+        role: "repo-profiler",
+      }]),
+      {
+        skillName: "ce-doc-review",
+        workflowId: docReview.WORKFLOW_ID,
+        packet: {
+          schema: docReview.PACKET_SCHEMA,
+          workflowId: docReview.WORKFLOW_ID,
+          nodes: [{
+            stage: "persona-review",
+            role: "coherence-reviewer",
+            prompt: "Review the plan for contradictions.",
+            required: true,
+          }],
+        },
+        resultSchema: docReview.RESULT_SCHEMA,
+        artifacts: [{
+          ref: "reviewers/coherence-reviewer.json",
+          schema: "ce-orca.doc-reviewer-artifact/v1",
+        }],
+      },
+      {
+        skillName: "ce-work",
+        workflowId: "ce-work",
+        packet: {
+          schema: work.PACKET_SCHEMA,
+          workflowId: "ce-work",
+          nodes: [{
+            id: "U1",
+            stage: "implementation",
+            role: "implementation-unit-worker",
+            predictedFiles: ["src/entrypoint-smoke.ts"],
+            prompt: "Exercise the installed ce-work entrypoint.",
+          }],
+        },
+        resultSchema: work.RESULT_SCHEMA,
+        artifacts: [],
+      },
+      {
+        skillName: "lfg",
+        workflowId: "lfg",
+        packet: {
+          schema: lfg.PACKET_SCHEMA,
+          workflowId: "lfg",
+          hasRemote: false,
+          browserRequired: false,
+          stages: [
+            lfgStage("plan"),
+            lfgStage("work", { returnToCaller: true, standaloneShippingSkipped: true }),
+            lfgStage("simplify"),
+            lfgStage("review", { mode: "agent" }),
+            lfgStage("fixes"),
+          ],
+        },
+        resultSchema: lfg.RESULT_SCHEMA,
+        artifacts: [],
+      },
+    ]
+
+    expect(cases).toHaveLength(8)
+    for (const entrypoint of cases) {
+      const source = path.join(
+        REPO_ROOT,
+        "skills",
+        entrypoint.skillName,
+        "scripts",
+        "orca-workflow.mjs",
+      )
+      const workflowRunDir = path.join(directory, entrypoint.workflowId)
+      await fs.mkdir(workflowRunDir)
+      const child = Bun.spawn(["node", source], {
         cwd: REPO_ROOT,
         env: {
           ...Bun.env,
           ORCH_ENGINE_URL: pathToFileURL(engineFile).href,
-          ORCH_RUN_DIR: adapterRunDir,
-          TEST_PACKET_JSON: JSON.stringify(packet),
+          ORCH_RUN_DIR: workflowRunDir,
+          TEST_PACKET_JSON: JSON.stringify(entrypoint.packet),
         },
         stdout: "pipe",
         stderr: "pipe",
@@ -331,9 +564,19 @@ describe("CE-Orca first-wave read adapters", () => {
         new Response(child.stderr).text(),
       ])
 
-      expect(exitCode, `${adapter.WORKFLOW_ID}: ${stderr}`).toBe(0)
-      expect(JSON.parse(await fs.readFile(path.join(adapterRunDir, "ce-result.json"), "utf8")))
-        .toMatchObject({ workflowId: adapter.WORKFLOW_ID, status: "completed" })
+      expect(exitCode, `${entrypoint.workflowId}: ${stderr}`).toBe(0)
+      const result = JSON.parse(await fs.readFile(
+        path.join(workflowRunDir, "ce-result.json"),
+        "utf8",
+      ))
+      expect(result.schema, entrypoint.workflowId).toBe(entrypoint.resultSchema)
+      for (const artifact of entrypoint.artifacts) {
+        const persisted = JSON.parse(await fs.readFile(
+          path.join(workflowRunDir, artifact.ref),
+          "utf8",
+        ))
+        expect(persisted.schema, `${entrypoint.workflowId}:${artifact.ref}`).toBe(artifact.schema)
+      }
       expect(await fs.readFile(source, "utf8")).not.toContain("ORCH_PACKET_FILE")
     }
   })

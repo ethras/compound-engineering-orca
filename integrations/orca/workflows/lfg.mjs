@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { pathToFileURL } from 'node:url'
+import { fileURLToPath } from 'node:url'
 
 export const PACKET_SCHEMA = 'ce-orca.lfg-packet/v1'
 export const RESULT_SCHEMA = 'ce-orca.lfg-result/v1'
@@ -239,8 +239,19 @@ async function deriveChildPatchesCli(args) {
   process.stdout.write(`${JSON.stringify(manifest, null, 2)}\n`)
 }
 
-const invokedDirectly = process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href
-if (invokedDirectly) {
+async function isMainModule() {
+  if (!process.argv[1]) return false
+  const entryPath = path.resolve(process.argv[1])
+  const modulePath = fileURLToPath(import.meta.url)
+  if (entryPath === modulePath) return true
+  const [realEntryPath, realModulePath] = await Promise.all([
+    fs.realpath(entryPath).catch(() => entryPath),
+    fs.realpath(modulePath).catch(() => modulePath),
+  ])
+  return realEntryPath === realModulePath
+}
+
+if (await isMainModule()) {
   if (process.argv[2] === 'derive-child-patches') await deriveChildPatchesCli(process.argv.slice(3))
   else await main()
 }

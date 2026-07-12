@@ -1,14 +1,15 @@
 #!/usr/bin/env node
 
-// Self-contained on purpose: this file is copied byte-for-byte into each
-// supported skill so converted installations never depend on the repository
-// level overlay tree.
+// Portable on purpose: this file and result-contract.mjs are copied
+// byte-for-byte into each supported skill so converted installations never
+// depend on the repository-level overlay tree.
 import { execFile as nodeExecFile } from "node:child_process"
 import { createHash, randomBytes } from "node:crypto"
-import { promises as fs } from "node:fs"
+import { constants as fsConstants, promises as fs } from "node:fs"
 import os from "node:os"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
+import { loadResultContract, validateResultContract } from "./result-contract.mjs"
 
 export const EXECUTION_REQUEST_SCHEMA = "ce-orca.execution-request/v1"
 export const RESOLVED_EXECUTION_SCHEMA = "ce-orca.resolved-execution/v1"
@@ -31,6 +32,15 @@ const ID_RE = /^[a-z][a-z0-9-]{0,63}$/
 const MODEL_RE = /^[A-Za-z0-9][A-Za-z0-9._:/+\[\],=-]{0,127}$/
 const LEVEL_RE = /^[a-z][a-z0-9-]{0,31}$/
 const PROFILE_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/
+const RUN_ID_RE = /^[0-9]{8}-[0-9]{6}-[a-f0-9]{4}$/
+const MAX_CHILD_ARTIFACTS = 64
+const ARTIFACT_READ_CONCURRENCY = 4
+const PROFILE_LOCK_TIMEOUT_MS = 5_000
+const PROFILE_LOCK_RETRY_MS = 25
+const PROFILE_LOCK_SCHEMA = "ce-orca.profile-lock/v1"
+const MKFIFO_COMMAND = "/usr/bin/mkfifo"
+const RUN_RESULT_STATES = new Set(["succeeded", "failed", "stopped", "aborted", "timeout", "invalid", "not-found"])
+const TERMINAL_RUN_RESULT_STATES = new Set(["succeeded", "failed", "stopped", "aborted"])
 
 const own = (value, key) => Object.prototype.hasOwnProperty.call(value, key)
 const isObject = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value)
@@ -56,6 +66,27 @@ const digest = (value) => createHash("sha256").update(canonicalJson(value, 0)).d
 
 function fail(code, message, details) {
   throw new ExecutionResolutionError(code, message, details)
+}
+
+function rethrowResultContractError(error) {
+  if (error?.code === "invalid_result_contract") fail(error.code, error.message, error.details)
+  throw error
+}
+
+async function loadRuntimeResultContract(options) {
+  try {
+    return await loadResultContract(options)
+  } catch (error) {
+    rethrowResultContractError(error)
+  }
+}
+
+function validateRuntimeResultContract(contract, value) {
+  try {
+    return validateResultContract(contract, value)
+  } catch (error) {
+    rethrowResultContractError(error)
+  }
 }
 
 // Natural-language interpretation belongs to the invoking controller. Raw
@@ -732,30 +763,360 @@ export async function writePrivateJsonAtomic(filePath, value) {
   return absolute
 }
 
+const delay = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds))
+
+function profileLockFifoPath(lockPath, token) {
+  if (typeof process.getuid !== "function") {
+    fail("profile_lock_platform_unsupported", "Atomic profile persistence requires a Unix-like runtime with process ownership support.")
+  }
+  const absoluteLockPath = path.resolve(lockPath)
+  return { directory: path.dirname(absoluteLockPath), fifoPath: `${absoluteLockPath}.${token}.fifo` }
+}
+
+async function startProfileLockLiveness(lockPath, token) {
+  const { directory, fifoPath } = profileLockFifoPath(lockPath, token)
+  await fs.mkdir(directory, { recursive: true, mode: 0o700 })
+  await fs.rm(fifoPath, { force: true })
+  let handle
+  try {
+    await executeFile(MKFIFO_COMMAND, [fifoPath], { timeout: 1_000 })
+    await fs.chmod(fifoPath, 0o600)
+    handle = await fs.open(fifoPath, fsConstants.O_RDWR | fsConstants.O_NONBLOCK)
+  } catch (error) {
+    await handle?.close().catch(() => {})
+    await fs.rm(fifoPath, { force: true })
+    throw error
+  }
+  let closed = false
+  return {
+    descriptor: { protocol: "fifo-writer-v1", path: fifoPath },
+    close: async ({ removePath = true } = {}) => {
+      if (closed) return
+      closed = true
+      try {
+        await handle.close()
+      } finally {
+        if (removePath) await fs.rm(fifoPath, { force: true })
+      }
+    },
+  }
+}
+
+async function assertFifoPath(fifoPath) {
+  const stats = await fs.lstat(fifoPath)
+  if (!stats.isFIFO()) {
+    fail("profile_lock_liveness_unavailable", `Profile lock liveness path is not a FIFO: ${JSON.stringify(fifoPath)}.`)
+  }
+}
+
+async function readFifoWriterState(handle) {
+  try {
+    const { bytesRead } = await handle.read(Buffer.alloc(1), 0, 1, null)
+    return bytesRead > 0
+  } catch (error) {
+    if (error?.code === "EAGAIN" || error?.code === "EWOULDBLOCK") return true
+    throw error
+  }
+}
+
+function rethrowFifoLivenessError(error, fifoPath) {
+  if (error?.code === "profile_lock_liveness_unavailable") throw error
+  fail("profile_lock_liveness_unavailable", `Profile lock liveness could not be verified at ${JSON.stringify(fifoPath)}.`, {
+    cause: error?.code || error?.name || "unknown",
+  })
+}
+
+async function fifoHasWriter(fifoPath) {
+  let handle
+  try {
+    await assertFifoPath(fifoPath)
+    handle = await fs.open(fifoPath, fsConstants.O_RDONLY | fsConstants.O_NONBLOCK)
+    return await readFifoWriterState(handle)
+  } catch (error) {
+    rethrowFifoLivenessError(error, fifoPath)
+  } finally {
+    await handle?.close().catch(() => {})
+  }
+}
+
+function invalidProfileLockFormat(lockPath, owner, message) {
+  fail("profile_lock_format_unsupported", message, {
+    lockPath,
+    schema: isObject(owner) && typeof owner.schema === "string" ? owner.schema : null,
+  })
+}
+
+function validateProfileLockOwner(owner, lockPath) {
+  if (
+    !isObject(owner)
+    || owner.schema !== PROFILE_LOCK_SCHEMA
+    || !/^[0-9]+-[a-f0-9]{24}$/.test(owner.token || "")
+    || owner.liveness?.protocol !== "fifo-writer-v1"
+    || typeof owner.liveness.path !== "string"
+  ) {
+    invalidProfileLockFormat(
+      lockPath,
+      owner,
+      `Profile lock at ${JSON.stringify(lockPath)} uses an unsupported or incomplete format; verify no older writer is active before removing it.`,
+    )
+  }
+  const { fifoPath } = profileLockFifoPath(lockPath, owner.token)
+  if (owner.liveness.path !== fifoPath) {
+    invalidProfileLockFormat(
+      lockPath,
+      owner,
+      `Profile lock at ${JSON.stringify(lockPath)} has an invalid liveness path; refusing unsafe recovery.`,
+    )
+  }
+  return fifoPath
+}
+
+async function profileLockOwnerIsAlive(owner, lockPath) {
+  const fifoPath = validateProfileLockOwner(owner, lockPath)
+  return fifoHasWriter(fifoPath)
+}
+
+async function removeStaleProfileLockLiveness(owner, lockPath) {
+  const fifoPath = validateProfileLockOwner(owner, lockPath)
+  await fs.rm(fifoPath, { force: true })
+}
+
+async function readProfileLockOwner(filePath, lockPath) {
+  try {
+    const owner = JSON.parse(await fs.readFile(filePath, "utf8"))
+    validateProfileLockOwner(owner, lockPath)
+    return owner
+  } catch (error) {
+    if (error?.code === "ENOENT") return null
+    if (error?.code === "profile_lock_format_unsupported") throw error
+    invalidProfileLockFormat(
+      lockPath,
+      null,
+      `Profile lock at ${JSON.stringify(filePath)} is unreadable; refusing unsafe recovery.`,
+    )
+  }
+}
+
+async function latestRecoveryClaim(recoveryBase) {
+  const directory = path.dirname(recoveryBase)
+  const prefix = `${path.basename(recoveryBase)}.`
+  const names = await fs.readdir(directory)
+  let index = -1
+  let recoveryPath = null
+  for (const name of names) {
+    if (!name.startsWith(prefix)) continue
+    const suffix = name.slice(prefix.length)
+    if (!/^\d+$/.test(suffix)) continue
+    const candidate = Number(suffix)
+    if (Number.isSafeInteger(candidate) && candidate > index) {
+      index = candidate
+      recoveryPath = path.join(directory, name)
+    }
+  }
+  return { index, recoveryPath }
+}
+
+async function recoveryClaimIsLive(recoveryPath, lockPath) {
+  if (!recoveryPath) return false
+  const owner = await readProfileLockOwner(recoveryPath, lockPath)
+  if (!owner) return false
+  return profileLockOwnerIsAlive(owner, lockPath)
+}
+
+async function electProfileLockRecovery(recoveryBase, claimPath, lockPath, deadline) {
+  while (Date.now() < deadline) {
+    const latest = await latestRecoveryClaim(recoveryBase)
+    if (await recoveryClaimIsLive(latest.recoveryPath, lockPath)) return false
+    const recoveryPath = `${recoveryBase}.${latest.index + 1}`
+    try {
+      await fs.link(claimPath, recoveryPath)
+      return true
+    } catch (error) {
+      if (error?.code !== "EEXIST") throw error
+    }
+  }
+  return false
+}
+
+async function replaceAbandonedProfileLock(lockPath, claimPath, owner) {
+  const current = await readProfileLockOwner(lockPath, lockPath)
+  if (!current || current.token !== owner.token || await profileLockOwnerIsAlive(current, lockPath)) return false
+  await fs.rename(claimPath, lockPath)
+  await fs.link(lockPath, claimPath)
+  await removeStaleProfileLockLiveness(owner, lockPath)
+  return true
+}
+
+async function recoverAbandonedProfileLock(lockPath, claimPath, deadline) {
+  const owner = await readProfileLockOwner(lockPath, lockPath)
+  if (!owner || await profileLockOwnerIsAlive(owner, lockPath)) return false
+  const claimant = await readProfileLockOwner(claimPath, lockPath)
+  if (!claimant) return false
+  const recoveryBase = `${lockPath}.${owner.token}.recovery`
+  const elected = await electProfileLockRecovery(recoveryBase, claimPath, lockPath, deadline)
+  if (!elected) return false
+  // Recovery claims are deliberately retained. Removing and later reusing a
+  // generation creates an ABA race where an older cleaner can unlink a newer
+  // claimant's liveness FIFO. They are inert once the owner token changes and
+  // only accumulate after an actual writer crash.
+  return replaceAbandonedProfileLock(lockPath, claimPath, owner)
+}
+
+async function statIfExists(filePath) {
+  try {
+    return await fs.stat(filePath)
+  } catch (error) {
+    if (error?.code === "ENOENT") return null
+    throw error
+  }
+}
+
+const releaseProfileLock = (lockPath, claimPath, closeLiveness) => async () => {
+  let removeLivenessPath = false
+  try {
+    const [claimed, current] = await Promise.all([
+      fs.stat(claimPath),
+      statIfExists(lockPath),
+    ])
+    const ownsCurrent = Boolean(current && current.dev === claimed.dev && current.ino === claimed.ino)
+    if (ownsCurrent) {
+      await fs.rm(lockPath, { force: true })
+    }
+    // A recovery hardlink may intentionally outlive this owner so generation
+    // names are never reused. Keep its FIFO node (with no writer after close)
+    // so later contenders can prove that retained recovery claim is dead.
+    removeLivenessPath = claimed.nlink <= 1 + Number(ownsCurrent)
+  } finally {
+    try {
+      await fs.rm(claimPath, { force: true })
+    } finally {
+      await closeLiveness({ removePath: removeLivenessPath })
+    }
+  }
+}
+
+async function lockBelongsToToken(lockPath, token) {
+  try {
+    const owner = JSON.parse(await fs.readFile(lockPath, "utf8"))
+    return owner?.schema === PROFILE_LOCK_SCHEMA && owner?.token === token
+  } catch (error) {
+    if (error?.code === "ENOENT") return false
+    return true
+  }
+}
+
+async function claimHasOtherLinks(claimPath) {
+  try {
+    return (await fs.stat(claimPath)).nlink > 1
+  } catch (error) {
+    if (error?.code === "ENOENT") return false
+    return true
+  }
+}
+
+async function acquireProfileLock(filePath) {
+  const absolute = path.resolve(filePath)
+  const lockPath = `${absolute}.lock`
+  const token = `${process.pid}-${randomBytes(12).toString("hex")}`
+  const claimPath = `${lockPath}.${token}.claim`
+  const deadline = Date.now() + PROFILE_LOCK_TIMEOUT_MS
+  await fs.mkdir(path.dirname(absolute), { recursive: true, mode: 0o700 })
+  const liveness = await startProfileLockLiveness(lockPath, token)
+  try {
+    const claim = await fs.open(claimPath, "wx", 0o600)
+    try {
+      await claim.writeFile(canonicalJson({
+        schema: PROFILE_LOCK_SCHEMA,
+        token,
+        pid: process.pid,
+        createdAt: new Date().toISOString(),
+        liveness: liveness.descriptor,
+      }), "utf8")
+      await claim.sync()
+    } finally {
+      await claim.close()
+    }
+    while (true) {
+      try {
+        await fs.link(claimPath, lockPath)
+        return releaseProfileLock(lockPath, claimPath, liveness.close)
+      } catch (error) {
+        if (error?.code !== "EEXIST") throw error
+        if (await recoverAbandonedProfileLock(lockPath, claimPath, deadline)) {
+          return releaseProfileLock(lockPath, claimPath, liveness.close)
+        }
+        if (Date.now() >= deadline) {
+          fail("profile_lock_timeout", `Timed out waiting to update profiles at ${JSON.stringify(absolute)}.`, {
+            filePath: absolute,
+            timeoutMs: PROFILE_LOCK_TIMEOUT_MS,
+          })
+        }
+        await delay(Math.min(PROFILE_LOCK_RETRY_MS, Math.max(1, deadline - Date.now())))
+      }
+    }
+  } catch (error) {
+    const preserveLivenessPath = await lockBelongsToToken(lockPath, token) || await claimHasOtherLinks(claimPath)
+    try {
+      await fs.rm(claimPath, { force: true })
+    } finally {
+      await liveness.close({ removePath: !preserveLivenessPath })
+    }
+    throw error
+  }
+}
+
+async function readProfilesStore(filePath) {
+  try {
+    const existing = JSON.parse(await fs.readFile(path.resolve(filePath), "utf8"))
+    if (existing.schema !== PROFILES_SCHEMA || !isObject(existing.profiles)) {
+      fail("invalid_profiles_file", `Profiles file must use ${PROFILES_SCHEMA}.`)
+    }
+    allowedKeys(existing, new Set(["schema", "profiles"]), "profiles")
+    return existing
+  } catch (error) {
+    if (error?.code === "ENOENT") return { schema: PROFILES_SCHEMA, profiles: {} }
+    throw error
+  }
+}
+
+function updatedProfilesStore(store, profileName, workflowId, profileValue) {
+  const existing = store.profiles[profileName]
+  const previous = isObject(existing) && isObject(existing.workflows) ? existing : { workflows: {} }
+  const profileRecord = { workflows: { ...previous.workflows, [workflowId]: profileValue } }
+  return { schema: PROFILES_SCHEMA, profiles: { ...store.profiles, [profileName]: profileRecord } }
+}
+
+async function writeProfileUpdate(filePath, profileName, workflowId, profileValue) {
+  const store = await readProfilesStore(filePath)
+  const next = updatedProfilesStore(store, profileName, workflowId, profileValue)
+  await writePrivateJsonAtomic(filePath, next)
+}
+
 export async function persistProfileAtomic({ filePath, profileName, request, explicit = false, registry, workflowId }) {
   if (explicit !== true) fail("persistence_not_explicit", "Saving an execution profile requires explicit user intent.")
   if (!PROFILE_RE.test(String(profileName || ""))) fail("invalid_profile_name", "Profile name must use 1-64 letters, digits, dots, underscores, or hyphens.")
   const sanitized = sanitizeLayer(request, { workflowId, registry, label: "profile-write" })
   const profileValue = canonicalize({
     ...(own(sanitized, "runtime") ? { runtime: sanitized.runtime } : {}),
+    ...(own(sanitized, "confirmation") ? { confirmation: sanitized.confirmation } : {}),
     ...(sanitized.defaults ? { defaults: sanitized.defaults } : {}),
     ...(sanitized.stages ? { stages: sanitized.stages } : {}),
   })
-  let store = { schema: PROFILES_SCHEMA, profiles: {} }
+  const releaseLock = await acquireProfileLock(filePath)
+  let operationError = null
   try {
-    const existing = JSON.parse(await fs.readFile(path.resolve(filePath), "utf8"))
-    if (existing.schema !== PROFILES_SCHEMA || !isObject(existing.profiles)) fail("invalid_profiles_file", `Profiles file must use ${PROFILES_SCHEMA}.`)
-    allowedKeys(existing, new Set(["schema", "profiles"]), "profiles")
-    store = existing
+    await writeProfileUpdate(filePath, profileName, workflowId, profileValue)
   } catch (error) {
-    if (error?.code !== "ENOENT") throw error
+    operationError = error
   }
-  const previous = isObject(store.profiles[profileName]) && isObject(store.profiles[profileName].workflows)
-    ? store.profiles[profileName]
-    : { workflows: {} }
-  const profileRecord = { workflows: { ...previous.workflows, [workflowId]: profileValue } }
-  const next = { schema: PROFILES_SCHEMA, profiles: { ...store.profiles, [profileName]: profileRecord } }
-  await writePrivateJsonAtomic(filePath, next)
+  let releaseError = null
+  try {
+    await releaseLock()
+  } catch (error) {
+    releaseError = error
+  }
+  if (operationError) throw operationError
+  if (releaseError) throw releaseError
   return { profileName, profileDigest: digest(profileValue), filePath: path.resolve(filePath) }
 }
 
@@ -797,6 +1158,107 @@ function childArtifactRefs(result) {
   return [...new Set(refs)].sort()
 }
 
+function validateRelativeArtifactRef(relative) {
+  if (
+    typeof relative !== "string"
+    || !relative
+    || relative.startsWith("/")
+    || relative.includes("\\")
+    || relative.split("/").some((part) => !part || part === "." || part === "..")
+  ) fail("invalid_result_artifact", `CE result contains an unsafe artifactRef ${JSON.stringify(relative)}.`)
+  return relative
+}
+
+async function mapWithConcurrency(values, concurrency, mapper) {
+  const results = new Array(values.length)
+  let nextIndex = 0
+  let firstError = null
+  const workers = Array.from({ length: Math.min(concurrency, values.length) }, async () => {
+    while (firstError === null && nextIndex < values.length) {
+      const index = nextIndex
+      nextIndex += 1
+      try {
+        results[index] = await mapper(values[index], index)
+      } catch (error) {
+        if (firstError === null) firstError = error
+      }
+    }
+  })
+  await Promise.allSettled(workers)
+  if (firstError !== null) throw firstError
+  return results
+}
+
+function runScopedRef(value, runRoot, { root = false } = {}) {
+  if (value === null) return true
+  if (typeof value !== "string" || value.includes("\\")) return false
+  if (root && value === runRoot) return true
+  if (!value.startsWith(`${runRoot}/`)) return false
+  const relative = value.slice(runRoot.length + 1)
+  return Boolean(relative) && relative.split("/").every((part) => part && part !== "." && part !== "..")
+}
+
+function validRunArtifactRefs(refs, runRoot) {
+  if (!Array.isArray(refs)) return false
+  const pathsAreValid = refs.every((ref) => typeof ref === "string" && runScopedRef(ref, runRoot))
+  return pathsAreValid && new Set(refs).size === refs.length
+}
+
+function validRunResultRefs(refs, runRoot) {
+  if (!isObject(refs)) return false
+  const checks = [
+    runScopedRef(refs.run, runRoot, { root: true }),
+    runScopedRef(refs.log, runRoot),
+    runScopedRef(refs.events, runRoot),
+    refs.terminalResult === undefined || runScopedRef(refs.terminalResult, runRoot),
+    validRunArtifactRefs(refs.artifacts, runRoot),
+  ]
+  return checks.every(Boolean)
+}
+
+function runResultId(response) {
+  return typeof response?.runId === "string" ? response.runId : ""
+}
+
+function primaryArtifactCount(refs, expectedPrimary, validRefs) {
+  if (!validRefs) return 0
+  return refs.artifacts.filter((ref) => ref === expectedPrimary).length
+}
+
+function validSucceededRunRefs(succeeded, refs, runRoot, primaryCount) {
+  if (!succeeded) return true
+  return refs?.run === runRoot && primaryCount === 1
+}
+
+function validateRunResultEnvelope(response) {
+  const runId = runResultId(response)
+  const runRoot = `runs/${runId}`
+  const refs = response?.refs
+  const validState = RUN_RESULT_STATES.has(response?.state)
+  const validRefs = validRunResultRefs(refs, runRoot)
+  const expectedPrimary = `${runRoot}/ce-result.json`
+  const primaryCount = primaryArtifactCount(refs, expectedPrimary, validRefs)
+  const succeeded = response?.state === "succeeded"
+  const terminal = TERMINAL_RUN_RESULT_STATES.has(response?.state)
+  const validSuccess = validSucceededRunRefs(succeeded, refs, runRoot, primaryCount)
+  const envelopeChecks = [
+    response?.schema === "orca.run-result/v1",
+    validState,
+    response?.terminal === terminal,
+    RUN_ID_RE.test(runId),
+    response?.ok === succeeded,
+    validRefs,
+    validSuccess,
+  ]
+  if (!envelopeChecks.every(Boolean)) {
+    fail("invalid_orca_response", "orca-orch returned an unsupported or non-terminal run-result envelope.", {
+      response,
+      expectedPrimary,
+    })
+  }
+  return { expectedPrimary, primaryCount }
+}
+
 async function readPublishedJsonArtifact({ command, execFile, response, ref }) {
   if (!Array.isArray(response?.refs?.artifacts) || !response.refs.artifacts.includes(ref)) {
     fail("result_artifact_missing", `Orca did not publish required artifact ${JSON.stringify(ref)}.`)
@@ -814,32 +1276,59 @@ async function readPublishedJsonArtifact({ command, execFile, response, ref }) {
   }
 }
 
-async function hydrateRunResult({ command, execFile, response }) {
-  const primaryRef = response.refs?.artifacts?.find((ref) =>
-    typeof ref === "string" && ref.endsWith("/ce-result.json"))
-  if (!primaryRef) fail("result_artifact_missing", "Orca did not publish ce-result.json.")
+async function hydrateRunResult({ command, execFile, response, resultContract = null, tolerateChildErrors = false }) {
+  const primaryRef = `runs/${response.runId}/ce-result.json`
   const value = await readPublishedJsonArtifact({ command, execFile, response, ref: primaryRef })
+  if (resultContract) validateRuntimeResultContract(resultContract, value)
   const prefix = `runs/${response.runId}/`
-  const entries = await Promise.all(childArtifactRefs(value).map(async (relative) => {
-    if (
-      !relative ||
-      relative.startsWith("/") ||
-      relative.includes("\\") ||
-      relative.split("/").includes("..")
-    ) fail("invalid_result_artifact", `CE result contains an unsafe artifactRef ${JSON.stringify(relative)}.`)
-    const ref = `${prefix}${relative}`
-    const artifact = await readPublishedJsonArtifact({ command, execFile, response, ref })
-    return [relative, artifact]
-  }))
-  return { ref: primaryRef, value, artifacts: Object.fromEntries(entries) }
+  const relatives = childArtifactRefs(value).map(validateRelativeArtifactRef)
+  if (relatives.length > MAX_CHILD_ARTIFACTS) {
+    fail("result_artifact_limit", `CE result publishes ${relatives.length} child artifacts; the limit is ${MAX_CHILD_ARTIFACTS}.`, {
+      count: relatives.length,
+      limit: MAX_CHILD_ARTIFACTS,
+    })
+  }
+  const outcomes = await mapWithConcurrency(relatives, ARTIFACT_READ_CONCURRENCY, async (relative) => {
+    try {
+      const artifact = await readPublishedJsonArtifact({ command, execFile, response, ref: `${prefix}${relative}` })
+      return { ok: true, relative, artifact }
+    } catch (error) {
+      if (!tolerateChildErrors) throw error
+      return {
+        ok: false,
+        relative,
+        error: {
+          artifactRef: relative,
+          code: error?.code || "artifact_read_failed",
+          message: error?.message || String(error),
+        },
+      }
+    }
+  })
+  const artifacts = Object.fromEntries(outcomes.filter(({ ok }) => ok).map(({ relative, artifact }) => [relative, artifact]))
+  const artifactErrors = outcomes.filter(({ ok }) => !ok).map(({ error }) => error)
+  return {
+    ref: primaryRef,
+    value,
+    artifacts,
+    ...(artifactErrors.length ? { artifactErrors } : {}),
+  }
 }
 
-async function hydrateFailedRunResult({ command, execFile, response }) {
-  const hasPrimaryResult = Array.isArray(response?.refs?.artifacts)
-    && response.refs.artifacts.some((ref) => typeof ref === "string" && ref.endsWith("/ce-result.json"))
+async function hydrateFailedRunResult({ command, execFile, response, resultContract }) {
+  const primaryRef = `runs/${response?.runId}/ce-result.json`
+  const hasPrimaryResult = Array.isArray(response?.refs?.artifacts) && response.refs.artifacts.includes(primaryRef)
   if (response?.terminal !== true || !hasPrimaryResult) return {}
   try {
-    return { result: await hydrateRunResult({ command, execFile, response }) }
+    return {
+      result: await hydrateRunResult({
+        command,
+        execFile,
+        response,
+        resultContract,
+        tolerateChildErrors: true,
+      }),
+    }
   } catch (error) {
     return {
       resultHydrationError: {
@@ -863,14 +1352,33 @@ export async function runResolvedRequest({
   onDisplay = () => {},
 } = {}) {
   if (!isObject(resolved) || resolved.schema !== RESOLVED_EXECUTION_SCHEMA) fail("invalid_resolved_request", `Resolved request must use ${RESOLVED_EXECUTION_SCHEMA}.`)
-  await onDisplay(displayExecutionConfiguration(resolved))
-  if (resolved.runtime?.selected === "native") return { schema: DISPATCH_SCHEMA, action: "native", display: displayExecutionConfiguration(resolved) }
+  if (typeof resolved.confirmationRequired !== "boolean") {
+    fail("invalid_resolved_request", "Resolved confirmationRequired must be boolean.", {
+      confirmationRequired: resolved.confirmationRequired,
+    })
+  }
+  if (!isObject(resolved.executionConfig) || typeof resolved.executionConfig.confirmation !== "boolean") {
+    fail("invalid_resolved_request", "Resolved executionConfig.confirmation must be boolean.", {
+      executionConfigConfirmation: resolved.executionConfig?.confirmation,
+    })
+  }
+  if (resolved.confirmationRequired !== resolved.executionConfig.confirmation) {
+    fail("invalid_resolved_request", "Resolved confirmation fields must agree.", {
+      confirmationRequired: resolved.confirmationRequired,
+      executionConfigConfirmation: resolved.executionConfig.confirmation,
+    })
+  }
+  const confirmationRequired = resolved.executionConfig.confirmation
+  const display = displayExecutionConfiguration(resolved)
+  await onDisplay(display)
+  if (resolved.runtime?.selected === "native") return { schema: DISPATCH_SCHEMA, action: "native", display }
   if (resolved.runtime?.selected !== "orca") fail("invalid_resolved_request", "Resolved runtime must be native or orca.")
-  if (resolved.confirmationRequired && approved !== true) {
-    return { schema: DISPATCH_SCHEMA, action: "awaiting-confirmation", display: displayExecutionConfiguration(resolved) }
+  if (confirmationRequired && approved !== true) {
+    return { schema: DISPATCH_SCHEMA, action: "awaiting-confirmation", display }
   }
   if (!workflowRegistryPath) fail("workflow_registry_required", "An installed skill-local Orca workflow registry is required.")
   if (!Number.isInteger(waitSeconds) || waitSeconds < 1) fail("invalid_wait", "waitSeconds must be a positive integer.")
+  const resultContract = await loadRuntimeResultContract({ workflowRegistryPath, workflowId: resolved.workflowId })
   const scratch = await fs.mkdtemp(path.join(os.tmpdir(), "ce-orca-dispatch-"))
   await fs.chmod(scratch, 0o700)
   try {
@@ -897,7 +1405,8 @@ export async function runResolvedRequest({
         // into the persisted execution request.
       }
       if (response?.schema === "orca.run-result/v1") {
-        const failureArtifacts = await hydrateFailedRunResult({ command, execFile, response })
+        validateRunResultEnvelope(response)
+        const failureArtifacts = await hydrateFailedRunResult({ command, execFile, response, resultContract })
         fail("orca_run_failed", `Orca run ended ${response.state}.`, { response, ...failureArtifacts })
       }
       fail("orca_dispatch_failed", error?.stderr || error?.stdout || error?.message || String(error), { command, args: args.map((arg, index) => index === 1 ? "<private-request>" : arg) })
@@ -908,21 +1417,23 @@ export async function runResolvedRequest({
     } catch {
       fail("invalid_orca_response", `${command} returned invalid JSON.`)
     }
-    const states = new Set(["succeeded", "failed", "stopped", "aborted", "timeout", "invalid", "not-found"])
-    if (response.schema !== "orca.run-result/v1" || !states.has(response.state)) {
-      fail("invalid_orca_response", `${command} returned an unsupported run-result envelope.`, { response })
-    }
+    validateRunResultEnvelope(response)
     if (response.state !== "succeeded" || response.ok !== true) {
-      const failureArtifacts = await hydrateFailedRunResult({ command, execFile, response })
+      const failureArtifacts = await hydrateFailedRunResult({ command, execFile, response, resultContract })
       fail("orca_run_failed", `Orca run ended ${response.state}.`, { response, ...failureArtifacts })
     }
-    const hydratedResult = await hydrateRunResult({ command, execFile, response })
+    const hydratedResult = await hydrateRunResult({
+      command,
+      execFile,
+      response,
+      resultContract,
+    })
     return {
       schema: DISPATCH_SCHEMA,
       action: "orca",
       response,
       result: hydratedResult,
-      display: displayExecutionConfiguration(resolved),
+      display,
     }
   } finally {
     await fs.rm(scratch, { recursive: true, force: true })
@@ -1037,7 +1548,19 @@ async function cli() {
   fail("usage", "Usage: orca-runtime.mjs <resolve|save-profile|run> ...")
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+async function isMainModule() {
+  if (!process.argv[1]) return false
+  const entryPath = path.resolve(process.argv[1])
+  const modulePath = fileURLToPath(import.meta.url)
+  if (entryPath === modulePath) return true
+  const [realEntryPath, realModulePath] = await Promise.all([
+    fs.realpath(entryPath).catch(() => entryPath),
+    fs.realpath(modulePath).catch(() => modulePath),
+  ])
+  return realEntryPath === realModulePath
+}
+
+if (await isMainModule()) {
   try {
     await cli()
   } catch (error) {

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { promises as fs } from "node:fs"
+import { constants as fsConstants, promises as fs } from "node:fs"
 import os from "node:os"
 import path from "node:path"
 import {
@@ -14,6 +14,8 @@ import { deriveLfgChildExecutionPatches } from "../integrations/orca/workflows/l
 
 const ROOT = path.resolve(import.meta.dir, "..")
 const scratch: string[] = []
+const wait = (milliseconds: number) => new Promise((resolve) => setTimeout(resolve, milliseconds))
+const PROFILE_LOCK_SCHEMA = "ce-orca.profile-lock/v1"
 
 afterEach(async () => {
   await Promise.all(scratch.splice(0).map((root) => fs.rm(root, { recursive: true, force: true })))
@@ -24,6 +26,44 @@ async function data(workflowId: string, mode = "mixed") {
   registry.workflows[workflowId].mode = mode
   const builtins = JSON.parse(await fs.readFile(path.join(ROOT, `skills/${workflowId}/references/orca-defaults.json`), "utf8"))
   return { registry, builtins }
+}
+
+async function profileLockOwnerFixture(lockPath: string, token: string, pid: number, live = false) {
+  if (typeof process.getuid !== "function") throw new Error("profile lock fixtures require Unix")
+  const fifoDirectory = path.dirname(path.resolve(lockPath))
+  const fifoPath = `${path.resolve(lockPath)}.${token}.fifo`
+  await fs.mkdir(fifoDirectory, { recursive: true, mode: 0o700 })
+  await fs.rm(fifoPath, { force: true })
+  const child = Bun.spawn(["/usr/bin/mkfifo", fifoPath], {
+    stdout: "pipe",
+    stderr: "pipe",
+  })
+  const [exitCode, stderr] = await Promise.all([child.exited, new Response(child.stderr).text()])
+  if (exitCode !== 0) throw new Error(`fixture could not create liveness FIFO: ${stderr}`)
+  await fs.chmod(fifoPath, 0o600)
+  scratch.push(fifoPath)
+  const handle = live ? await fs.open(fifoPath, fsConstants.O_RDWR | fsConstants.O_NONBLOCK) : null
+  return {
+    owner: {
+      schema: PROFILE_LOCK_SCHEMA,
+      token,
+      pid,
+      createdAt: new Date().toISOString(),
+      liveness: { protocol: "fifo-writer-v1", path: fifoPath },
+    },
+    fifoPath,
+    handle,
+  }
+}
+
+async function expectFifoWithoutWriter(fifoPath: string) {
+  expect((await fs.lstat(fifoPath)).isFIFO()).toBe(true)
+  const handle = await fs.open(fifoPath, fsConstants.O_RDONLY | fsConstants.O_NONBLOCK)
+  try {
+    expect((await handle.read(Buffer.alloc(1), 0, 1, null)).bytesRead).toBe(0)
+  } finally {
+    await handle.close()
+  }
 }
 
 const healthyProbe = {
@@ -439,6 +479,302 @@ describe("CE-Orca canonical configuration resolution", () => {
     expect(fresh.executionConfig.defaults.model).toBe("gpt-5.4")
   })
 
+  test("serializes concurrent profile updates without losing successful writes", async () => {
+    const { registry } = await data("ce-doc-review")
+    const directory = await fs.mkdtemp(path.join(os.tmpdir(), "ce-orca-concurrent-profiles-"))
+    scratch.push(directory)
+    const filePath = path.join(directory, "profiles.json")
+    const names = Array.from({ length: 12 }, (_, index) => `review-${index}`)
+
+    await Promise.all(names.map((profileName, index) => persistProfileAtomic({
+      filePath,
+      profileName,
+      request: {
+        schema: "ce-orca.execution-request/v1",
+        workflowId: "ce-doc-review",
+        defaults: { effort: index % 2 === 0 ? "low" : "high" },
+      },
+      explicit: true,
+      registry,
+      workflowId: "ce-doc-review",
+    })))
+
+    const store = JSON.parse(await fs.readFile(filePath, "utf8"))
+    expect(Object.keys(store.profiles).sort()).toEqual([...names].sort())
+    for (const [index, profileName] of names.entries()) {
+      expect(selectProfile(store, profileName, "ce-doc-review").defaults.effort)
+        .toBe(index % 2 === 0 ? "low" : "high")
+    }
+    await expect(fs.stat(`${filePath}.lock`)).rejects.toMatchObject({ code: "ENOENT" })
+  })
+
+  test("elects one recovery owner when concurrent writers find an abandoned profile lock", async () => {
+    const { registry } = await data("ce-doc-review")
+    const directory = await fs.mkdtemp(path.join(os.tmpdir(), "ce-orca-abandoned-profile-lock-"))
+    scratch.push(directory)
+    const filePath = path.join(directory, "profiles.json")
+    const deadPid = 99_999_999
+    const token = `${deadPid}-${"a".repeat(24)}`
+    const lockPath = `${filePath}.lock`
+    const fixture = await profileLockOwnerFixture(lockPath, token, deadPid)
+    await fs.writeFile(lockPath, canonicalJson(fixture.owner), { mode: 0o600 })
+
+    await Promise.all(["recovered-a", "recovered-b"].map((profileName) => persistProfileAtomic({
+      filePath,
+      profileName,
+      request: {
+        schema: "ce-orca.execution-request/v1",
+        workflowId: "ce-doc-review",
+        defaults: { effort: "high" },
+      },
+      explicit: true,
+      registry,
+      workflowId: "ce-doc-review",
+    })))
+
+    const store = JSON.parse(await fs.readFile(filePath, "utf8"))
+    expect(Object.keys(store.profiles).sort()).toEqual(["recovered-a", "recovered-b"])
+    expect(selectProfile(store, "recovered-a", "ce-doc-review").defaults.effort).toBe("high")
+    expect(selectProfile(store, "recovered-b", "ce-doc-review").defaults.effort).toBe("high")
+    await expect(fs.stat(`${filePath}.lock`)).rejects.toMatchObject({ code: "ENOENT" })
+  })
+
+  test("advances recovery generations after an elected recovery owner crashes", async () => {
+    const { registry } = await data("ce-doc-review")
+    const directory = await fs.mkdtemp(path.join(os.tmpdir(), "ce-orca-abandoned-recovery-lock-"))
+    scratch.push(directory)
+    const filePath = path.join(directory, "profiles.json")
+    const deadOwnerPid = 99_999_998
+    const deadRecoveryPid = 99_999_997
+    const ownerToken = `${deadOwnerPid}-${"a".repeat(24)}`
+    const recoveryToken = `${deadRecoveryPid}-${"b".repeat(24)}`
+    const lockPath = `${filePath}.lock`
+    const recoveryBase = `${lockPath}.${ownerToken}.recovery`
+    const ownerFixture = await profileLockOwnerFixture(lockPath, ownerToken, deadOwnerPid)
+    const recoveryFixture = await profileLockOwnerFixture(lockPath, recoveryToken, deadRecoveryPid)
+    await fs.writeFile(lockPath, canonicalJson(ownerFixture.owner), { mode: 0o600 })
+    for (let index = 0; index < 40; index += 1) {
+      await fs.writeFile(`${recoveryBase}.${index}`, canonicalJson(recoveryFixture.owner), { mode: 0o600 })
+    }
+
+    await Promise.all(["generation-a", "generation-b"].map((profileName) => persistProfileAtomic({
+      filePath,
+      profileName,
+      request: {
+        schema: "ce-orca.execution-request/v1",
+        workflowId: "ce-doc-review",
+        defaults: { effort: "medium" },
+      },
+      explicit: true,
+      registry,
+      workflowId: "ce-doc-review",
+    })))
+
+    const store = JSON.parse(await fs.readFile(filePath, "utf8"))
+    expect(Object.keys(store.profiles).sort()).toEqual(["generation-a", "generation-b"])
+    expect(selectProfile(store, "generation-a", "ce-doc-review").defaults.effort).toBe("medium")
+    expect(selectProfile(store, "generation-b", "ce-doc-review").defaults.effort).toBe("medium")
+    await expect(fs.stat(lockPath)).rejects.toMatchObject({ code: "ENOENT" })
+    expect((await fs.stat(`${recoveryBase}.0`)).isFile()).toBe(true)
+    expect((await fs.stat(`${recoveryBase}.39`)).isFile()).toBe(true)
+    expect((await fs.stat(`${recoveryBase}.40`)).isFile()).toBe(true)
+    await expect(fs.stat(ownerFixture.fifoPath)).rejects.toMatchObject({ code: "ENOENT" })
+    await expectFifoWithoutWriter(recoveryFixture.fifoPath)
+    const electedOwner = JSON.parse(await fs.readFile(`${recoveryBase}.40`, "utf8"))
+    await expectFifoWithoutWriter(electedOwner.liveness.path)
+  })
+
+  test("ignores crash-orphaned unpublished claims without racing a new writer", async () => {
+    const { registry } = await data("ce-doc-review")
+    const directory = await fs.mkdtemp(path.join(os.tmpdir(), "ce-orca-orphan-profile-claim-"))
+    scratch.push(directory)
+    const filePath = path.join(directory, "profiles.json")
+    const lockPath = `${filePath}.lock`
+    const token = `${99_999_996}-${"b".repeat(24)}`
+    const fixture = await profileLockOwnerFixture(lockPath, token, 99_999_996)
+    const claimPath = `${lockPath}.${token}.claim`
+    await fs.writeFile(claimPath, canonicalJson(fixture.owner), { mode: 0o600 })
+
+    await persistProfileAtomic({
+      filePath,
+      profileName: "after-orphan",
+      request: {
+        schema: "ce-orca.execution-request/v1",
+        workflowId: "ce-doc-review",
+        defaults: { effort: "medium" },
+      },
+      explicit: true,
+      registry,
+      workflowId: "ce-doc-review",
+    })
+
+    expect(JSON.parse(await fs.readFile(claimPath, "utf8"))).toEqual(fixture.owner)
+    expect((await fs.lstat(fixture.fifoPath)).isFIFO()).toBe(true)
+    const store = JSON.parse(await fs.readFile(filePath, "utf8"))
+    expect(selectProfile(store, "after-orphan", "ce-doc-review").defaults.effort).toBe("medium")
+  })
+
+  test("recovers a dead profile owner even when its PID has been reused", async () => {
+    const { registry } = await data("ce-doc-review")
+    const directory = await fs.mkdtemp(path.join(os.tmpdir(), "ce-orca-reused-profile-pid-"))
+    scratch.push(directory)
+    const filePath = path.join(directory, "profiles.json")
+    const lockPath = `${filePath}.lock`
+    const token = `${process.pid}-${"c".repeat(24)}`
+    const fixture = await profileLockOwnerFixture(lockPath, token, process.pid)
+    await fs.writeFile(lockPath, canonicalJson(fixture.owner), { mode: 0o600 })
+
+    await persistProfileAtomic({
+      filePath,
+      profileName: "pid-reused",
+      request: {
+        schema: "ce-orca.execution-request/v1",
+        workflowId: "ce-doc-review",
+        defaults: { effort: "low" },
+      },
+      explicit: true,
+      registry,
+      workflowId: "ce-doc-review",
+    })
+
+    const store = JSON.parse(await fs.readFile(filePath, "utf8"))
+    expect(selectProfile(store, "pid-reused", "ce-doc-review").defaults.effort).toBe("low")
+    await expect(fs.stat(lockPath)).rejects.toMatchObject({ code: "ENOENT" })
+    await expect(fs.stat(fixture.fifoPath)).rejects.toMatchObject({ code: "ENOENT" })
+  })
+
+  test("keeps a live FIFO owner until the kernel closes its writer", async () => {
+    const { registry } = await data("ce-doc-review")
+    const directory = await fs.mkdtemp(path.join(os.tmpdir(), "ce-orca-live-profile-owner-"))
+    scratch.push(directory)
+    const filePath = path.join(directory, "profiles.json")
+    const lockPath = `${filePath}.lock`
+    const token = `${process.pid}-${"d".repeat(24)}`
+    const fixture = await profileLockOwnerFixture(lockPath, token, process.pid, true)
+    await fs.writeFile(lockPath, canonicalJson(fixture.owner), { mode: 0o600 })
+
+    const saving = persistProfileAtomic({
+      filePath,
+      profileName: "after-live-owner",
+      request: {
+        schema: "ce-orca.execution-request/v1",
+        workflowId: "ce-doc-review",
+        defaults: { effort: "high" },
+      },
+      explicit: true,
+      registry,
+      workflowId: "ce-doc-review",
+    })
+    await wait(100)
+    const observedOwner = JSON.parse(await fs.readFile(lockPath, "utf8"))
+    await fixture.handle?.close()
+    await saving
+
+    expect(observedOwner.token).toBe(token)
+    const store = JSON.parse(await fs.readFile(filePath, "utf8"))
+    expect(selectProfile(store, "after-live-owner", "ce-doc-review").defaults.effort).toBe("high")
+    await expect(fs.stat(fixture.fifoPath)).rejects.toMatchObject({ code: "ENOENT" })
+  })
+
+  test("fails closed when FIFO liveness becomes unverifiable", async () => {
+    const { registry } = await data("ce-doc-review")
+    const directory = await fs.mkdtemp(path.join(os.tmpdir(), "ce-orca-unknown-profile-owner-"))
+    scratch.push(directory)
+    const filePath = path.join(directory, "profiles.json")
+    const lockPath = `${filePath}.lock`
+    const token = `${process.pid}-${"f".repeat(24)}`
+    const fixture = await profileLockOwnerFixture(lockPath, token, process.pid, true)
+    await fs.writeFile(lockPath, canonicalJson(fixture.owner), { mode: 0o600 })
+    await fs.rm(fixture.fifoPath, { force: true })
+
+    try {
+      await expect(persistProfileAtomic({
+        filePath,
+        profileName: "must-not-guess-liveness",
+        request: {
+          schema: "ce-orca.execution-request/v1",
+          workflowId: "ce-doc-review",
+          defaults: { effort: "medium" },
+        },
+        explicit: true,
+        registry,
+        workflowId: "ce-doc-review",
+      })).rejects.toMatchObject({ code: "profile_lock_liveness_unavailable" })
+    } finally {
+      await fixture.handle?.close()
+    }
+
+    expect(JSON.parse(await fs.readFile(lockPath, "utf8")).token).toBe(token)
+    await expect(fs.stat(filePath)).rejects.toMatchObject({ code: "ENOENT" })
+  })
+
+  test("fails closed for an unversioned profile lock instead of stealing it", async () => {
+    const { registry } = await data("ce-doc-review")
+    const directory = await fs.mkdtemp(path.join(os.tmpdir(), "ce-orca-legacy-profile-lock-"))
+    scratch.push(directory)
+    const filePath = path.join(directory, "profiles.json")
+    const lockPath = `${filePath}.lock`
+    const legacyOwner = {
+      token: `${process.pid}-${"e".repeat(24)}`,
+      pid: process.pid,
+      createdAt: new Date().toISOString(),
+    }
+    await fs.writeFile(lockPath, canonicalJson(legacyOwner), { mode: 0o600 })
+
+    await expect(persistProfileAtomic({
+      filePath,
+      profileName: "must-not-steal",
+      request: {
+        schema: "ce-orca.execution-request/v1",
+        workflowId: "ce-doc-review",
+        defaults: { effort: "low" },
+      },
+      explicit: true,
+      registry,
+      workflowId: "ce-doc-review",
+    })).rejects.toMatchObject({ code: "profile_lock_format_unsupported" })
+
+    expect(JSON.parse(await fs.readFile(lockPath, "utf8"))).toEqual(legacyOwner)
+    await expect(fs.stat(filePath)).rejects.toMatchObject({ code: "ENOENT" })
+  })
+
+  test("round-trips explicit confirmation values through saved profiles", async () => {
+    const { registry, builtins } = await data("ce-doc-review")
+    const directory = await fs.mkdtemp(path.join(os.tmpdir(), "ce-orca-confirmation-profiles-"))
+    scratch.push(directory)
+    const filePath = path.join(directory, "profiles.json")
+
+    for (const confirmation of [true, false]) {
+      const profileName = `confirmation-${confirmation}`
+      await persistProfileAtomic({
+        filePath,
+        profileName,
+        request: {
+          schema: "ce-orca.execution-request/v1",
+          workflowId: "ce-doc-review",
+          confirmation,
+        },
+        explicit: true,
+        registry,
+        workflowId: "ce-doc-review",
+      })
+      const store = JSON.parse(await fs.readFile(filePath, "utf8"))
+      const profile = selectProfile(store, profileName, "ce-doc-review")
+      expect(profile.confirmation).toBe(confirmation)
+
+      const resolved = resolveExecutionRequest({
+        workflowId: "ce-doc-review",
+        registry,
+        builtins,
+        profile,
+        profileName,
+        probe: healthyProbe,
+      })
+      expect(resolved.confirmationRequired).toBe(confirmation)
+      expect(resolved.runScopedOverride.confirmation).toBe(confirmation)
+    }
+  })
+
   test("selects stable per-workflow project defaults", () => {
     const store = {
       schema: "ce-orca.project-config/v1",
@@ -464,6 +800,7 @@ describe("CE-Orca canonical configuration resolution", () => {
       schema: "ce-orca.execution-request/v1",
       workflowId: "ce-doc-review",
       runtime: "orca",
+      confirmation: true,
       defaults: { backend: "claude", model: "opus", reasoning: "high" },
     }))
     await fs.writeFile(probePath, JSON.stringify(healthyProbe))
@@ -488,11 +825,17 @@ describe("CE-Orca canonical configuration resolution", () => {
     expect(saved.exitCode, saved.stderr).toBe(0)
     expect(JSON.parse(saved.stdout)).toMatchObject({ ok: true, schema: "ce-orca.profile-saved/v1", profileName: "review" })
     expect((await fs.stat(profilesPath)).mode & 0o777).toBe(0o600)
+    expect(selectProfile(
+      JSON.parse(await fs.readFile(profilesPath, "utf8")),
+      "review",
+      "ce-doc-review",
+    ).confirmation).toBe(true)
 
     const loaded = await run(["resolve", "--workflow", "ce-doc-review", "--profile", "review", "--probe", probePath])
     expect(loaded.exitCode, loaded.stderr).toBe(0)
     const resolved = JSON.parse(loaded.stdout)
     expect(resolved.runtime).toMatchObject({ requested: "orca", selected: "orca" })
+    expect(resolved.confirmationRequired).toBe(true)
     expect(resolved.executionConfig.defaults).toMatchObject({ backend: "claude", model: "opus", reasoning: "high", effort: "low" })
   })
 

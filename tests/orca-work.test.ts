@@ -40,11 +40,8 @@ const runDir = async () => {
 }
 
 describe('ce-work Orca workflow', () => {
-  test('rejects overlapping or broad batches before launching a writer', () => {
+  test('rejects overlapping batches and unsafe paths before launching a writer', () => {
     expect(validatePacket(packet(node('U1', ['src/shared.ts']), node('U2', ['src/shared.ts'])))).toContain(
-      'nodes U1 and U2 overlap; serialize them',
-    )
-    expect(validatePacket(packet(node('U1', ['*']), node('U2', ['src/two.ts'])))).toContain(
       'nodes U1 and U2 overlap; serialize them',
     )
     expect(validatePacket(packet(node('U1', ['src/feature/../shared.ts']), node('U2', ['src/shared.ts'])))).toContain(
@@ -53,14 +50,48 @@ describe('ce-work Orca workflow', () => {
     expect(validatePacket(packet(node('U1', ['.'])))).toContain('nodes[0].predictedFiles contains an unsafe path')
   })
 
+  test('rejects wildcard and glob scopes before launching a single writer', async () => {
+    for (const predictedFile of [
+      '*',
+      'src/*.ts',
+      'src/file?.ts',
+      'src/[ab].ts',
+      'src/{one,two}.ts',
+      'src/@(one|two).ts',
+      'src/+(one|two).ts',
+      'src/!(one|two).ts',
+    ]) {
+      let writerCalls = 0
+      const engine = {
+        phase: () => undefined,
+        agentWithChanges: async () => {
+          writerCalls += 1
+          return { value: workerValue('U1'), change: { id: 'U1' } }
+        },
+        integrateChange: async () => ({ files: ['src/U1.ts'] }),
+      }
+      const directory = await runDir()
+
+      await expect(executeWorkBatch(packet(node('U1', [predictedFile])), engine, directory)).rejects.toThrow(
+        'nodes[0].predictedFiles contains an unsafe path',
+      )
+      expect(writerCalls).toBe(0)
+    }
+  })
+
   test('runs disjoint writers concurrently and integrates in packet order', async () => {
     const calls: string[] = []
     const engine = {
       phase: (title: string) => calls.push(`phase:${title}`),
-      agentWithChanges: async (prompt: string, options: { label: string; allowedFiles: string[] }) => {
+      agentWithChanges: async (prompt: string, options: {
+        label: string
+        allowedFiles: string[]
+        schema: { properties: { status: { enum: string[] } } }
+      }) => {
         calls.push(`agent:${options.label}`)
         expect(prompt).toContain('Do not run git add, commit, push, open a PR')
         expect(options.allowedFiles).toEqual([options.label === 'U1' ? 'src/one.ts' : 'src/two.ts'])
+        expect(options.schema.properties.status.enum).toEqual(['complete', 'blocked', 'failed'])
         return { value: workerValue(options.label), change: { id: options.label } }
       },
       integrateChange: async (change: { id: string }) => {
@@ -106,6 +137,37 @@ describe('ce-work Orca workflow', () => {
     expect(integrations).toBe(0)
     const result = JSON.parse(await readFile(path.join(directory, 'ce-result.json'), 'utf8'))
     expect(result.status).toBe('failed')
+    expect(result.units.map(({ status }: { status: string }) => status)).toEqual(['complete', 'failed'])
+  })
+
+  test('normalizes malformed and unknown-status worker envelopes to failed', async () => {
+    const invalidValues = [
+      { ...workerValue('U1'), status: 'unexpected' },
+      { status: 'complete', unit_id: 'U1', changed_files: ['src/one.ts'] },
+      ['not', 'an', 'object'],
+    ]
+
+    for (const value of invalidValues) {
+      let integrations = 0
+      const engine = {
+        phase: () => undefined,
+        agentWithChanges: async () => ({ value, change: { id: 'U1' } }),
+        integrateChange: async () => {
+          integrations += 1
+          return { files: ['src/one.ts'] }
+        },
+      }
+      const directory = await runDir()
+
+      await expect(executeWorkBatch(packet(node('U1', ['src/one.ts'])), engine, directory)).rejects.toThrow(
+        'no batch integration was attempted',
+      )
+      expect(integrations).toBe(0)
+      expect(JSON.parse(await readFile(path.join(directory, 'ce-result.json'), 'utf8'))).toMatchObject({
+        status: 'failed',
+        units: [{ id: 'U1', status: 'failed' }],
+      })
+    }
   })
 
   test('does not integrate a blocked or mismatched worker envelope', async () => {
@@ -125,6 +187,9 @@ describe('ce-work Orca workflow', () => {
       'no batch integration was attempted',
     )
     expect(integrations).toBe(0)
+    expect(JSON.parse(await readFile(path.join(directory, 'ce-result.json'), 'utf8'))).toMatchObject({
+      units: [{ id: 'U1', status: 'failed' }],
+    })
   })
 
   test('stops deterministic integration after the first conflict', async () => {
@@ -163,6 +228,26 @@ describe('ce-work Orca workflow', () => {
         change: { id: 'U1' },
       }),
       integrateChange: async () => ({ version: 'orca.change-integration/v1' }),
+    }
+    const directory = await runDir()
+
+    await expect(executeWorkBatch(packet(node('U1', ['src/one.ts'])), engine, directory)).rejects.toThrow(
+      'integration did not attest actual changed files',
+    )
+    expect(JSON.parse(await readFile(path.join(directory, 'ce-result.json'), 'utf8'))).toMatchObject({
+      status: 'failed',
+      units: [{ id: 'U1', status: 'failed' }],
+    })
+  })
+
+  test('rejects array-shaped integration attestations even when they expose files', async () => {
+    const engine = {
+      phase: () => undefined,
+      agentWithChanges: async () => ({
+        value: workerValue('U1'),
+        change: { id: 'U1' },
+      }),
+      integrateChange: async () => Object.assign([], { files: ['src/one.ts'] }),
     }
     const directory = await runDir()
 

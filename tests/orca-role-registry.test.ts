@@ -169,12 +169,14 @@ describe("CE-Orca role registry", () => {
   test("keeps generated skill-local bundles deterministic and self-contained", async () => {
     expect(await generateSkillBundles({ check: true })).toMatchObject({ ok: true, drift: [] })
     const canonicalRuntime = await fs.readFile(path.join(ROOT, "integrations/orca/runtime-bundle.mjs"), "utf8")
+    const canonicalResultContract = await fs.readFile(path.join(ROOT, "integrations/orca/result-contract.mjs"), "utf8")
     const canonicalRouting = await fs.readFile(path.join(ROOT, "integrations/orca/references/execution-routing.md"), "utf8")
     const canonicalSchema = await fs.readFile(path.join(ROOT, "integrations/orca/execution-request.schema.json"), "utf8")
 
     for (const workflowId of firstWaveWorkflowIds()) {
       const skillRoot = path.join(ROOT, "skills", workflowId)
       expect(await fs.readFile(path.join(skillRoot, "scripts/orca-runtime.mjs"), "utf8")).toBe(canonicalRuntime)
+      expect(await fs.readFile(path.join(skillRoot, "scripts/result-contract.mjs"), "utf8")).toBe(canonicalResultContract)
       expect(await fs.readFile(path.join(skillRoot, "references/orca-routing.md"), "utf8")).toBe(canonicalRouting)
       expect(await fs.readFile(path.join(skillRoot, "references/orca-execution-request.schema.json"), "utf8")).toBe(canonicalSchema)
       const localRegistry = await readJson(`skills/${workflowId}/references/orca-role-registry.json`)
@@ -215,6 +217,7 @@ describe("CE-Orca role registry", () => {
     for (const workflowId of firstWaveWorkflowIds()) {
       const converted = path.join(output, "skills", "compound-engineering", workflowId)
       expect((await fs.stat(path.join(converted, "scripts/orca-runtime.mjs"))).isFile()).toBe(true)
+      expect((await fs.stat(path.join(converted, "scripts/result-contract.mjs"))).isFile()).toBe(true)
       expect((await fs.stat(path.join(converted, "references/orca-role-registry.json"))).isFile()).toBe(true)
       expect(await fs.readFile(path.join(converted, "scripts/orca-runtime.mjs"), "utf8")).not.toContain("integrations/orca")
     }

@@ -28,8 +28,9 @@ The command defaults to `orca-orch` on `PATH`. Set `CE_ORCA_COMMAND` to an
 absolute or otherwise directly executable path when needed. It is an executable
 override, not a shell command string, so arguments are not allowed.
 
-The portable controller helper is generated into each integrated skill at
-`scripts/orca-runtime.mjs`. It probes the external `orca-orch` executable and
+The portable controller modules are generated into each integrated skill at
+`scripts/orca-runtime.mjs` and `scripts/result-contract.mjs`. The runtime probes
+the external `orca-orch` executable and
 supports `auto`, `orca`, and `native`. `auto` uses native CE only when the
 executable is absent; an installed but unhealthy or incompatible endpoint is a
 preflight failure. The external command must expose
