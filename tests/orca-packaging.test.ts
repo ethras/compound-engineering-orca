@@ -171,6 +171,16 @@ describe("CE-Orca packaging", () => {
 
   test("reports a fork release identity with upstream provenance", async () => {
     const packageJson = await readJson<{ scripts: Record<string, string> }>("package.json")
+    const upstreamBaseline = await readJson<{
+      repository: string
+      version: string
+      commit: string
+    }>("integrations/orca/upstream.json")
+    const upstream = {
+      repository: upstreamBaseline.repository,
+      version: upstreamBaseline.version,
+      commit: upstreamBaseline.commit,
+    }
     expect(packageJson.scripts["orca:version"]).toBe("bun integrations/orca/version.mjs")
 
     const stdout = execFileSync("bun", ["integrations/orca/version.mjs"], {
@@ -180,11 +190,7 @@ describe("CE-Orca packaging", () => {
     expect(JSON.parse(stdout)).toEqual({
       name: "compound-engineering-orca",
       version: "3.19.0-orca.1",
-      upstream: {
-        repository: "https://github.com/EveryInc/compound-engineering-plugin.git",
-        version: "3.19.0",
-        commit: "8d81a5998a167e6cc8fe8a4c982591e1423acc04",
-      },
+      upstream,
       integrationRevision: 1,
       orca: {
         protocol: "orca.local-protocol/v1",
