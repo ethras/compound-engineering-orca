@@ -76,7 +76,7 @@ const healthyProbe = {
     transport: { confidentialPacket: { supported: true, maxBytes: 8_388_608, delivery: "in-memory-consume-v1", sourceConsumption: "explicit-one-shot-v1" } },
     targets: {
       claude: { available: true, models: ["opus", "sonnet"], reasoning: ["low", "medium", "high"], reasoningByModel: { opus: ["medium", "high"], sonnet: ["low", "medium", "high"] }, mutation: { read: { supported: true, policy: "orca.read-policy/v1", issues: [] }, writer: { supported: true, policy: "orca.writer-policy/v1", issues: [] } } },
-      codex: { available: true, models: ["gpt-5.4", "gpt-5.4-mini", "gpt-5.6-sol"], reasoning: ["low", "medium", "high", "xhigh"], reasoningByModel: { "gpt-5.4": ["low", "medium", "high"], "gpt-5.4-mini": ["low", "medium", "high"], "gpt-5.6-sol": ["high", "xhigh"] }, mutation: { read: { supported: true, policy: "orca.read-policy/v1", issues: [] }, writer: { supported: true, policy: "orca.writer-policy/v1", issues: [] } } },
+      codex: { available: true, models: ["gpt-5.4", "gpt-5.4-mini", "gpt-5.6-sol"], reasoning: ["low", "medium", "high", "xhigh"], reasoningByModel: { "gpt-5.4": ["low", "medium", "high"], "gpt-5.4-mini": ["low", "medium", "high"], "gpt-5.6-sol": ["medium", "high", "xhigh"] }, mutation: { read: { supported: true, policy: "orca.read-policy/v1", issues: [] }, writer: { supported: true, policy: "orca.writer-policy/v1", issues: [] } } },
       cursor: { available: true, models: ["composer-2.5"], reasoning: ["none"], reasoningByModel: { "composer-2.5": ["none"] }, mutation: { read: { supported: true, policy: "orca.read-policy/v1", issues: [] }, writer: { supported: false, policy: "orca.writer-policy/v1", issues: ["not attested"] } } },
     },
   },
@@ -89,7 +89,7 @@ describe("CE-Orca canonical configuration resolution", () => {
     const prose = "Refactor the domain model so the model object keeps its invariants."
     expect(controllerExecutionPatch(prose)).toEqual({})
     const resolved = resolveExecutionRequest({ workflowId: "ce-doc-review", registry, builtins, prompt: controllerExecutionPatch(prose), probe: healthyProbe })
-    expect(resolved.executionConfig.defaults.model).toBe("gpt-5.4")
+    expect(resolved.executionConfig.defaults).toMatchObject({ backend: "codex", model: "gpt-5.6-sol", reasoning: "medium" })
     expect(canonicalJson(resolved)).not.toContain(prose)
   })
 
@@ -171,8 +171,8 @@ describe("CE-Orca canonical configuration resolution", () => {
     })
     expect(documentRoles["feasibility-reviewer"]).toMatchObject({
       backend: "codex",
-      model: "gpt-5.4",
-      reasoning: "high",
+      model: "gpt-5.6-sol",
+      reasoning: "medium",
     })
 
     const simplificationData = await data("ce-simplify-code")
@@ -212,7 +212,7 @@ describe("CE-Orca canonical configuration resolution", () => {
       },
     })
     expect(roleOverride.executionConfig.stages["persona-review"].roles["coherence-reviewer"])
-      .toMatchObject({ backend: "claude", model: "opus", reasoning: "high" })
+      .toMatchObject({ backend: "claude", model: "opus", reasoning: "medium" })
     expect(roleOverride.executionConfig.stages["persona-review"].roles["design-lens-reviewer"])
       .toMatchObject({ backend: "codex", model: "gpt-5.4-mini", reasoning: "medium" })
   })
@@ -317,8 +317,8 @@ describe("CE-Orca canonical configuration resolution", () => {
       registry,
       builtins,
       probe: healthyProbe,
-      prompt: { defaults: { backend: "codex", model: "gpt-5.6-sol", reasoning: "medium" } },
-    })).toThrow(/unsupported for codex\/gpt-5.6-sol.*high, xhigh/)
+      prompt: { defaults: { backend: "codex", model: "gpt-5.6-sol", reasoning: "low" } },
+    })).toThrow(/unsupported for codex\/gpt-5.6-sol.*high, medium, xhigh/)
   })
 
   test("rejects ambiguous controller output rather than guessing and never activates roles", async () => {
@@ -386,7 +386,7 @@ describe("CE-Orca canonical configuration resolution", () => {
       probe: healthyProbe,
       prompt: { defaults: { backend: "claude", model: "opus" } },
     })
-    expect(claude.executionConfig.defaults).toMatchObject({ backend: "claude", model: "opus", reasoning: "high" })
+    expect(claude.executionConfig.defaults).toMatchObject({ backend: "claude", model: "opus", reasoning: "medium" })
 
     expect(() => resolveExecutionRequest({
       workflowId: "ce-doc-review",
@@ -476,7 +476,7 @@ describe("CE-Orca canonical configuration resolution", () => {
     const store = JSON.parse(await fs.readFile(filePath, "utf8"))
     expect(selectProfile(store, "review", "ce-doc-review")).toEqual({ defaults: { backend: "claude", model: "opus", reasoning: "high" } })
     const fresh = resolveExecutionRequest({ workflowId: "ce-doc-review", registry, builtins, probe: healthyProbe })
-    expect(fresh.executionConfig.defaults.model).toBe("gpt-5.4")
+    expect(fresh.executionConfig.defaults).toMatchObject({ model: "gpt-5.6-sol", reasoning: "medium" })
   })
 
   test("serializes concurrent profile updates without losing successful writes", async () => {
