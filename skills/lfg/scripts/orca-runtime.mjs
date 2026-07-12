@@ -1359,6 +1359,7 @@ export async function runResolvedRequest({
   workflowRegistryPath,
   packet = null,
   packetPath = "",
+  inputsDir = "",
   approved = false,
   waitSeconds = 900,
   worktree = "",
@@ -1405,6 +1406,20 @@ export async function runResolvedRequest({
     const resolvedWorktree = worktree || resolved.runtime?.worktree || ""
     if (typeof resolvedWorktree !== "string" || resolvedWorktree.includes("\0")) {
       fail("invalid_resolved_request", "Resolved Orca worktree must be a NUL-free selector string.")
+    }
+    if (inputsDir) {
+      if (typeof inputsDir !== "string" || inputsDir.includes("\0")) {
+        fail("invalid_inputs_dir", "inputsDir must be a NUL-free path string.")
+      }
+      // Controller inputs need an endpoint that stages private per-node copies;
+      // an older endpoint must fail closed here so the CE controller can take
+      // the documented native fallback instead of shipping unreadable paths.
+      const inputsProbe = await probeRuntime({ command, worktree: resolvedWorktree, execFile })
+      const inputsTransport = inputsProbe?.capabilities?.transport?.controllerInputs
+      if (inputsProbe?.state !== "healthy" || inputsTransport?.supported !== true || inputsTransport.delivery !== "private-node-copy-v1") {
+        fail("controller_inputs_unsupported", "The Orca endpoint does not attest private-node-copy-v1 controller inputs; dispatch stages that need controller-prepared scratch files natively.", { state: inputsProbe?.state ?? null })
+      }
+      args.push("--inputs-dir", path.resolve(inputsDir))
     }
     if (resolvedWorktree) args.push("--worktree", resolvedWorktree)
     args.push("--wait", String(waitSeconds))
@@ -1546,12 +1561,13 @@ async function cli() {
   }
   if (commandName === "run") {
     const resolvedPath = String(flags.resolved || positional[0] || "")
-    if (!resolvedPath) fail("usage", "Usage: orca-runtime.mjs run --resolved <file> --registry <file> [--packet <file>] [--approved true].")
+    if (!resolvedPath) fail("usage", "Usage: orca-runtime.mjs run --resolved <file> --registry <file> [--packet <file>] [--inputs-dir <dir>] [--approved true].")
     const resolved = await readJson(resolvedPath)
     const result = await runResolvedRequest({
       resolved,
       workflowRegistryPath: String(flags.registry || path.join(scriptDir, "orca-workflow-registry.json")),
       packetPath: flags.packet ? String(flags.packet) : "",
+      inputsDir: flags["inputs-dir"] ? String(flags["inputs-dir"]) : "",
       approved: flags.approved === "true",
       waitSeconds: flags.wait ? Number(flags.wait) : 900,
       worktree: String(flags.worktree || ""),

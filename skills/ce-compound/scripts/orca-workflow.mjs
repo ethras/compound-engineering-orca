@@ -26,12 +26,30 @@ export const ROLE_POLICY = Object.freeze({
 })
 
 const PACKET_KEYS = new Set(["schema", "workflowId", "nodes"])
-const NODE_KEYS = new Set(["id", "stage", "role", "prompt", "required", "wave"])
+const NODE_KEYS = new Set(["id", "stage", "role", "prompt", "required", "wave", "inputs"])
 const SAFE_ID = /^[a-z0-9][a-z0-9._-]{0,79}$/
+// Mirrors the endpoint's controller-input name policy: names select among the
+// files the controller already staged with --inputs-dir; they are never paths.
+const SAFE_INPUT_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/
+const MAX_NODE_INPUTS = 16
 const isRecord = (value) => value !== null && typeof value === "object" && !Array.isArray(value)
 const ownKeysAre = (value, allowed) => Object.keys(value).every((key) => allowed.has(key))
 const hasOwn = (value, key) => Object.prototype.hasOwnProperty.call(value, key)
 const nonEmpty = (value) => typeof value === "string" && value.trim().length > 0
+
+function validateNodeInputs(node, index) {
+  if (!Array.isArray(node.inputs) || node.inputs.length === 0 || node.inputs.length > MAX_NODE_INPUTS) {
+    throw new Error(`nodes[${index}].inputs must list between 1 and ${MAX_NODE_INPUTS} staged controller-input names`)
+  }
+  const seen = new Set()
+  for (const name of node.inputs) {
+    if (typeof name !== "string" || !SAFE_INPUT_NAME.test(name)) {
+      throw new Error(`nodes[${index}].inputs contains an unsafe controller-input name`)
+    }
+    if (seen.has(name)) throw new Error(`nodes[${index}].inputs contains a duplicate controller-input name`)
+    seen.add(name)
+  }
+}
 
 function validateNode(node, index, seenIds, seenRoles) {
   if (!isRecord(node) || !ownKeysAre(node, NODE_KEYS)) throw new Error(`nodes[${index}] must be a data-only CE compounding node`)
@@ -44,6 +62,7 @@ function validateNode(node, index, seenIds, seenRoles) {
   if (!nonEmpty(node.prompt)) throw new Error(`nodes[${index}].prompt must be non-empty`)
   if (node.required !== policy.required) throw new Error(`nodes[${index}].required does not match the installed role policy`)
   if (!Number.isInteger(node.wave) || node.wave < 0) throw new Error(`nodes[${index}].wave must be a non-negative integer`)
+  if (hasOwn(node, "inputs")) validateNodeInputs(node, index)
   const roleKey = `${node.stage}:${node.role}`
   if (!policy.repeatable && seenRoles.has(roleKey)) throw new Error(`duplicate non-repeatable role: ${roleKey}`)
   seenIds.add(node.id)
@@ -91,6 +110,7 @@ async function runWorker(engine, node) {
   try {
     return await engine.agent(makeWorkerPrompt(node), {
       label: node.id, stage: node.stage, role: node.role, required: node.required,
+      ...(node.inputs ? { inputs: node.inputs } : {}),
     })
   } catch {
     return null

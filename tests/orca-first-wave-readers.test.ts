@@ -371,6 +371,34 @@ describe("CE-Orca first-wave read adapters", () => {
     }])
   })
 
+  test("accepts session-historian controller inputs and forwards them to the engine", async () => {
+    const engine = fakeEngine({ history: "session history digest" })
+    const directory = await runDir()
+    const packet = packetFor(compound, [{ id: "history", stage: "session-history", role: "session-historian" }])
+    ;(packet.nodes[0] as Record<string, unknown>).inputs = ["abc123.skeleton.txt", "def456.errors.txt"]
+
+    const result = await compound.executeReadWorkflow({ engine, packet, runDir: directory })
+
+    expect(result.status).toBe("completed")
+    expect(engine.calls[0].options.inputs).toEqual(["abc123.skeleton.txt", "def456.errors.txt"])
+    expect(engine.calls[0].options.role).toBe("session-historian")
+  })
+
+  test("rejects empty, unsafe, path-like, or duplicate controller-input names", () => {
+    const base = packetFor(compound, [{ id: "history", stage: "session-history", role: "session-historian" }])
+    const withInputs = (inputs: unknown) => ({
+      ...base,
+      nodes: [{ ...base.nodes[0], inputs }],
+    })
+
+    expect(compound.validatePacket(withInputs(["abc.skeleton.txt"]))).toBeTruthy()
+    expect(() => compound.validatePacket(withInputs([]))).toThrow("between 1 and")
+    expect(() => compound.validatePacket(withInputs(["../escape.txt"]))).toThrow("unsafe")
+    expect(() => compound.validatePacket(withInputs(["/var/folders/a/skeleton.txt"]))).toThrow("unsafe")
+    expect(() => compound.validatePacket(withInputs([".hidden"]))).toThrow("unsafe")
+    expect(() => compound.validatePacket(withInputs(["a.txt", "a.txt"]))).toThrow("duplicate")
+  })
+
   test("keeps every workflow executable after a one-file Orca snapshot", async () => {
     const directory = await runDir()
     const names = ["plan", "code-review", "simplify-review", "debug", "compound"]
