@@ -79,8 +79,11 @@ override, not a shell command string, so arguments are not allowed.
 The portable controller modules are generated into each integrated skill at
 `scripts/orca-runtime.mjs` and `scripts/result-contract.mjs`. The runtime probes
 the external `orca-orch` executable and
-supports `auto`, `orca`, and `native`. `auto` uses native CE only when the
-executable is absent; an installed but unhealthy or incompatible endpoint is a
+supports `auto`, `orca`, and `native`. `auto` can select Orca only when the
+controller is running inside an attested Orca terminal (`TERM_PROGRAM=Orca`
+plus a non-empty `ORCA_TERMINAL_HANDLE`). Every other host, including the Codex
+app while Orca happens to be open, stays native without probing Orca. Inside an
+Orca terminal, an installed but unhealthy or incompatible endpoint is a
 preflight failure. The external command must expose
 `orca.local-protocol/v1`, `orca.execution-config/v1`, waitable run results,
 opaque artifact reads, and confidential packet delivery
@@ -90,11 +93,11 @@ The endpoint must also attest `explicit-one-shot-v1`: the helper marks its
 private source for identity-checked consumption before run creation, so no
 caller-side packet remains readable for the duration of the run.
 
-| Requested runtime | Absent | Healthy + compatible | Unhealthy | Incompatible |
-| --- | --- | --- | --- | --- |
-| `auto` | native, announced | Orca | fail | fail |
-| `native` | native | native | native | native |
-| `orca` | fail | Orca | fail | fail |
+| Requested runtime | Outside an Orca terminal | Absent | Healthy + compatible | Unhealthy | Incompatible |
+| --- | --- | --- | --- | --- | --- |
+| `auto` | native, no probe | native, announced | Orca | fail | fail |
+| `native` | native | native | native | native | native |
+| `orca` | fail, no probe | fail | Orca | fail | fail |
 
 An installed endpoint never degrades silently to native, and an Orca run is
 never retried through native subagents after dispatch begins.
@@ -212,6 +215,11 @@ node "$SKILL_DIR/scripts/orca-runtime.mjs" run \
   --packet /tmp/ce-plan-packet.json \
   --registry "$SKILL_DIR/scripts/orca-workflow-registry.json"
 ```
+
+Dispatch preflights confidential packet JSON before invoking Orca. Workflow
+guides that ship a deterministic packet builder, such as `ce-simplify-code`,
+should use it so raw prompts are serialized by code rather than hand-escaped.
+Malformed input fails locally as `invalid_packet_json`.
 
 Omit `--patch` when no prompt override exists. The first command displays the
 effective configuration. The second displays the same snapshot again and

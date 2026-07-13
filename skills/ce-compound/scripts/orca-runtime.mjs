@@ -23,6 +23,7 @@ const ORCA_REQUEST_VERSION = "orca.execution-config/v1"
 const BACKENDS = new Set(["claude", "codex", "cursor"])
 const MODEL_TIERS = new Set(["cheap", "mid", "parent"])
 const NO_REASONING = "none"
+export const MAX_CONFIDENTIAL_PACKET_BYTES = 8 * 1024 * 1024
 const EFFORTS = new Set(["low", "medium", "high"])
 const ISOLATION = new Set(["shared", "worktree", "worktree-strict"])
 const TARGET_FIELDS = ["backend", "model", "reasoning", "effort", "budget", "concurrency", "isolation"]
@@ -323,10 +324,25 @@ function validateTargetApplication({ workflowId, workflow, runtime, runScopedOve
   }
 }
 
-export function routeRuntime(requested, probe) {
+export function isOrcaTerminal(env = process.env) {
+  const terminalHandle = typeof env?.ORCA_TERMINAL_HANDLE === "string" ? env.ORCA_TERMINAL_HANDLE.trim() : ""
+  const terminalProgram = typeof env?.TERM_PROGRAM === "string" ? env.TERM_PROGRAM.trim().toLowerCase() : ""
+  return Boolean(terminalHandle) && terminalProgram === "orca"
+}
+
+export function routeRuntime(requested, probe, controller = probe?.controller) {
   if (!RUNTIME_MODES.has(requested)) fail("invalid_runtime", `Invalid runtime ${JSON.stringify(requested)}.`)
   if (requested === "native") {
     return { requested, selected: "native", state: probe?.state || "not-checked", fallback: false }
+  }
+  if (controller?.orcaTerminal !== true) {
+    if (requested === "auto") {
+      return { requested, selected: "native", state: "not-checked", fallback: true, reason: "outside-orca-terminal" }
+    }
+    fail(
+      "orca_terminal_required",
+      "Orca execution is available only from an attested Orca terminal. Continue with the current host's native agents or retry inside Orca.",
+    )
   }
   const state = probe?.state
   if (!RUNTIME_STATES.has(state)) fail("probe_required", "Orca must be probed before resolving auto or orca runtime.")
@@ -1354,6 +1370,52 @@ async function hydrateFailedRunResult({ command, execFile, response, resultContr
   }
 }
 
+async function readStableRegularBytes(file, maximumBytes, label) {
+  const handle = await fs.open(file, fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW | fsConstants.O_NONBLOCK)
+  try {
+    const before = await handle.stat()
+    if (!before.isFile() || before.nlink !== 1) throw new Error(`${label} must be a regular file without hard links`)
+    if (before.size > maximumBytes) throw new Error(`${label} exceeds ${maximumBytes} bytes`)
+    const buffer = Buffer.allocUnsafe(maximumBytes + 1)
+    let offset = 0
+    while (offset < buffer.length) {
+      const { bytesRead } = await handle.read(buffer, offset, buffer.length - offset, offset)
+      if (bytesRead === 0) break
+      offset += bytesRead
+    }
+    const after = await handle.stat()
+    if (
+      offset > maximumBytes || offset !== before.size ||
+      before.dev !== after.dev || before.ino !== after.ino || before.size !== after.size ||
+      before.mtimeMs !== after.mtimeMs || before.ctimeMs !== after.ctimeMs
+    ) throw new Error(`${label} changed while being read`)
+    return buffer.subarray(0, offset)
+  } finally {
+    await handle.close()
+  }
+}
+
+async function assertPacketSourceIsJson(packetPath) {
+  let bytes
+  try {
+    bytes = await readStableRegularBytes(packetPath, MAX_CONFIDENTIAL_PACKET_BYTES, "confidential packet")
+  } catch (error) {
+    fail("invalid_packet_source", `Confidential packet is not readable: ${error?.code || error?.message || String(error)}`)
+  }
+  try {
+    JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes))
+  } catch {
+    fail("invalid_packet_json", "Confidential packet must be valid JSON.")
+  }
+}
+
+function runFailureMessage(response) {
+  const reason = typeof response?.error === "string"
+    ? response.error.trim().replace(/[\r\n\t]+/g, " ").slice(0, 500)
+    : ""
+  return reason ? `Orca run ended ${response.state}: ${reason}` : `Orca run ended ${response.state}.`
+}
+
 export async function runResolvedRequest({
   resolved,
   workflowRegistryPath,
@@ -1401,6 +1463,7 @@ export async function runResolvedRequest({
     const requestPath = await writePrivateJsonAtomic(path.join(scratch, "execution-config.json"), resolved.executionConfig)
     let effectivePacketPath = packetPath ? path.resolve(packetPath) : ""
     if (packet !== null) effectivePacketPath = await writePrivateJsonAtomic(path.join(scratch, "packet.json"), packet)
+    else if (effectivePacketPath) await assertPacketSourceIsJson(effectivePacketPath)
     const args = ["run-request", requestPath, "--registry", path.resolve(workflowRegistryPath)]
     if (effectivePacketPath) args.push("--packet", effectivePacketPath, "--consume-packet-source", "true")
     const resolvedWorktree = worktree || resolved.runtime?.worktree || ""
@@ -1437,7 +1500,7 @@ export async function runResolvedRequest({
       if (response?.schema === "orca.run-result/v1") {
         validateRunResultEnvelope(response)
         const failureArtifacts = await hydrateFailedRunResult({ command, execFile, response, resultContract })
-        fail("orca_run_failed", `Orca run ended ${response.state}.`, { response, ...failureArtifacts })
+        fail("orca_run_failed", runFailureMessage(response), { response, ...failureArtifacts })
       }
       fail("orca_dispatch_failed", error?.stderr || error?.stdout || error?.message || String(error), { command, args: args.map((arg, index) => index === 1 ? "<private-request>" : arg) })
     }
@@ -1450,7 +1513,7 @@ export async function runResolvedRequest({
     validateRunResultEnvelope(response)
     if (response.state !== "succeeded" || response.ok !== true) {
       const failureArtifacts = await hydrateFailedRunResult({ command, execFile, response, resultContract })
-      fail("orca_run_failed", `Orca run ended ${response.state}.`, { response, ...failureArtifacts })
+      fail("orca_run_failed", runFailureMessage(response), { response, ...failureArtifacts })
     }
     const hydratedResult = await hydrateRunResult({
       command,
@@ -1525,15 +1588,18 @@ async function cli() {
     const profileName = flags.profile ? String(flags.profile) : null
     const profile = selectProfile(profiles, profileName, workflowId)
     const requestedRuntime = prompt.runtime ?? profile.runtime ?? project.runtime ?? builtins.runtime ?? "auto"
+    const controller = { orcaTerminal: isOrcaTerminal() }
     const probe = flags.probe
-      ? await readJson(String(flags.probe))
+      ? { ...await readJson(String(flags.probe)), controller }
       : requestedRuntime === "native"
         ? undefined
-        : await probeRuntime({
+        : !controller.orcaTerminal
+          ? { controller }
+          : { ...await probeRuntime({
             protocolVersion: registry.identities.protocolVersion,
             requestVersion: registry.identities.requestVersion,
             worktree: String(flags.worktree || ""),
-          })
+          }), controller }
     const resolved = resolveExecutionRequest({ workflowId, registry, builtins, project, profile, profileName, prompt, probe })
     if (flags.out) await writePrivateJsonAtomic(String(flags.out), resolved)
     process.stdout.write(canonicalJson(resolved))

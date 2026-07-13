@@ -18,10 +18,19 @@ Runtime routing has four observed Orca states:
 
 | Orca state | `auto` | `orca` | `native` |
 | --- | --- | --- | --- |
+| controller outside an attested Orca terminal | native, no probe | fail, no probe | native |
 | absent | native, announced | fail | native |
 | healthy and compatible | Orca | Orca | native |
 | unhealthy | fail | fail | native |
 | incompatible | fail | fail | native |
+
+An Orca terminal is attested only when `TERM_PROGRAM=Orca` and
+`ORCA_TERMINAL_HANDLE` is non-empty. Endpoint availability, hook variables, an
+open Orca app, or a worktree that Orca can resolve do not satisfy this gate.
+Therefore the Codex app stays native in `auto` even when Orca is open and the
+repository is registered there. Outside the terminal gate, explicit
+`runtime: orca` fails before probing; inside it, all endpoint and worktree
+failures remain fail-closed.
 
 Node.js 24 or newer is a prerequisite of this Orca overlay only; the upstream
 native CE workflow does not acquire a Node.js prerequisite. Before creating a
@@ -84,6 +93,10 @@ node "$SKILL_DIR/scripts/orca-runtime.mjs" run \
 The helper marks the private packet source as one-shot. A compatible
 `orca-orch` validates and consumes that source before run creation; callers
 must not reuse the packet path after dispatch starts.
+`orca-runtime.mjs run` first rejects malformed JSON locally with
+`invalid_packet_json`, before invoking Orca. When the workflow-specific guide
+provides a deterministic packet builder, use it instead of hand-escaping prompt
+text inside JSON.
 
 When a workflow node needs controller-prepared scratch files (for example
 extracted session skeletons), pass their flat private directory with

@@ -7,24 +7,26 @@ the three installed persona assets, merges suggestions, edits code, verifies
 behavior, and summarizes. Orca owns only the three read-only reviewer calls.
 Do not launch native reviewers for an Orca-owned packet.
 
-Create a private packet outside the checkout:
+Create a private prompt directory outside the checkout. Write the full persona
+prompt plus resolved scope as raw text to `reuse.txt`, `quality.txt`, and
+`efficiency.txt`; do not hand-escape those prompt bytes inside JSON. Then build
+and validate the fixed three-node packet deterministically:
 
-```json
-{
-  "schema": "ce-orca.packet/v1",
-  "workflowId": "ce-simplify-code",
-  "nodes": [
-    {
-      "id": "reuse",
-      "stage": "reviewer-analysis",
-      "role": "code-reuse-reviewer",
-      "prompt": "<full native persona prompt plus resolved scope>",
-      "required": true,
-      "wave": 0
-    }
-  ]
-}
+```bash
+SKILL_DIR="<absolute path of the ce-simplify-code skill directory>";
+node "$SKILL_DIR/scripts/orca-workflow.mjs" build-packet \
+  --prompts-dir <private-prompt-directory> \
+  --out <private-packet.json>
 ```
+
+The builder accepts only stable regular prompt files, enforces the endpoint's
+8 MiB aggregate confidential-packet limit, writes the packet through a private
+atomic temporary file, and consumes the three raw prompt files on both success
+and failure. Never retain those confidential staging files after the packet has
+been built. If an infrastructure failure requires a full-roster rerun, create a
+new private prompt directory and reconstruct all three prompts from the
+unchanged resolved scope and the three canonical reviewer personas before
+building a fresh packet.
 
 Include exactly one node for each installed reviewer:
 `code-reuse-reviewer`, `code-quality-reviewer`, and `efficiency-reviewer`.
@@ -41,6 +43,8 @@ the native Step 3 merge. References such as `runs/<run-id>/...` are opaque
 transport identifiers; never resolve or open them relative to the target
 checkout or current working directory. The helper retrieves only published
 artifacts through the protocol's allowlisted reader. If any reviewer fails,
-the Orca run fails; keep completed artifacts, report the missing lens, and do
-not pretend the three-lens pass completed. The CE controller alone applies and
-verifies changes.
+the Orca run fails; keep completed artifacts and report the missing lens. Do
+not construct a one-node retry packet: either stop with the incomplete pass or
+rebuild a fresh packet containing all three required reviewers and rerun the
+full fixed roster. Never combine artifacts from separate runs and claim a
+complete three-lens pass. The CE controller alone applies and verifies changes.

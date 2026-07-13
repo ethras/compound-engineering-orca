@@ -4,6 +4,8 @@ import os from "node:os"
 import path from "node:path"
 import { ExecutionResolutionError } from "../integrations/orca/resolve-config.mjs"
 import {
+  MAX_CONFIDENTIAL_PACKET_BYTES,
+  isOrcaTerminal,
   probeRuntime,
   resolveRuntimeCommand,
   routeRuntime,
@@ -68,12 +70,36 @@ describe("CE-Orca runtime routing", () => {
   })
 
   test("implements absent, healthy, unhealthy, and incompatible routing without degraded fallback", () => {
-    expect(routeRuntime("auto", { state: "absent" })).toEqual({ requested: "auto", selected: "native", state: "absent", fallback: true })
-    expect(routeRuntime("auto", { state: "healthy" })).toEqual({ requested: "auto", selected: "orca", state: "healthy", fallback: false })
-    expect(() => routeRuntime("auto", { state: "unhealthy" })).toThrow(/cannot fall back/)
-    expect(() => routeRuntime("auto", { state: "incompatible" })).toThrow(/cannot fall back/)
-    expect(() => routeRuntime("orca", { state: "absent" })).toThrow(/explicitly requested/)
+    const orcaTerminal = { orcaTerminal: true }
+    expect(routeRuntime("auto", { state: "absent" }, orcaTerminal)).toEqual({ requested: "auto", selected: "native", state: "absent", fallback: true })
+    expect(routeRuntime("auto", { state: "healthy" }, orcaTerminal)).toEqual({ requested: "auto", selected: "orca", state: "healthy", fallback: false })
+    expect(routeRuntime("auto", {
+      state: "healthy",
+      runtime: { context: { worktree: { available: true, selector: "path:/registered-repo" } } },
+    }, { orcaTerminal: false })).toEqual({
+      requested: "auto",
+      selected: "native",
+      state: "not-checked",
+      fallback: true,
+      reason: "outside-orca-terminal",
+    })
+    expect(() => routeRuntime("auto", { state: "unhealthy" }, orcaTerminal)).toThrow(/cannot fall back/)
+    expect(() => routeRuntime("auto", { state: "incompatible" }, orcaTerminal)).toThrow(/cannot fall back/)
+    expect(() => routeRuntime("orca", { state: "absent" }, orcaTerminal)).toThrow(/explicitly requested/)
+    expect(() => routeRuntime("orca", { state: "healthy" }, { orcaTerminal: false })).toThrow(/Orca terminal/)
     expect(routeRuntime("native", { state: "incompatible" })).toMatchObject({ selected: "native", fallback: false })
+  })
+
+  test("attests a real Orca terminal instead of the mere presence of Orca environment hooks", () => {
+    expect(isOrcaTerminal({ TERM_PROGRAM: "Orca", ORCA_TERMINAL_HANDLE: "term_123" })).toBe(true)
+    expect(isOrcaTerminal({ TERM_PROGRAM: "Orca" })).toBe(false)
+    expect(isOrcaTerminal({ ORCA_TERMINAL_HANDLE: "term_123" })).toBe(false)
+    expect(isOrcaTerminal({
+      TERM_PROGRAM: "Apple_Terminal",
+      ORCA_TERMINAL_HANDLE: "",
+      ORCA_AGENT_HOOK_ENDPOINT: "/tmp/orca-hook",
+      ORCA_APP_VERSION: "1.4.137",
+    })).toBe(false)
   })
 
   test("probes the versioned endpoint and requires wait plus confidential packet capabilities", async () => {
@@ -230,6 +256,52 @@ describe("CE-Orca runtime routing", () => {
     expect(observed.requestMode).toBe(0o600)
     expect(observed.packetMode).toBe(0o600)
     await expect(fs.stat(observed.args[1])).rejects.toMatchObject({ code: "ENOENT" })
+  })
+
+  test("rejects malformed confidential packet JSON before invoking Orca", async () => {
+    const directory = await fs.mkdtemp(path.join(os.tmpdir(), "ce-orca-invalid-packet-"))
+    const packetPath = path.join(directory, "packet.json")
+    await fs.writeFile(packetPath, '{"prompt":"invalid \\`backtick\\` escape"}', { mode: 0o600 })
+    let calls = 0
+    try {
+      await expect(runResolvedRequest({
+        resolved: resolved(),
+        workflowRegistryPath: DOC_REVIEW_REGISTRY,
+        packetPath,
+        execFile: async () => {
+          calls += 1
+          return { stdout: "{}", stderr: "", exitCode: 0 }
+        },
+      })).rejects.toMatchObject({
+        code: "invalid_packet_json",
+        message: "Confidential packet must be valid JSON.",
+      })
+      expect(calls).toBe(0)
+    } finally {
+      await fs.rm(directory, { recursive: true, force: true })
+    }
+  })
+
+  test("rejects oversized confidential packet sources before invoking Orca", async () => {
+    const directory = await fs.mkdtemp(path.join(os.tmpdir(), "ce-orca-oversized-packet-"))
+    const packetPath = path.join(directory, "packet.json")
+    await fs.writeFile(packetPath, "{}", { mode: 0o600 })
+    await fs.truncate(packetPath, MAX_CONFIDENTIAL_PACKET_BYTES + 1)
+    let calls = 0
+    try {
+      await expect(runResolvedRequest({
+        resolved: resolved(),
+        workflowRegistryPath: DOC_REVIEW_REGISTRY,
+        packetPath,
+        execFile: async () => {
+          calls += 1
+          return { stdout: "{}", stderr: "", exitCode: 0 }
+        },
+      })).rejects.toMatchObject({ code: "invalid_packet_source" })
+      expect(calls).toBe(0)
+    } finally {
+      await fs.rm(directory, { recursive: true, force: true })
+    }
   })
 
   test("gates controller inputs on the endpoint transport capability and forwards --inputs-dir", async () => {
@@ -488,6 +560,22 @@ describe("CE-Orca runtime routing", () => {
     const failed: any = new Error("exit 1")
     failed.stdout = JSON.stringify(resultEnvelope("failed"))
     await expect(runResolvedRequest({ resolved: resolved(), workflowRegistryPath: DOC_REVIEW_REGISTRY, execFile: async () => { throw failed } })).rejects.toMatchObject({ code: "orca_run_failed", details: { response: { state: "failed" } } })
+  })
+
+  test("surfaces the bounded terminal reason in Orca run failure messages", async () => {
+    const response = {
+      ...resultEnvelope("failed"),
+      error: "confidential packet is not valid JSON",
+      refs: { ...resultEnvelope("failed").refs, artifacts: [] },
+    }
+    await expect(runResolvedRequest({
+      resolved: resolved(),
+      workflowRegistryPath: DOC_REVIEW_REGISTRY,
+      execFile: async () => ({ stdout: JSON.stringify(response), stderr: "", exitCode: 1 }),
+    })).rejects.toMatchObject({
+      code: "orca_run_failed",
+      message: "Orca run ended failed: confidential packet is not valid JSON",
+    })
   })
 
   test("turns a stopped Orca-owned LFG stage into a hard boundary before shipping", async () => {
