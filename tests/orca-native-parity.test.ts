@@ -275,7 +275,7 @@ const PARITY_CASES: ParityCase[] = [
     hooks: [{
       id: "lfg-controller",
       before: "When invoking any skill referenced below, resolve its name against the available-skills list",
-      after: "1. Invoke the `ce-plan` skill with `$ARGUMENTS`.",
+      after: "1. Invoke the `ce-plan` skill with the arguments you were invoked with.",
     }],
     reference: "skills/lfg/references/orca-lfg.md",
     controllerAnchors: [
