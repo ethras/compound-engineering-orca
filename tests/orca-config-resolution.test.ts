@@ -69,6 +69,7 @@ async function expectFifoWithoutWriter(fifoPath: string) {
 const healthyProbe = {
   schema: "orca.capabilities/v1",
   state: "healthy",
+  controller: { orcaTerminal: true },
   protocol: { version: "orca.local-protocol/v1", compatible: true },
   capabilities: {
     lifecycle: { wait: true },
@@ -106,6 +107,83 @@ describe("CE-Orca canonical configuration resolution", () => {
     })
     expect(resolved.runtime.worktree).toBe("path:/fixture-repo")
     expect(resolved.display.runtime.worktree).toBe("path:/fixture-repo")
+  })
+
+  test("keeps an auto request native outside an Orca terminal even when the worktree is registered", async () => {
+    const { registry, builtins } = await data("ce-plan")
+    const resolved = resolveExecutionRequest({
+      workflowId: "ce-plan",
+      registry,
+      builtins,
+      probe: {
+        ...healthyProbe,
+        controller: { orcaTerminal: false },
+        runtime: {
+          state: "healthy",
+          context: { worktree: { available: true, selector: "path:/registered-repo", path: "/registered-repo" } },
+        },
+        issues: [],
+      },
+    })
+
+    expect(resolved.runtime).toEqual({
+      requested: "auto",
+      selected: "native",
+      state: "not-checked",
+      fallback: true,
+      reason: "outside-orca-terminal",
+    })
+    expect(new Set(Object.values(resolved.executionConfig.ownership))).toEqual(new Set(["native"]))
+  })
+
+  test("does not probe the Orca executable when auto resolution runs outside an Orca terminal", async () => {
+    const directory = await fs.mkdtemp(path.join(os.tmpdir(), "ce-orca-native-host-"))
+    scratch.push(directory)
+    const marker = path.join(directory, "probe-called")
+    const fakeOrca = path.join(directory, "fake-orca.mjs")
+    await fs.writeFile(fakeOrca, [
+      "#!/usr/bin/env node",
+      "import fs from 'node:fs'",
+      "fs.writeFileSync(process.env.PROBE_MARKER, 'called')",
+      "process.stdout.write('{}')",
+      "",
+    ].join("\n"), { mode: 0o700 })
+
+    const child = Bun.spawn([
+      "bun",
+      path.join(ROOT, "integrations/orca/runtime-bundle.mjs"),
+      "resolve",
+      "--workflow", "ce-plan",
+      "--registry", path.join(ROOT, "skills/ce-plan/references/orca-role-registry.json"),
+      "--defaults", path.join(ROOT, "skills/ce-plan/references/orca-defaults.json"),
+    ], {
+      cwd: directory,
+      env: {
+        ...Bun.env,
+        HOME: directory,
+        TERM_PROGRAM: "Apple_Terminal",
+        ORCA_TERMINAL_HANDLE: "",
+        CE_ORCA_COMMAND: fakeOrca,
+        PROBE_MARKER: marker,
+      },
+      stdout: "pipe",
+      stderr: "pipe",
+    })
+    const [exitCode, stdout, stderr] = await Promise.all([
+      child.exited,
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+    ])
+
+    expect(exitCode, stderr).toBe(0)
+    expect(JSON.parse(stdout).runtime).toEqual({
+      requested: "auto",
+      selected: "native",
+      state: "not-checked",
+      fallback: true,
+      reason: "outside-orca-terminal",
+    })
+    await expect(fs.stat(marker)).rejects.toMatchObject({ code: "ENOENT" })
   })
 
   test("routes network, MCP, and mixed-tool stages natively with explicit target authority", async () => {
@@ -848,7 +926,12 @@ describe("CE-Orca canonical configuration resolution", () => {
     const runtime = path.join(ROOT, "skills/ce-doc-review/scripts/orca-runtime.mjs")
     const profilesPath = path.join(home, ".config/compound-engineering-orca/profiles.json")
     const run = async (args: string[]) => {
-      const child = Bun.spawn(["bun", runtime, ...args], { cwd: project, env: { ...Bun.env, HOME: home }, stdout: "pipe", stderr: "pipe" })
+      const child = Bun.spawn(["bun", runtime, ...args], {
+        cwd: project,
+        env: { ...Bun.env, HOME: home, TERM_PROGRAM: "Orca", ORCA_TERMINAL_HANDLE: "term_fixture" },
+        stdout: "pipe",
+        stderr: "pipe",
+      })
       const [exitCode, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
       return { exitCode, stdout, stderr }
     }

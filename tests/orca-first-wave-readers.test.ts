@@ -76,6 +76,69 @@ function fakeEngine(outputs: Record<string, unknown | Error>) {
 }
 
 describe("CE-Orca first-wave read adapters", () => {
+  test("builds the fixed simplification packet from raw prompt files without JSON escaping hazards", async () => {
+    const directory = await runDir()
+    const prompts = path.join(directory, "prompts")
+    const output = path.join(directory, "packet.json")
+    await fs.mkdir(prompts, { mode: 0o700 })
+    const promptValues = {
+      reuse: "Reuse `Intl` and C:\\tools\\helpers.\nKeep \"quoted\" text and café.",
+      quality: "Quality prompt with <input type=\"date\"> and `file:line`.",
+      efficiency: "Efficiency prompt\nwith two lines and an em dash — safely.",
+    }
+    await Promise.all(Object.entries(promptValues).map(([name, value]) =>
+      fs.writeFile(path.join(prompts, `${name}.txt`), value, { mode: 0o600 })
+    ))
+
+    const packet = await simplify.buildReviewPacketFromDirectory(prompts)
+    expect(simplify.validatePacket(packet)).toBe(packet)
+    expect(packet.nodes.map(({ id, prompt }) => ({ id, prompt }))).toEqual([
+      { id: "reuse", prompt: promptValues.reuse },
+      { id: "quality", prompt: promptValues.quality },
+      { id: "efficiency", prompt: promptValues.efficiency },
+    ])
+
+    await simplify.writeReviewPacket({ promptsDirectory: prompts, outputPath: output })
+    expect(JSON.parse(await fs.readFile(output, "utf8"))).toEqual(packet)
+    expect((await fs.stat(output)).mode & 0o777).toBe(0o600)
+    await expect(fs.stat(prompts)).rejects.toMatchObject({ code: "ENOENT" })
+  })
+
+  test("bounds simplification prompt sources and writes through an unpredictable private temporary", async () => {
+    const directory = await runDir()
+    const prompts = path.join(directory, "prompts")
+    const output = path.join(directory, "packet.json")
+    const victim = path.join(directory, "victim.txt")
+    await fs.mkdir(prompts, { mode: 0o700 })
+    await fs.writeFile(path.join(prompts, "reuse.txt"), "reuse", { mode: 0o600 })
+    await fs.writeFile(path.join(prompts, "quality.txt"), "quality", { mode: 0o600 })
+    await fs.writeFile(path.join(prompts, "efficiency.txt"), "efficiency", { mode: 0o600 })
+    await fs.writeFile(victim, "unchanged", { mode: 0o600 })
+    await fs.symlink(victim, `${output}.tmp`)
+
+    await simplify.writeReviewPacket({ promptsDirectory: prompts, outputPath: output })
+    expect(await fs.readFile(victim, "utf8")).toBe("unchanged")
+
+    const oversizedPrompts = path.join(directory, "oversized-prompts")
+    await fs.mkdir(oversizedPrompts, { mode: 0o700 })
+    await fs.writeFile(path.join(oversizedPrompts, "reuse.txt"), "reuse", { mode: 0o600 })
+    await fs.writeFile(path.join(oversizedPrompts, "quality.txt"), "quality", { mode: 0o600 })
+    await fs.writeFile(path.join(oversizedPrompts, "efficiency.txt"), "", { mode: 0o600 })
+    await fs.truncate(path.join(oversizedPrompts, "reuse.txt"), simplify.MAX_CONFIDENTIAL_PACKET_BYTES + 1)
+    await expect(simplify.writeReviewPacket({ promptsDirectory: oversizedPrompts, outputPath: path.join(directory, "oversized.json") }))
+      .rejects.toThrow(/exceeds 8388608 aggregate bytes/)
+    await expect(fs.stat(oversizedPrompts)).rejects.toMatchObject({ code: "ENOENT" })
+
+    const escapedPrompts = path.join(directory, "escaped-prompts")
+    await fs.mkdir(escapedPrompts, { mode: 0o700 })
+    await fs.writeFile(path.join(escapedPrompts, "reuse.txt"), "\\".repeat(simplify.MAX_CONFIDENTIAL_PACKET_BYTES / 2), { mode: 0o600 })
+    await fs.writeFile(path.join(escapedPrompts, "quality.txt"), "quality", { mode: 0o600 })
+    await fs.writeFile(path.join(escapedPrompts, "efficiency.txt"), "efficiency", { mode: 0o600 })
+    await expect(simplify.writeReviewPacket({ promptsDirectory: escapedPrompts, outputPath: path.join(directory, "escaped.json") }))
+      .rejects.toThrow(/serialized packet exceeds 8388608 bytes/)
+    await expect(fs.stat(escapedPrompts)).rejects.toMatchObject({ code: "ENOENT" })
+  })
+
   test("allowlists only installed workflow roles and preserves registry failure policy", async () => {
     const registry = await buildRoleRegistry(REPO_ROOT)
 

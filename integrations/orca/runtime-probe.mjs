@@ -1,5 +1,7 @@
 export {
   DISPATCH_SCHEMA,
+  MAX_CONFIDENTIAL_PACKET_BYTES,
+  isOrcaTerminal,
   probeRuntime,
   resolveRuntimeCommand,
   routeRuntime,

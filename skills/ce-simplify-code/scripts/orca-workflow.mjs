@@ -1,12 +1,15 @@
 #!/usr/bin/env node
 
 import { promises as fs } from "node:fs"
+import { constants as fsConstants } from "node:fs"
+import { randomBytes } from "node:crypto"
 import path from "node:path"
 import { pathToFileURL } from "node:url"
 
 export const PACKET_SCHEMA = "ce-orca.packet/v1"
 export const RESULT_SCHEMA = "ce-orca.read-result/v1"
 export const WORKFLOW_ID = "ce-simplify-code"
+export const MAX_CONFIDENTIAL_PACKET_BYTES = 8 * 1024 * 1024
 
 export const ROLE_POLICY = Object.freeze({
   "reviewer-analysis": Object.freeze({
@@ -17,6 +20,11 @@ export const ROLE_POLICY = Object.freeze({
 })
 
 const REQUIRED_ROLES = Object.freeze(Object.keys(ROLE_POLICY["reviewer-analysis"]).sort())
+const REVIEW_PROMPTS = Object.freeze([
+  Object.freeze({ id: "reuse", role: "code-reuse-reviewer", file: "reuse.txt" }),
+  Object.freeze({ id: "quality", role: "code-quality-reviewer", file: "quality.txt" }),
+  Object.freeze({ id: "efficiency", role: "efficiency-reviewer", file: "efficiency.txt" }),
+])
 
 const PACKET_KEYS = new Set(["schema", "workflowId", "nodes"])
 const NODE_KEYS = new Set(["id", "stage", "role", "prompt", "required", "wave"])
@@ -58,6 +66,46 @@ export function validatePacket(packet) {
   return packet
 }
 
+export async function buildReviewPacketFromDirectory(promptsDirectory) {
+  if (!nonEmpty(promptsDirectory)) throw new Error("prompts directory must be non-empty")
+  const nodes = []
+  let bytes = 0
+  for (const { id, role, file } of REVIEW_PROMPTS) {
+    const promptBytes = await readStableRegularBytes(
+      path.join(promptsDirectory, file),
+      MAX_CONFIDENTIAL_PACKET_BYTES - bytes,
+      file,
+    )
+    bytes += promptBytes.length
+    const prompt = new TextDecoder("utf-8", { fatal: true }).decode(promptBytes)
+    if (!nonEmpty(prompt)) throw new Error(`${file} must contain a non-empty reviewer prompt`)
+    nodes.push({
+      id,
+      stage: "reviewer-analysis",
+      role,
+      prompt,
+      required: true,
+      wave: 0,
+    })
+  }
+  const packet = validatePacket({ schema: PACKET_SCHEMA, workflowId: WORKFLOW_ID, nodes })
+  if (Buffer.byteLength(serializedPacket(packet), "utf8") > MAX_CONFIDENTIAL_PACKET_BYTES) {
+    throw new Error(`serialized packet exceeds ${MAX_CONFIDENTIAL_PACKET_BYTES} bytes`)
+  }
+  return packet
+}
+
+export async function writeReviewPacket({ promptsDirectory, outputPath }) {
+  if (!nonEmpty(outputPath)) throw new Error("output path must be non-empty")
+  try {
+    const packet = await buildReviewPacketFromDirectory(promptsDirectory)
+    await writeJsonAtomic(path.resolve(outputPath), packet)
+    return packet
+  } finally {
+    await consumePromptSources(promptsDirectory)
+  }
+}
+
 export function makeWorkerPrompt(node) {
   return [
     "<ce-orca-owner-boundary>",
@@ -71,11 +119,85 @@ export function makeWorkerPrompt(node) {
   ].join("\n")
 }
 
+async function readStableRegularBytes(file, maximumBytes, label) {
+  if (!Number.isSafeInteger(maximumBytes) || maximumBytes < 0) throw new Error(`${label} exceeds ${MAX_CONFIDENTIAL_PACKET_BYTES} aggregate bytes`)
+  const handle = await fs.open(file, fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW | fsConstants.O_NONBLOCK)
+  try {
+    const before = await handle.stat()
+    if (!before.isFile() || before.nlink !== 1) throw new Error(`${label} must be a regular file without hard links`)
+    if (before.size > maximumBytes) throw new Error(`${label} exceeds ${MAX_CONFIDENTIAL_PACKET_BYTES} aggregate bytes`)
+    const buffer = Buffer.allocUnsafe(maximumBytes + 1)
+    let offset = 0
+    while (offset < buffer.length) {
+      const { bytesRead } = await handle.read(buffer, offset, buffer.length - offset, offset)
+      if (bytesRead === 0) break
+      offset += bytesRead
+    }
+    const after = await handle.stat()
+    if (
+      offset > maximumBytes || offset !== before.size ||
+      before.dev !== after.dev || before.ino !== after.ino || before.size !== after.size ||
+      before.mtimeMs !== after.mtimeMs || before.ctimeMs !== after.ctimeMs
+    ) throw new Error(`${label} changed while being read`)
+    return buffer.subarray(0, offset)
+  } finally {
+    await handle.close()
+  }
+}
+
+async function consumePromptSources(promptsDirectory) {
+  if (!nonEmpty(promptsDirectory)) return
+  await Promise.all(REVIEW_PROMPTS.map(({ file }) => fs.rm(path.join(promptsDirectory, file), { force: true })))
+  await fs.rmdir(promptsDirectory).catch((error) => {
+    if (error?.code !== "ENOENT" && error?.code !== "ENOTEMPTY") throw error
+  })
+}
+
 async function writeJsonAtomic(file, value) {
-  await fs.mkdir(path.dirname(file), { recursive: true })
-  const temporary = `${file}.tmp`
-  await fs.writeFile(temporary, `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600 })
-  await fs.rename(temporary, file)
+  await fs.mkdir(path.dirname(file), { recursive: true, mode: 0o700 })
+  const temporary = path.join(path.dirname(file), `.${path.basename(file)}.${process.pid}.${randomBytes(6).toString("hex")}.tmp`)
+  try {
+    const handle = await fs.open(temporary, "wx", 0o600)
+    try {
+      await handle.writeFile(serializedPacket(value), "utf8")
+      await handle.sync()
+    } finally {
+      await handle.close()
+    }
+    await fs.chmod(temporary, 0o600)
+    await fs.rename(temporary, file)
+    await fs.chmod(file, 0o600)
+  } catch (error) {
+    await fs.rm(temporary, { force: true })
+    throw error
+  }
+}
+
+const serializedPacket = (value) => `${JSON.stringify(value, null, 2)}\n`
+
+function packetBuilderOptions(args) {
+  const options = {}
+  for (let index = 0; index < args.length; index += 1) {
+    const key = args[index]
+    const value = args[index + 1]
+    if (!["--prompts-dir", "--out"].includes(key) || !value || value.startsWith("--")) {
+      throw new Error("usage: orca-workflow.mjs build-packet --prompts-dir <private-dir> --out <packet.json>")
+    }
+    options[key] = value
+    index += 1
+  }
+  if (!options["--prompts-dir"] || !options["--out"]) {
+    throw new Error("usage: orca-workflow.mjs build-packet --prompts-dir <private-dir> --out <packet.json>")
+  }
+  return options
+}
+
+async function buildPacketCli(args) {
+  const options = packetBuilderOptions(args)
+  await writeReviewPacket({
+    promptsDirectory: path.resolve(options["--prompts-dir"]),
+    outputPath: path.resolve(options["--out"]),
+  })
 }
 
 async function runWorker(engine, node) {
@@ -145,4 +267,7 @@ export async function main() {
 }
 
 const invokedAsScript = process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url
-if (invokedAsScript) await main()
+if (invokedAsScript) {
+  if (process.argv[2] === "build-packet") await buildPacketCli(process.argv.slice(3))
+  else await main()
+}
