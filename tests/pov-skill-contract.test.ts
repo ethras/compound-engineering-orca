@@ -20,13 +20,14 @@ function compact(content: string): string {
 }
 
 describe("ce-pov subject-shape contract", () => {
-  test("the activation contract names all three POV shapes and preserves the cache helper", async () => {
+  test("the activation contract names all three POV shapes and avoids generic repo profiling", async () => {
     const skill = await skillFile("SKILL.md")
 
     expect(skill).toContain("external-adoption question")
     expect(skill).toContain("holistic take")
     expect(skill).toContain("approach set")
-    expect(skill).toContain('scripts/repo-profile-cache.py" get')
+    expect(skill).toContain("Send scouts directly to candidate-specific current evidence")
+    expect(skill).not.toContain("repo-profile-cache")
   })
 
   test("the always-loaded Phase 0 frame names the document and approach intents", async () => {
