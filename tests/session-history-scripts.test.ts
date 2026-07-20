@@ -1631,7 +1631,7 @@ describe("discover-sessions", () => {
     const files = stdout.trim().split("\n").filter((l) => l.trim())
     for (const file of files) {
       expect(file).toMatch(
-        /\.codex\/sessions|\.agents\/sessions|codex-runtime-home\/home\/sessions/
+        /\.codex\/sessions|\.agents\/sessions|codex-runtime-home\/home\/sessions|codex-accounts\/[^/]+\/home\/sessions/
       )
     }
   })
@@ -1663,6 +1663,25 @@ describe("discover-sessions", () => {
     const sessionPath = path.join(
       tempHome,
       "Library/Application Support/Orca/codex-runtime-home/home/sessions/2026/04/07/rollout-2026-04-07T09-00-00-test.jsonl"
+    )
+    await writeFixture(sessionPath, "codex-session.jsonl")
+
+    const { stdout, stderr, exitCode } = await runDiscover(
+      ["my-repo", "7", "--platform", "codex"],
+      { HOME: tempHome, CODEX_HOME: "", CE_CODEX_SESSION_ROOTS: "" }
+    )
+
+    expect(exitCode).toBe(0)
+    expect(stderr).toBe("")
+    const files = stdout.trim().split("\n").filter((l) => l.trim())
+    expect(files).toEqual([sessionPath])
+  })
+
+  test("--platform codex discovers Orca managed-account sessions without env", async () => {
+    const tempHome = fs.mkdtempSync(path.join(os.tmpdir(), "codex-home-"))
+    const sessionPath = path.join(
+      tempHome,
+      "Library/Application Support/Orca/codex-accounts/account-a/home/sessions/2026/04/07/rollout-account-a.jsonl"
     )
     await writeFixture(sessionPath, "codex-session.jsonl")
 
@@ -1727,6 +1746,30 @@ describe("discover-sessions", () => {
     expect(stderr).toBe("")
     const files = stdout.trim().split("\n").filter((l) => l.trim())
     expect(files.length).toBe(1)
+  })
+
+  test("--platform codex deduplicates a session replicated across distinct homes", async () => {
+    const tempHome = fs.mkdtempSync(path.join(os.tmpdir(), "codex-home-"))
+    const relativeSession = "2026/04/07/rollout-2026-04-07T09-00-00-shared.jsonl"
+    const realHomeSession = path.join(tempHome, ".codex/sessions", relativeSession)
+    const legacySession = path.join(
+      tempHome,
+      "Library/Application Support/Orca/codex-runtime-home/home/sessions",
+      relativeSession
+    )
+    await writeFixture(realHomeSession, "codex-session.jsonl")
+    await fs.promises.mkdir(path.dirname(legacySession), { recursive: true })
+    await fs.promises.link(realHomeSession, legacySession)
+
+    const { stdout, stderr, exitCode } = await runDiscover(
+      ["my-repo", "7", "--platform", "codex"],
+      { HOME: tempHome, CODEX_HOME: "", CE_CODEX_SESSION_ROOTS: "" }
+    )
+
+    expect(exitCode).toBe(0)
+    expect(stderr).toBe("")
+    const files = stdout.trim().split("\n").filter((l) => l.trim())
+    expect(files).toEqual([realHomeSession])
   })
 
   test("--platform codex ignores missing roots without error", async () => {
