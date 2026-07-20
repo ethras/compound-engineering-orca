@@ -48,7 +48,7 @@ gates between them. Never send Phase 3 specialized reviewers through Orca.
 
 Adapt the native Phase 1 artifact instruction only at the return boundary: ask
 the Orca worker for the complete content, then let the CE controller persist it
-to the existing `/tmp/compound-engineering/ce-compound/<run-id>/` slot if that
+to the existing `/tmp/compound-engineering-$(id -u)/ce-compound/<run-id>/` slot if that
 slot is needed downstream. Keep every persona, source-grounding, and output-shape
 instruction unchanged.
 

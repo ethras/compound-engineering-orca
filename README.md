@@ -150,9 +150,9 @@ controller for planning through shipping and propagates its stage targets to
 the four child workflows as private, run-scoped data while preserving the
 original user prompt. Strict writing stages require an attested mutation policy
 and exact file scope. Codex and Claude can write when their local CLI passes
-preflight. Cursor remains available for native CE routing but is not eligible
-for Orca-owned read or writer stages because it cannot currently attest the
-required read or writer policy.
+preflight. Cursor remains catalogued for native CE routing but is not eligible
+for Orca-owned read or writer stages because it cannot attest
+`orca.read-policy/v1` or the writer policy.
 
 See the [Orca integration guide](integrations/orca/README.md) for project and
 profile examples, the immutable `resolve` -> `run --resolved` contract, exact
@@ -481,9 +481,13 @@ See [`.agy/INSTALL.md`](.agy/INSTALL.md) for pinning, local development, uninsta
 
 Compound Engineering moved to a root-native, skills-only layout. An existing marketplace install keeps a **cached** marketplace snapshot that still points at the old `plugins/compound-engineering` path, so updating the plugin on its own reads that stale snapshot and leaves you on the previous version. Refresh the cached marketplace **first**, then update the plugin — order matters.
 
+If an existing install still uses the official `EveryInc/compound-engineering-plugin` marketplace, remove that source and add `ethras/compound-engineering-orca` before refreshing so Claude Code and Codex both load the Orca-enabled fork.
+
 **Claude Code**
 
 ```text
+/plugin marketplace remove compound-engineering-plugin
+/plugin marketplace add ethras/compound-engineering-orca
 /plugin marketplace update compound-engineering-plugin
 /plugin update compound-engineering
 ```
@@ -491,6 +495,8 @@ Compound Engineering moved to a root-native, skills-only layout. An existing mar
 **Codex CLI**
 
 ```bash
+codex plugin marketplace remove compound-engineering-plugin
+codex plugin marketplace add ethras/compound-engineering-orca
 codex plugin marketplace upgrade compound-engineering-plugin
 codex plugin add compound-engineering@compound-engineering-plugin
 ```
@@ -499,15 +505,15 @@ There is no `codex plugin update`; re-running `add` reinstalls from the refreshe
 
 **Codex App**
 
-Refresh the marketplace from the **Plugins** panel (remove and re-add the `ethras/compound-engineering-orca` marketplace if there is no refresh control), then reinstall **compound-engineering** and restart Codex.
+Refresh the marketplace from the **Plugins** panel. If it still uses the official source, remove it and add a marketplace with source `ethras/compound-engineering-orca`, then reinstall **compound-engineering** and restart Codex.
 
 If you configured a host with a direct path or sparse path under `plugins/compound-engineering`, edit or reinstall that source so it points at the repository root with no sparse path.
 
 If a previous Bun-installed copy is still shadowing native plugin skills, run the current cleanup command from a checkout of this repository:
 
 ```bash
-git clone https://github.com/ethras/compound-engineering-orca.git /tmp/compound-engineering-plugin-cleanup
-cd /tmp/compound-engineering-plugin-cleanup
+git clone https://github.com/ethras/compound-engineering-orca.git /tmp/compound-engineering-orca-cleanup
+cd /tmp/compound-engineering-orca-cleanup
 bun install
 bun run cleanup --target all
 ```

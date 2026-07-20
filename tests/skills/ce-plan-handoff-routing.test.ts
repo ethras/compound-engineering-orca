@@ -236,8 +236,12 @@ describe("ce-plan post-generation menu routing", () => {
       ),
       "ce-doc-review must own only its argument and execution contracts; caller-side routing belongs in ce-plan.",
     ).toBe(false)
+    const docReviewRuntimeProse = DOC_REVIEW_BODY.replace(
+      /<!-- ce-orca-hook:(?:start|end) [^>]+ -->/g,
+      "",
+    )
     expect(
-      DOC_REVIEW_BODY.match(/\bce-doc-review\b/g)?.length,
+      docReviewRuntimeProse.match(/\bce-doc-review\b/g)?.length,
       "inside ce-doc-review, use direct runtime instructions instead of referring to the running skill in the third person.",
     ).toBe(1)
 
