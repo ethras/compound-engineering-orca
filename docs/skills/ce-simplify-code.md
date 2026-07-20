@@ -23,6 +23,26 @@ The compound-engineering ideation chain is `/ce-ideate → /ce-brainstorm → /c
 
 ---
 
+## Example invocations
+
+```text
+# Simplify the current branch diff before review or PR creation
+/ce-simplify-code
+
+# Limit the pass to one file
+/ce-simplify-code app/services/notification_dispatcher.rb
+
+# Describe a conversational scope when paths alone are not expressive enough
+/ce-simplify-code the changes I made to NotificationDispatcher
+
+# Clean up code an agent just generated before it becomes review noise
+/ce-simplify-code the authentication code from the last implementation step
+```
+
+User-named scope is authoritative. A bare invocation prefers the branch diff, then staged or unstaged work, then files recently edited in the conversation.
+
+---
+
 ## The Problem
 
 After writing a feature, the code usually has refinement debt that's easy to miss in the moment:
@@ -54,8 +74,8 @@ The orchestrator aggregates their findings, applies fixes, and runs typecheck + 
 
 A single "review and improve" prompt collapses into the agent's most-trained directions. Three reviewers each focused on one dimension cover meaningfully more ground:
 
-- **Reuse** — searches for existing utilities and helpers; flags new functions that duplicate existing ones; flags inline logic that could use an existing utility; flags diff code that reimplements a language standard-library or runtime primitive (gated on behavior-equivalence, excluding UX-changing swaps)
-- **Quality** — redundant state, parameter sprawl, copy-paste with variation, leaky abstractions, stringly-typed code, unnecessary wrappers (in component-tree UI frameworks), deeply nested conditionals, unnecessary comments, dead code / unused imports / unused exports
+- **Reuse** — searches for existing utilities and helpers; flags new functions that duplicate existing ones; flags inline logic that could use an existing utility; flags diff code that reimplements a language standard-library or runtime primitive (gated on behavior-equivalence, excluding UX-changing swaps); flags code that hand-maintains a verified guarantee the platform, framework, or downstream layer already provides
+- **Quality** — redundant state, parameter sprawl, copy-paste with variation (checking whether the duplicated construct can be eliminated before proposing a merge), leaky abstractions, stringly-typed code, unnecessary wrappers (in component-tree UI frameworks), deeply nested conditionals, unnecessary comments, dead code / unused imports / unused exports
 - **Efficiency** — unnecessary work (redundant computations, repeat reads), missed concurrency, hot-path bloat, recurring no-op updates, TOCTOU pre-checks, memory issues, overly broad operations
 
 ### 2. Smart scope detection — user-named > git diff > recent edits
@@ -69,6 +89,10 @@ After applying fixes, the skill runs typecheck and lint over the project and run
 ### 4. Mid-tier model selection — cost-aware
 
 The reviewer agents are dispatched on the platform's mid-tier model. Code review of a known diff doesn't need top-tier reasoning. On platforms where the model override is unavailable, the skill omits the override rather than failing the dispatch.
+
+### 5. Honors caller-passed structure pins
+
+When a caller (`/ce-work` or `/lfg`) passes a plan path whose labeled `session-settled:` KTDs name structural constraints, `ce-simplify-code` treats those as pins: a deliberately duplicated block stays duplicated, an intentional wrapper stays. A settled structural decision the user made on purpose isn't collapsed just because it looks reducible in isolation.
 
 ---
 

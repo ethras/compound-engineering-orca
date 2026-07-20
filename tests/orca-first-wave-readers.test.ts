@@ -292,7 +292,7 @@ describe("CE-Orca first-wave read adapters", () => {
     })
   })
 
-  test("supports repeatable probes and validators without manufacturing extra nodes", async () => {
+  test("supports repeatable probes and enforces the single validator batch", async () => {
     const debugPacket = packetFor(debug, [
       { id: "hypothesis-a", stage: "hypothesis-investigation", role: "hypothesis-probe" },
       { id: "hypothesis-b", stage: "hypothesis-investigation", role: "hypothesis-probe" },
@@ -300,10 +300,15 @@ describe("CE-Orca first-wave read adapters", () => {
     expect(debug.validatePacket(debugPacket)).toBe(debugPacket)
 
     const validatorPacket = packetFor(codeReview, [
-      { id: "finding-1", stage: "finding-validation", role: "finding-validator" },
-      { id: "finding-2", stage: "finding-validation", role: "finding-validator" },
+      { id: "validator-batch", stage: "finding-validation", role: "finding-validator" },
     ])
     expect(codeReview.validatePacket(validatorPacket)).toBe(validatorPacket)
+
+    const duplicateValidator = packetFor(codeReview, [
+      { id: "validator-a", stage: "finding-validation", role: "finding-validator" },
+      { id: "validator-b", stage: "finding-validation", role: "finding-validator" },
+    ])
+    expect(() => codeReview.validatePacket(duplicateValidator)).toThrow("duplicate non-repeatable role")
 
     const duplicatePersona = packetFor(codeReview, [
       { id: "correctness-a", stage: "persona-review", role: "correctness-reviewer" },
@@ -547,9 +552,9 @@ export async function integrateChange(change) {
     })
     const cases = [
       readCase("ce-plan", plan, [{
-        id: "profile",
-        stage: "project-profile",
-        role: "repo-profiler",
+        id: "repo-research",
+        stage: "local-research",
+        role: "repo-research-analyst",
       }]),
       readCase("ce-code-review", codeReview, [{
         id: "correctness",
@@ -566,11 +571,11 @@ export async function integrateChange(change) {
         stage: "hypothesis-investigation",
         role: "hypothesis-probe",
       }]),
-      readCase("ce-compound", compound, [{
-        id: "profile",
-        stage: "project-profile",
-        role: "repo-profiler",
-      }]),
+      readCase("ce-compound", compound, [
+        { id: "context", stage: "research", role: "context-analyzer" },
+        { id: "solution", stage: "research", role: "solution-extractor" },
+        { id: "related", stage: "research", role: "related-docs-finder" },
+      ]),
       {
         skillName: "ce-doc-review",
         workflowId: docReview.WORKFLOW_ID,
@@ -675,7 +680,7 @@ export async function integrateChange(change) {
   test("keeps native workflow prose behind bounded hooks", async () => {
     const checks = [
       ["ce-plan", "ce-plan.read-analysis", "All specialist research and deepening prompts used in this phase are skill-local prompt assets"],
-      ["ce-code-review", "ce-code-review.persona-dispatch", "### Stage 4: Spawn sub-agents"],
+      ["ce-code-review", "ce-code-review.persona-dispatch", "### Stage 4: Dispatch and collect reviewers"],
       ["ce-simplify-code", "ce-simplify-code.reviewer-analysis", "Dispatch three generic subagents"],
       ["ce-debug", "ce-debug.hypothesis-investigation", "**Parallel investigation option:**"],
       ["ce-compound", "ce-compound.research-dispatch", "Launch research subagents."],

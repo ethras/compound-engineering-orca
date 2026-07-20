@@ -24,8 +24,24 @@ This is the fourth and final step in the compound-engineering ideation chain:
 | What does it do? | Reads an implementation-ready plan (or scopes a bare prompt), executes against the guardrails, runs tests continuously, ships a reviewed PR |
 | When to use it | Implementing a `ce-plan` plan with `artifact_readiness: implementation-ready`; small/medium bare-prompt work; resuming partly-shipped work |
 | What it produces | Commits + a PR (or just commits, no-PR path) |
+| Caller-owned mode | For outer orchestrators (e.g. `lfg`): `mode:return-to-caller <plan path>` implements and locally verifies, then returns a structured envelope and skips the standalone shipping tail (final simplify, review, PR, CI). Mid-implementation Simplify as You Go still runs. |
 | What's next | Review the PR; run `/ce-compound` to capture learnings |
 | Distinguishing | Plan-aware idempotency, subagent dispatch with worktree isolation, tiered review with residual gate, operational validation in PR |
+
+---
+
+## Example invocations
+
+```text
+# Execute a specific implementation-ready plan and own the shipping tail
+/ce-work docs/plans/notification-mute.md
+
+# Implement a clear small or medium task without writing a plan first
+/ce-work extract a shared duration formatter from the notification views
+
+# Resume the latest eligible plan in docs/plans
+/ce-work
+```
 
 ---
 
@@ -87,6 +103,10 @@ Every PR description includes a `Post-Deploy Monitoring & Validation` section: l
 
 Not every invocation has a plan. `ce-work` accepts a bare prompt and triages by complexity: trivial work (a couple of files, no behavioral change) goes straight to implementation; small/medium work builds a task list; large or sensitive work surfaces a recommendation to use `/ce-brainstorm` or `/ce-plan` first. The triage is what makes `ce-work` reasonable for direct invocation on small work, without forcing the full chain for everything.
 
+### 9. Session-settled decisions are not-yours-to-improve
+
+A KTD carrying a `session-settled:` label records a decision the user examined and chose for a reason — `ce-work` implements it as specified instead of "improving" it. The restraint is scoped tightly to labeled KTDs; judgment on everything the plan leaves open is unchanged, and real defects inside a settled approach still surface at full strength. A discovery that a settled decision genuinely can't work is a blocker return, never a silently-accepted residual; non-blocking proceed-and-flag conflicts ride the return envelope as `settled_decision_conflicts`.
+
 ---
 
 ## Quick Example
@@ -95,7 +115,7 @@ A plan with four implementation units arrives. `ce-work` reads it, picks up an `
 
 The Parallel Safety Check finds no file overlap across the four units and worktree isolation is available — so all four dispatch in parallel, each on its own branch. They complete; the orchestrator merges them in dependency order; tests pass after each merge. The idempotency check catches that one unit's verification was already satisfied by a prior session and marks it complete without reimplementation.
 
-The diff isn't on a sensitive surface and isn't large/diffuse, so harness-native review handles it; the two suggested findings are addressed inline. Final validation passes; the operational validation plan is drafted; and `ce-commit-push-pr` opens the PR with summary, testing notes, the operational section, and a Compound Engineered badge. The plan itself is left untouched — it's a decision artifact, and whether it shipped is derived from git, not recorded in the doc.
+The diff isn't on a sensitive surface and isn't large/diffuse, so harness-native review handles it; the two suggested findings are addressed inline. Final validation passes; the operational validation plan is drafted; and `ce-work` invokes `ce-commit-push-pr` with `branding:on`, so the PR includes summary, testing notes, the operational section, and generic Compound Engineering branding. The plan itself is left untouched — it's a decision artifact, and whether it shipped is derived from git, not recorded in the doc.
 
 ---
 
@@ -157,6 +177,16 @@ Many people reach for `ce-work` directly with a bare prompt — `ce-plan` is ove
 
 For large bare-prompt scope (cross-cutting, sensitive surfaces, many files), `ce-work` recommends `/ce-brainstorm` or `/ce-plan` first — but proceeds with your choice.
 
+## Use Beneath an Outer Orchestrator
+
+When another workflow owns the post-implementation shipping gates (final simplify, code review, PR creation, and CI watching), invoke:
+
+```text
+/ce-work mode:return-to-caller <plan path>
+```
+
+This mode keeps `ce-work` on implementation and local verification. Mid-implementation "Simplify as You Go" still runs during Phase 2. After that, `ce-work` returns a structured envelope with changed files, completed units, verification evidence, and blockers, sets `standalone_shipping_skipped: true`, and does not run the standalone shipping tail. The caller remains responsible for every post-implementation gate.
+
 ---
 
 ## Reference
@@ -166,6 +196,7 @@ For large bare-prompt scope (cross-cutting, sensitive surfaces, many files), `ce
 | _(empty)_ | Auto-uses the latest plan in `docs/plans/` |
 | `<plan path>` | Origin-sourced execution |
 | `<bare prompt>` | Triage by complexity (Trivial / Small-Medium / Large) |
+| `mode:return-to-caller <plan path>` | Outer-orchestrator use: implement and locally verify, then return structured evidence without the standalone shipping tail (final simplify, review, PR, CI) |
 
 Output: commits and (typically) a PR via `ce-commit-push-pr`. The plan is read-only throughout — `ce-work` never mutates it; whether it shipped is derived from git, not recorded in the doc.
 

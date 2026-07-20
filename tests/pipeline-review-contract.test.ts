@@ -52,6 +52,9 @@ describe("ce-work review contract", () => {
 
     expect(shipping).toContain("`ce-commit-push-pr` skill")
     expect(shipping).toContain("`ce-commit` skill")
+    expect(shipping).toContain("`branding:on`")
+    expect(shipping).not.toContain("attribution badges")
+    expect(shipping).not.toContain("Compound Engineered badge with accurate model and harness")
 
     // Should not contain inline PR templates or attribution placeholders
     expect(content).not.toContain("gh pr create")
@@ -453,6 +456,9 @@ describe("ce-doc-review contract", () => {
     // Cross-persona agreement promotion (replaces +0.10 boost)
     expect(synthesis).toContain("Cross-Persona Agreement Promotion")
     expect(synthesis).toContain("one anchor step")
+    expect(synthesis).toContain("`independence_verified` is `true`")
+    expect(synthesis).toContain("cannot use the twin fingerprint exception")
+    expect(synthesis).toContain("Cursor default/Auto")
 
     // R29 and R30 round-2 rules
     expect(synthesis).toContain("R29 Rejected-Finding Suppression")
@@ -574,6 +580,20 @@ describe("ce-doc-review contract", () => {
     expect(bulkPreview).toContain("Appending to Open Questions (N):")
     expect(bulkPreview).toContain("Skipping (N):")
 
+    // The preview and question are two ordered user-facing events. The
+    // portable contract names the capability before non-exhaustive adapters.
+    const previewEvent = bulkPreview.indexOf("Preview event")
+    const questionCapability = bulkPreview.indexOf(
+      "agent-callable blocking-question capability"
+    )
+    const adapters = bulkPreview.indexOf("Non-exhaustive adapters")
+    expect(previewEvent).toBeGreaterThan(-1)
+    expect(questionCapability).toBeGreaterThan(previewEvent)
+    expect(adapters).toBeGreaterThan(questionCapability)
+    expect(bulkPreview).toContain("user-visible assistant text")
+    expect(bulkPreview).toMatch(/(?:thinking|reasoning).*does not count/)
+    expect(bulkPreview).toContain("do not invoke the blocking-question capability")
+
     // No Acknowledge bucket in bulk preview either
     expect(bulkPreview).not.toContain("Acknowledging (N):")
   })
@@ -656,9 +676,10 @@ describe("ce-compound Phase 1 artifact contract", () => {
 
     // A run identifier scopes the per-subagent artifact files
     expect(content).toContain("RUN_ID")
-    // Run dir under the shared cross-invocation scratch namespace
-    expect(content).toContain("/tmp/compound-engineering/ce-compound/")
-    expect(content).toContain('mkdir -p "/tmp/compound-engineering/ce-compound/')
+    // Run dir under the validated owner-private scratch namespace
+    expect(content).toContain('SCRATCH_ROOT="/tmp/compound-engineering-$(id -u)"')
+    expect(content).toContain('RUN_DIR="$SCRATCH_ROOT/ce-compound/$RUN_ID"')
+    expect(content).toContain('(umask 077; mkdir -p "$RUN_DIR")')
   })
 
   test("Phase 1 subagents write full output to the run-artifact path", async () => {
@@ -670,7 +691,7 @@ describe("ce-compound Phase 1 artifact contract", () => {
     )
 
     // Subagents are instructed to write their full structured output to the run dir
-    expect(phase1).toContain("/tmp/compound-engineering/ce-compound/")
+    expect(phase1).toContain("{run_dir}")
     // ...and return a compact confirmation containing the artifact path
     expect(phase1.toLowerCase()).toContain("artifact path")
     // Inline return is required whenever the write did not succeed (not only when
@@ -688,7 +709,7 @@ describe("ce-compound Phase 1 artifact contract", () => {
     )
 
     // Orchestrator reads the per-subagent artifact files
-    expect(phase2).toContain("/tmp/compound-engineering/ce-compound/")
+    expect(phase2).toContain("{run_dir}")
     // Inline return is the documented fallback when the artifact is absent
     expect(phase2.toLowerCase()).toContain("fall back")
   })
@@ -721,7 +742,7 @@ describe("concept-teaching seam parity (ce-commit-push-pr <-> lfg)", () => {
     expect(lfg).toContain("New concepts:")
 
     // The callsite passes the mode explicitly rather than relying on defaults
-    expect(lfg).toContain("Invoke the `ce-commit-push-pr` skill with `mode:pipeline`.")
+    expect(lfg).toContain("Invoke the `ce-commit-push-pr` skill with `mode:pipeline branding:on`.")
 
     // The pre-DONE report line names the concept and the /ce-explain pointer
     expect(lfg).toContain("New concept introduced:")
@@ -729,6 +750,20 @@ describe("concept-teaching seam parity (ce-commit-push-pr <-> lfg)", () => {
 
     // The callee documents the mode the caller passes
     expect(skill).toContain("mode:pipeline")
+  })
+})
+
+describe("explicit Compound Engineering branding provenance", () => {
+  test("CE-owned shipping callers pass branding:on", async () => {
+    const shipping = await readRepoFile("skills/ce-work/references/shipping-workflow.md")
+    const lfg = await readRepoFile("skills/lfg/SKILL.md")
+    const debug = await readRepoFile("skills/ce-debug/SKILL.md")
+
+    expect(shipping).toContain("Load the `ce-commit-push-pr` skill with `branding:on`")
+    expect(lfg).toContain("ce-commit-push-pr` skill with `mode:pipeline branding:on`")
+    expect(debug).toContain("Invoke the `ce-commit-push-pr` skill with `branding:on`.")
+    expect(debug).toContain("reviewed fix (invoke the `ce-commit-push-pr` skill with `branding:on`)")
+    expect(debug).not.toContain("`/ce-commit-push-pr branding:on`")
   })
 })
 

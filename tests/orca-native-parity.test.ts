@@ -41,6 +41,7 @@ type HookSeam = {
   id: string
   before: string
   after: string
+  file?: string
 }
 
 type JsonRecord = Record<string, unknown>
@@ -105,7 +106,7 @@ const PARITY_CASES: ParityCase[] = [
     }],
     reference: "skills/ce-plan/references/orca-read-analysis.md",
     controllerAnchors: [
-      "Keep scope classification, cache lookup, research intent, conditional-role selection",
+      "Keep scope classification, research intent, conditional-role selection",
       "synthesis, document review, and every project write in the CE controller.",
     ],
     nodes: [{
@@ -166,27 +167,23 @@ const PARITY_CASES: ParityCase[] = [
   }),
   makeReadParityCase({
     adapter: codeReviewWorkflow,
-    upstreamAnchor: "### Stage 4: Spawn sub-agents",
+    upstreamAnchor: "### Stage 4: Dispatch and collect reviewers",
     hooks: [
       {
-        id: "ce-code-review.project-profile",
-        before: "Only resolve the cache when the working tree is the reviewed tree",
-        after: "On `HIT`, load the profile JSON as the agnostic project orientation.",
-      },
-      {
         id: "ce-code-review.persona-dispatch",
-        before: "#### Spawning",
-        after: "Omit the `mode` parameter when dispatching sub-agents",
+        before: "Only after Stage 3d has materialized the final local roster",
+        after: "### Stage 5: Finish the review",
       },
       {
         id: "ce-code-review.finding-validation",
-        before: "Independent verification gate.",
-        after: "**When this stage runs:** After Stage 5 whenever at least one finding survives",
+        file: "skills/ce-code-review/references/finish-review.md",
+        before: "deterministic validator batch",
+        after: "Run the validator batch foreground",
       },
     ],
     reference: "skills/ce-code-review/references/orca-review-dispatch.md",
     controllerAnchors: [
-      "Keep scope resolution, intent discovery, cache gating, persona selection",
+      "Keep scope resolution, intent discovery, persona selection, roster materialization",
       "fixes, synthesis, and all writes in the CE controller.",
     ],
     nodes: [{
@@ -253,13 +250,13 @@ const PARITY_CASES: ParityCase[] = [
       },
       {
         id: "ce-compound.grounding-validation",
-        before: "2. **Semantic grounding validator (Full and headless; lightweight skips it).**",
+        before: "2. **Semantic grounding validator (Full mode, including headless Full; lightweight skips it).**",
         after: "### Phase 2.5: Selective Refresh Check",
       },
     ],
     reference: "skills/ce-compound/references/orca-read-analysis.md",
     controllerAnchors: [
-      "Keep mode selection, cache/probe logic, session discovery and relevance gate",
+      "Keep mode selection, session discovery and relevance gate",
       "every `docs/` or `CONCEPTS.md` write, and final output in the CE controller.",
     ],
     nodes: [
@@ -478,24 +475,36 @@ describe("first-wave native and Orca parity matrix", () => {
         `${parity.workflowId}: recorded upstream seam`,
       ).toBe(true)
       expect(skill, `${parity.workflowId}: recorded upstream anchor`).toContain(parity.upstreamAnchor)
-      expect(skill.match(/<!-- ce-orca-hook:start /g) ?? [], `${parity.workflowId}: complete hook table`)
-        .toHaveLength(parity.hooks.length)
+      const hookFiles = [...new Set(parity.hooks.map((hook) =>
+        hook.file ?? `skills/${parity.workflowId}/SKILL.md`
+      ))]
+      const hookSources = new Map(await Promise.all(hookFiles.map(async (file) => [
+        file,
+        await fs.readFile(path.join(REPO_ROOT, file), "utf8"),
+      ] as const)))
+      const hookCount = [...hookSources.values()].reduce(
+        (count, source) => count + (source.match(/<!-- ce-orca-hook:start /g) ?? []).length,
+        0,
+      )
+      expect(hookCount, `${parity.workflowId}: complete hook table`).toBe(parity.hooks.length)
 
       for (const hook of parity.hooks) {
+        const sourceFile = hook.file ?? `skills/${parity.workflowId}/SKILL.md`
+        const source = hookSources.get(sourceFile) ?? ""
         const startMarker = `<!-- ce-orca-hook:start ${hook.id} -->`
         const endMarker = `<!-- ce-orca-hook:end ${hook.id} -->`
-        expect(skill.split(startMarker), `${hook.id}: one start marker`).toHaveLength(2)
-        expect(skill.split(endMarker), `${hook.id}: one end marker`).toHaveLength(2)
+        expect(source.split(startMarker), `${hook.id}: one start marker`).toHaveLength(2)
+        expect(source.split(endMarker), `${hook.id}: one end marker`).toHaveLength(2)
 
-        const start = skill.indexOf(startMarker)
-        const end = skill.indexOf(endMarker)
-        const before = skill.lastIndexOf(hook.before, start)
-        const after = skill.indexOf(hook.after, end + endMarker.length)
+        const start = source.indexOf(startMarker)
+        const end = source.indexOf(endMarker)
+        const before = source.lastIndexOf(hook.before, start)
+        const after = source.indexOf(hook.after, end + endMarker.length)
         expect(before, `${hook.id}: upstream anchor before hook`).toBeGreaterThanOrEqual(0)
         expect(before, `${hook.id}: upstream anchor order`).toBeLessThan(start)
         expect(start, `${hook.id}: bounded hook order`).toBeLessThan(end)
         expect(after, `${hook.id}: native continuation after hook`).toBeGreaterThan(end)
-        expect(normalizeWhitespace(skill.slice(start, end)), `${hook.id}: Orca-only hook body`)
+        expect(normalizeWhitespace(source.slice(start, end)), `${hook.id}: Orca-only hook body`)
           .toContain("Orca")
       }
     }
@@ -627,6 +636,7 @@ describe("native and Orca document review parity", () => {
     const upstreamRoles = (await fs.readdir(personaDir))
       .filter((file) => file.endsWith(".md"))
       .map((file) => file.replace(/\.md$/, ""))
+      .filter((role) => role !== "whole-doc-reviewer")
       .sort()
 
     expect([...REVIEWER_ROLES].sort()).toEqual(upstreamRoles)
@@ -693,7 +703,7 @@ describe("native and Orca document review parity", () => {
     ])
 
     expect(skill).toContain("### Select Conditional Personas")
-    expect(skill).toContain("After all dispatched agents return, read `references/synthesis-and-presentation.md`")
+    expect(skill).toContain("read `references/synthesis-and-presentation.md` for the synthesis pipeline")
     expect(dispatchReference).toContain("Keep document classification, persona selection, prompt construction,")
     expect(dispatchReference).toContain("synthesis, `safe_auto` edits, interactive questions, and final presentation")
     expect(dispatchReference).toContain("An Orca reviewer must not")

@@ -9,14 +9,11 @@ export const RESULT_SCHEMA = "ce-orca.read-result/v1"
 export const WORKFLOW_ID = "ce-code-review"
 
 export const ROLE_POLICY = Object.freeze({
-  "project-profile": Object.freeze({
-    "repo-profiler": Object.freeze({ required: false, repeatable: false }),
-  }),
   "persona-review": Object.freeze({
     "correctness-reviewer": Object.freeze({ required: true, repeatable: false }),
-    "testing-reviewer": Object.freeze({ required: true, repeatable: false }),
-    "maintainability-reviewer": Object.freeze({ required: true, repeatable: false }),
-    "project-standards-reviewer": Object.freeze({ required: true, repeatable: false }),
+    "testing-reviewer": Object.freeze({ required: false, repeatable: false }),
+    "maintainability-reviewer": Object.freeze({ required: false, repeatable: false }),
+    "project-standards-reviewer": Object.freeze({ required: false, repeatable: false }),
     "agent-native-reviewer": Object.freeze({ required: false, repeatable: false }),
     "learnings-researcher": Object.freeze({ required: false, repeatable: false }),
     "security-reviewer": Object.freeze({ required: false, repeatable: false }),
@@ -31,7 +28,7 @@ export const ROLE_POLICY = Object.freeze({
     "deployment-verification-agent": Object.freeze({ required: false, repeatable: false }),
   }),
   "finding-validation": Object.freeze({
-    "finding-validator": Object.freeze({ required: false, repeatable: true }),
+    "finding-validator": Object.freeze({ required: false, repeatable: false }),
   }),
 })
 

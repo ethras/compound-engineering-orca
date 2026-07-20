@@ -6,12 +6,12 @@ activates session history, grounding validation, or a specialized reviewer.
 
 ## Ownership
 
-- Keep mode selection, cache/probe logic, session discovery and relevance gate,
+- Keep mode selection, session discovery and relevance gate,
   role selection, result assembly, grounding adjudication, vocabulary work,
   refresh decisions, every `docs/` or `CONCEPTS.md` write, and final output in
   the CE controller.
-- Orca owns only selected `repo-profiler`, Phase 1 research, session-historian
-  synthesis, or semantic grounding nodes.
+- Orca owns only selected Phase 1 research, session-historian synthesis, or
+  semantic grounding nodes.
 - Keep all `specialized-review` roles native. That stage intentionally mixes
   local reviewers with documentation/web researchers and therefore needs
   capabilities denied by the isolated Orca read policy.
@@ -48,7 +48,7 @@ gates between them. Never send Phase 3 specialized reviewers through Orca.
 
 Adapt the native Phase 1 artifact instruction only at the return boundary: ask
 the Orca worker for the complete content, then let the CE controller persist it
-to the existing `/tmp/compound-engineering/ce-compound/<run-id>/` slot if that
+to the existing `/tmp/compound-engineering-$(id -u)/ce-compound/<run-id>/` slot if that
 slot is needed downstream. Keep every persona, source-grounding, and output-shape
 instruction unchanged.
 

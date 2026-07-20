@@ -61,7 +61,7 @@ Invoked when a specific need arises — not part of any chain.
 
 | Skill | Description |
 |-------|-------------|
-| [`/ce-pov`](./ce-pov.md) | Form a decisive, project-grounded verdict on an external input (framework, library, CVE, pattern) — dual-grounding floors, cold or warm (mid-session) invocation, graded Adopt/Trial/Hold/Reject/Not-our-problem with a reasoned handoff |
+| [`/ce-pov`](./ce-pov.md) | Form a decisive, project-grounded POV as an adoption verdict, holistic document take, or position on supplied approaches — optional named/`oracle` panel with a blind initial round, bounded evidence-based reconciliation, and a user-extensible checkpoint |
 | [`/ce-explain`](./ce-explain.md) | Turn a concept, a diff, an idea, or a window of your own recent work into a dense, visual explainer written for you personally — optional check-in (predict-then-reveal for diffs, corrected exercises), capability-detected destination ask |
 | [`/ce-debug`](./ce-debug.md) | Find root causes systematically — causal chain gate, predictions, post-fix polish/review, PR handoff |
 | [`/ce-code-review`](./ce-code-review.md) | Structured code review with skill-local reviewer personas, confidence-gated findings, four modes |
@@ -110,7 +110,7 @@ Invoked when a specific need arises — not part of any chain.
 
 | Skill | Description |
 |-------|-------------|
-| [`/ce-proof`](./ce-proof.md) | Publish, view, comment on, and edit markdown via [Proof](https://www.proofeditor.ai), Every's collaborative editor — Web API and Local Bridge surfaces |
+| [`/ce-proof`](./ce-proof.md) | Publish, view, comment on, and edit markdown via [Proof](https://www.proofeditor.ai), Every's collaborative editor — hosted v3 web API with owner credential lifecycle |
 
 ---
 
@@ -124,6 +124,7 @@ Invoked when a specific need arises — not part of any chain.
 | [`/ce-test-browser`](./ce-test-browser.md) | End-to-end browser tests using a host-native browser with `agent-browser` fallback |
 | [`/ce-test-xcode`](./ce-test-xcode.md) | Build and test iOS apps on simulator using XcodeBuildMCP — screenshots, logs, human verification |
 | [`/ce-setup`](./ce-setup.md) | Diagnose optional tool capabilities and bootstrap safe project-local config |
+| [`/ce-handoff`](./ce-handoff.md) | Create a session handoff at the default temp store or a requested destination, then discover or orient from a selected source — no automatic continuation |
 
 ---
 

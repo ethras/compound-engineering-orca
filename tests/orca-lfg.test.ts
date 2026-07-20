@@ -841,7 +841,7 @@ describe('LFG Orca ownership gate', () => {
       '5. **Apply and persist review fixes**',
       '6. **Autonomous residual handoff**',
       '7. Invoke the `ce-test-browser` skill with `mode:pipeline`',
-      '8. Invoke the `ce-commit-push-pr` skill with `mode:pipeline`',
+      '8. Invoke the `ce-commit-push-pr` skill with `mode:pipeline branding:on`',
       '9. **Drive CI to green via `ce-babysit-pr`**',
       '10. Output `<promise>DONE</promise>`',
     ]

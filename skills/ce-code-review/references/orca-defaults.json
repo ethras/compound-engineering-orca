@@ -38,15 +38,11 @@
           "concurrency": 1
         },
         "finding-validation": {
-          "concurrency": 4,
+          "concurrency": 1,
           "isolation": "worktree-strict"
         },
         "persona-review": {
           "concurrency": 4,
-          "isolation": "worktree-strict"
-        },
-        "project-profile": {
-          "concurrency": 1,
           "isolation": "worktree-strict"
         },
         "scope-triage": {

@@ -63,6 +63,9 @@ const stage = (sourcePath, anchor, roles = {}, {
 // An execution override can configure a conditional role but cannot activate it.
 const WORKFLOW_DEFINITIONS = {
   "ce-doc-review": {
+    excludedPromptAssets: {
+      "whole-doc-reviewer": "Upstream uses this asset only for the detached cross-model whole-document sweep, not the local persona roster.",
+    },
     stages: {
       "persona-review": stage(
         "skills/ce-doc-review/SKILL.md",
@@ -84,9 +87,6 @@ const WORKFLOW_DEFINITIONS = {
       "data-migration-reviewer": "The upstream asset is dormant in ce-plan and is not dispatched by the installed workflow.",
     },
     stages: {
-      "project-profile": stage("skills/ce-plan/SKILL.md", "Resolve the project profile from the shared cache first.", {
-        "repo-profiler": promptRole("skills/ce-plan/references/agents/repo-profiler.md", { activation: "conditional", modelTier: "cheap", resultMode: "artifact" }),
-      }),
       "local-research": stage("skills/ce-plan/SKILL.md", "All specialist research and deepening prompts used in this phase are skill-local prompt assets", {
         "repo-research-analyst": promptRole("skills/ce-plan/references/agents/repo-research-analyst.md", { activation: "always", required: true, resultMode: "artifact" }),
         "learnings-researcher": promptRole("skills/ce-plan/references/agents/learnings-researcher.md", { activation: "always", resultMode: "artifact" }),
@@ -129,16 +129,13 @@ const WORKFLOW_DEFINITIONS = {
       "scope-triage": stage("skills/ce-code-review/SKILL.md", "Trivial-PR judgment", {
         "trivial-pr-judge": workflowRole("skills/ce-code-review/SKILL.md", "Trivial-PR judgment", { activation: "conditional", modelTier: "cheap" }),
       }, { defaultOwner: "native" }),
-      "project-profile": stage("skills/ce-code-review/SKILL.md", "Resolve the question-agnostic project profile", {
-        "repo-profiler": promptRole("skills/ce-code-review/references/agents/repo-profiler.md", { activation: "conditional", modelTier: "cheap", resultMode: "artifact" }),
-      }),
-      "persona-review": stage("skills/ce-code-review/SKILL.md", "### Stage 4: Spawn sub-agents", {
+      "persona-review": stage("skills/ce-code-review/SKILL.md", "### Stage 4: Dispatch and collect reviewers", {
         "correctness-reviewer": promptRole("skills/ce-code-review/references/personas/correctness-reviewer.md", { activation: "always", required: true }),
-        "testing-reviewer": promptRole("skills/ce-code-review/references/personas/testing-reviewer.md", { activation: "always", modelTier: "mid", required: true }),
-        "maintainability-reviewer": promptRole("skills/ce-code-review/references/personas/maintainability-reviewer.md", { activation: "always", modelTier: "mid", required: true }),
-        "project-standards-reviewer": promptRole("skills/ce-code-review/references/personas/project-standards-reviewer.md", { activation: "always", modelTier: "mid", required: true }),
-        "agent-native-reviewer": promptRole("skills/ce-code-review/references/personas/agent-native-reviewer.md", { activation: "always", modelTier: "mid" }),
-        "learnings-researcher": promptRole("skills/ce-code-review/references/personas/learnings-researcher.md", { activation: "always", modelTier: "mid" }),
+        "testing-reviewer": promptRole("skills/ce-code-review/references/personas/testing-reviewer.md", { modelTier: "mid" }),
+        "maintainability-reviewer": promptRole("skills/ce-code-review/references/personas/maintainability-reviewer.md", { modelTier: "mid" }),
+        "project-standards-reviewer": promptRole("skills/ce-code-review/references/personas/project-standards-reviewer.md", { modelTier: "mid" }),
+        "agent-native-reviewer": promptRole("skills/ce-code-review/references/personas/agent-native-reviewer.md", { modelTier: "mid" }),
+        "learnings-researcher": promptRole("skills/ce-code-review/references/personas/learnings-researcher.md", { modelTier: "mid" }),
         "security-reviewer": promptRole("skills/ce-code-review/references/personas/security-reviewer.md"),
         "performance-reviewer": promptRole("skills/ce-code-review/references/personas/performance-reviewer.md", { modelTier: "mid" }),
         "api-contract-reviewer": promptRole("skills/ce-code-review/references/personas/api-contract-reviewer.md", { modelTier: "mid" }),
@@ -150,11 +147,11 @@ const WORKFLOW_DEFINITIONS = {
         "swift-ios-reviewer": promptRole("skills/ce-code-review/references/personas/swift-ios-reviewer.md", { modelTier: "mid" }),
         "deployment-verification-agent": promptRole("skills/ce-code-review/references/personas/deployment-verification-agent.md", { modelTier: "mid" }),
       }),
-      "adversarial-peer": stage("skills/ce-code-review/SKILL.md", "Cross-model adversarial pass", {
-        "adversarial-peer": workflowRole("skills/ce-code-review/SKILL.md", "cross-model adversarial pass", { activation: "conditional" }),
+      "adversarial-peer": stage("skills/ce-code-review/SKILL.md", "exclusive choice between a cross-model adversarial peer", {
+        "adversarial-peer": workflowRole("skills/ce-code-review/SKILL.md", "start the detached peer job", { activation: "conditional" }),
       }, { defaultOwner: "native" }),
-      "finding-validation": stage("skills/ce-code-review/SKILL.md", "### Stage 5b: Validation pass", {
-        "finding-validator": workflowRole("skills/ce-code-review/SKILL.md", "One sub-agent per finding", { activation: "repeatable", modelTier: "mid" }),
+      "finding-validation": stage("skills/ce-code-review/references/finish-review.md", "### Stage 5b: Validation pass", {
+        "finding-validator": workflowRole("skills/ce-code-review/references/finish-review.md", "deterministic validator batch", { activation: "conditional", modelTier: "mid" }),
       }),
     },
   },
@@ -168,9 +165,6 @@ const WORKFLOW_DEFINITIONS = {
     },
   },
   "ce-debug": {
-    excludedPromptAssets: {
-      "repo-profiler": "ce-debug reads the shared cache opportunistically and does not dispatch its bundled repo-profiler asset.",
-    },
     stages: {
       "hypothesis-investigation": stage("skills/ce-debug/SKILL.md", "Parallel investigation option", {
         "hypothesis-probe": workflowRole("skills/ce-debug/SKILL.md", "each with an explicit hypothesis and structured evidence-return format", { activation: "repeatable", modelTier: "mid" }),
@@ -179,9 +173,6 @@ const WORKFLOW_DEFINITIONS = {
   },
   "ce-compound": {
     stages: {
-      "project-profile": stage("skills/ce-compound/SKILL.md", "Resolve the agnostic project orientation from the shared cache", {
-        "repo-profiler": promptRole("skills/ce-compound/references/agents/repo-profiler.md", { activation: "conditional", modelTier: "cheap", resultMode: "artifact" }),
-      }),
       research: stage("skills/ce-compound/SKILL.md", "Launch research subagents.", {
         "context-analyzer": workflowRole("skills/ce-compound/SKILL.md", "Context Analyzer", { activation: "always", required: true, resultMode: "artifact" }),
         "solution-extractor": workflowRole("skills/ce-compound/SKILL.md", "Solution Extractor", { activation: "always", required: true, resultMode: "artifact" }),

@@ -9,9 +9,6 @@ export const RESULT_SCHEMA = "ce-orca.read-result/v1"
 export const WORKFLOW_ID = "ce-compound"
 
 export const ROLE_POLICY = Object.freeze({
-  "project-profile": Object.freeze({
-    "repo-profiler": Object.freeze({ required: false, repeatable: false }),
-  }),
   research: Object.freeze({
     "context-analyzer": Object.freeze({ required: true, repeatable: false }),
     "solution-extractor": Object.freeze({ required: true, repeatable: false }),

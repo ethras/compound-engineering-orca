@@ -19,6 +19,18 @@ The compound-engineering ideation chain is `/ce-ideate → /ce-brainstorm → /c
 
 ---
 
+## Example invocations
+
+```text
+# Review a specific requirements or plan document interactively
+/ce-doc-review docs/plans/notification-mute.md
+
+# Let the skill find the most recent planning document
+/ce-doc-review
+```
+
+---
+
 ## The Problem
 
 Document review is harder than code review in specific ways:
@@ -116,6 +128,22 @@ Persona dispatch respects the harness's active-subagent limit. Selected reviewer
 
 The output names which personas ran, which were activated by what signals, and whether any failed or timed out. The user can audit "did the right reviewers actually look at this" without parsing internal state.
 
+### 9. Cross-model judgment pass
+
+The **conditional judgment trio** — `adversarial-document-reviewer`, `product-lens-reviewer`, `security-lens-reviewer` — also runs through **one different model provider than the host**, in a separate read-only process, whenever those lenses activate. These are the lenses whose output diverges most across models — premise falsification, strategic-claim challenge, and threat coverage — so a second, genuinely independent model surfaces findings the host model misses, and agreement between a peer return and its in-process twin is the strongest promotion signal in the synthesis (different model providers, separate processes). The convergent lenses (coherence, scope-guardian) and the always-on feasibility lens stay single-model — feasibility is excluded specifically so the pass stays conditional and doesn't spawn a peer on every review.
+
+Alongside those focused twins, a single **whole-document sweep** has one different-provider peer review the *entire* document as a general reviewer (not lens-scoped), folding in as `whole-doc-<provider>` — so a different model catches blind spots across **every** section (feasibility, coherence, scope), not just the trio's premise lenses. It's one extra call, corroborating by dedup fingerprint against any in-process finding, so broad coverage comes without a per-lens fan-out. On unified plans the focused trio peers are sliced to review exactly what their in-process twin reviewed (true corroboration), while the sweep deliberately reads the whole document (breadth) — two complementary modes.
+
+**Which target runs the peer** is auto-chosen and overridable. Host harness and serving family are tracked separately so the pass can exclude same-model checks. Preference precedence is conversation, `cross_model_peer:` in `.compound-engineering/config.local.yaml`, active project instructions, then `codex → claude → grok → composer`. `Cursor` is also accepted explicitly and means `cursor-agent` using its configured default/Auto model; `Composer` means a Composer model through Cursor; Grok prefers its native CLI and may use a sanctioned Grok-via-Cursor route. Cursor Auto is not promoted as independent corroboration unless a receipt proves a different serving family.
+
+The declared model/route mappings are attempted first. When a current CLI rejects an obsolete or incompatible adapter default, the skill may discover the closest compatible equivalent within the same target/family and hard read-only, host-exclusion, authority, and egress boundaries. It records the substitution and actual route. An explicit user model or newly receiving intermediary never changes silently: route selection returns to the host for the required disclosure and sanction. A second target remains opt-in (`CROSS_MODEL_MAX_PEERS=2`), and failures remain non-blocking.
+
+**Trust boundary:** the pass embeds the full document content into the peer prompt and sends it to an external model provider (OpenAI, Anthropic, xAI, or Cursor, depending on the resolved peer); `CROSS_MODEL_PEERS` restricts which providers may receive content (unset = default order; set = allowlist). The peer runs strictly read-only, from an empty scratch dir with no project context — every route denies writes, network, MCP, and subagents. On **reads**, the routes are two tiers: **truly tool-less** — claude (`--safe-mode --tools ""`, all built-ins disabled and custom behavior suppressed) and grok (denies `Read`/`Edit`/`Write`/`Bash`/`Task`/web/`mcp__*`), with no read tool at all; and **read-only residual** — codex (`-s read-only`) and cursor-agent (`--mode ask --sandbox enabled`), which still permit a read tool (codex also read-only shell exec). So impact is bounded to disclosure rather than repo mutation, and the script emits a one-line audit log of each cross-model send so the egress is auditable even in headless mode. Peer prompts use basename-only document paths (content is already embedded). Over-size documents skip cleanly rather than truncating. The read residual on the codex/cursor-agent routes is **accepted** for the own-document threat model: the reviewed doc is the maintainer's own, and the host agent already runs in-repo with more privilege than any peer, so a peer that can read a file adds no material exposure.
+
+### 10. Settled-decision protection
+
+Decisions the user examined and settled carry a `session-settled:` annotation, and `ce-doc-review` treats it as protected content: the safe-auto pass never strips it, and a persona that wants to challenge a settled decision must frame the challenge as infeasibility, not preference — surfaced for decision, never auto-applied.
+
 ---
 
 ## Quick Example
@@ -184,7 +212,10 @@ Headless mode requires a path; without one it errors out rather than guessing.
 ## FAQ
 
 **What's the difference between this and `ce-code-review`?**
-`ce-code-review` reviews diffs (code changes); `ce-doc-review` reviews docs (requirements, plans). Different reviewer personas, different findings shape, different routing. Both share the multi-persona dispatch + synthesis pattern but are tuned for their respective artifact types.
+`ce-code-review` reviews diffs (code changes); `ce-doc-review` reviews docs (requirements, plans). Different reviewer personas, different findings shape, different routing. Both share the multi-persona dispatch + synthesis pattern, and both run a **cross-model pass** with the same provider-selection mechanics (host attestation, preference order, codex/claude/grok/composer routes). Lens policy differs: `ce-code-review` runs its single adversarial lens cross-model; `ce-doc-review` runs the three-lens judgment trio (adversarial, product-lens, security-lens) plus a whole-doc sweep, because doc-review's high-value judgment is spread across more lenses.
+
+**Which lenses run cross-model, and why not all of them?**
+Only the judgment trio — adversarial, product-lens, security-lens — get a dedicated cross-model *twin*, because those are where a second model's different priors and knowledge produce genuinely different findings, so agreement carries real signal. Coherence and scope-guardian are convergent (a second model just echoes them), and feasibility is always-on, so giving each its own twin would spawn a peer on every review rather than only on documents that warrant deeper scrutiny. Those areas aren't left uncovered, though: the separate whole-document sweep (above) still gives feasibility, coherence, and scope broad cross-model coverage — it just does so through one general-reviewer read rather than a per-lens twin.
 
 **Why does the decision primer matter?**
 Without it, every round re-surfaces the same findings, including ones the user already rejected. The primer uses fingerprint + evidence-snippet matching to suppress rejected findings and verify applied fixes — making round-to-round refinement actually iterate, not loop.

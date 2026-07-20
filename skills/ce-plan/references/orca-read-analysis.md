@@ -6,11 +6,11 @@ An override configures a role; it never activates it.
 
 ## Ownership
 
-- Keep scope classification, cache lookup, research intent, conditional-role
+- Keep scope classification, research intent, conditional-role
   selection, consolidation, questions, plan authoring, deepening decisions,
   synthesis, document review, and every project write in the CE controller.
-- Give Orca exactly the already-selected `project-profile`, `local-research`,
-  or `flow-analysis` subagents. `local-research` contains only
+- Give Orca exactly the already-selected `local-research` or `flow-analysis`
+  subagents. `local-research` contains only
   `repo-research-analyst`, `learnings-researcher`, and
   `agent-native-planning-strategist`.
 - Keep `organizational-research/slack-researcher`, every

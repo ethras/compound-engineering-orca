@@ -5,12 +5,12 @@ controller remains the review orchestrator.
 
 ## Ownership
 
-- Keep scope resolution, intent discovery, cache gating, persona selection,
-  lite-roster selection, the inline fast pass, cross-model peer shell-out,
-  finding merge/dedup, validator eligibility and budget, fixes, synthesis, and
+- Keep scope resolution, intent discovery, persona selection, roster
+  materialization, the inline fast pass, cross-model peer shell-out,
+  finding merge/dedup, validator eligibility and batch construction, fixes, synthesis, and
   all writes in the CE controller.
-- Orca may own a selected `repo-profiler`, Stage 4 persona/local-prompt node, or
-  Stage 5b `finding-validator`. It does not own `trivial-pr-judge` or the
+- Orca may own a selected Stage 4 persona/local-prompt node or the single
+  Stage 5b `finding-validator` batch. It does not own `trivial-pr-judge` or the
   `adversarial-peer` process.
 - Never launch the same node through both Orca and the native subagent path.
   Orca workers must not delegate again.
@@ -38,14 +38,13 @@ Create one private `ce-orca.packet/v1` file per dispatch wave:
 
 The controller selects every node before packet creation. A role override never
 adds a persona or makes a direct-verification finding use a validator. Use a
-unique safe `id` for each node; repeated `finding-validator` nodes need distinct
-IDs. Same-wave nodes run concurrently; waves run in ascending order.
+unique safe `id` for each node. The validator is one deterministic batch node,
+not one node per finding. Same-wave persona nodes run concurrently; waves run
+in ascending order.
 
-Copy `required` from the installed registry. The installed always-on structured
-personas (`correctness-reviewer`, `testing-reviewer`,
-`maintainability-reviewer`, and `project-standards-reviewer`) are required when
-selected; all other code-review workers are optional. A lite roster omits
-unselected always-on roles rather than sending hidden nodes.
+Copy `required` from the installed registry. `correctness-reviewer` is required;
+all other code-review workers are conditional and optional. An omitted role is
+never sent as a hidden node.
 
 Do not add executable command fields, credentials, environment dumps, or
 mutation instructions to the packet. The prompt may retain the native

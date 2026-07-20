@@ -72,14 +72,7 @@ Confirm the bug exists and understand its behavior. Run the test, trigger the er
 - **Manual setup required:** If reproduction needs specific conditions the agent cannot create alone (data states, user roles, external services, environment config), document the exact setup steps and guide the user through them. Clear step-by-step instructions save significant time even when the process is fully manual.
 - **Does not reproduce after 2-3 attempts:** Read `references/investigation-techniques.md` for intermittent-bug techniques.
 - **Cannot reproduce at all in this environment:** Document what was tried and what conditions appear to be missing.
-- **Writing the reproduction test:** Orient on the project's testing conventions before authoring the failing test. Resolve them from the shared repo-grounding cache first — set `SKILL_DIR` to this skill's directory and run the helper (full protocol in `references/repo-profile-cache.md`):
-
-  ```bash
-  SKILL_DIR="<absolute path of the directory containing the SKILL.md you just read>";
-  python3 "$SKILL_DIR/scripts/repo-profile-cache.py" get
-  ```
-
-  On `HIT`, use the cached profile's `conventions.testing` field as the testing-convention orientation — do not re-read the *root* instruction files for it. (If the bug lives under a subdirectory with its own scoped `AGENTS.md`/`CLAUDE.md` testing rules, still read those fresh — subdirectory-scoped instructions are excluded from the cache.) **But if that field is empty or null** (the profile recorded no explicit testing guidance), still fall back to the inline check below — in particular, look for a clear style across the project's existing tests. On `MISS` or `NO-CACHE` (or any error), fall back to deriving it inline as today: if the project has testing-conventions guidance — a dedicated testing skill, an `AGENTS.md`/`CLAUDE.md` testing section, or a clear style across existing tests — apply it. The cache is purely an orientation convenience here; never block on it, and do not derive or persist a full profile just for this lookup. Either way, inspect existing tests before adding coverage: use an existing failing test when it already captures the bug, update an existing test when it owns the contract but has the wrong expectation, strengthen an over-mocked test when it should have caught the bug, or add a new minimal isolated test only when no existing test is the right home. The chosen test must fail on the current bug and pass once the corrected behavior lands; name it descriptively so the failure message itself explains the bug.
+- **Writing the reproduction test:** Use the active project instructions and any applicable subdirectory-scoped instructions; always inspect existing tests before adding coverage. Use an existing failing test when it already captures the bug, update an existing test when it owns the contract but has the wrong expectation, strengthen an over-mocked test when it should have caught the bug, or add a new minimal isolated test only when no existing test is the right home. The chosen test must fail on the current bug and pass once the corrected behavior lands; name it descriptively so the failure message itself explains the bug.
 
 #### 1.2 Verify environment sanity
 
@@ -300,7 +293,7 @@ Run this tail after Phase 3 ran and before the branch-based commit/PR handoff. T
 
 1. **Check for contextual overrides first.** Look at the user's original prompt, loaded memories, and the project's active instructions already in your context for preferences that conflict with auto commit-and-PR — for example, "always review before pushing", "open PRs as drafts", or "don't open PRs from skills". A signal must be an explicit instruction or a clearly applicable rule, not a vague tonal cue. If any apply, honor them — switch to the pre-existing-branch menu below, or skip the PR step entirely, whichever matches the user's stated preference.
 2. **Briefly preview what will happen** — what will be committed, on what branch, and that a PR will be opened — then proceed without waiting for confirmation. The preview exists so the user can interrupt; it is not a blocking question. Format and length are your call; keep it scannable.
-3. **Run `/ce-commit-push-pr`.** When the entry came from an issue tracker, include the appropriate auto-close syntax for that tracker in the location it requires — most trackers parse PR descriptions (e.g., `Fixes #N` for GitHub, `Closes ABC-123` for Linear), but some only parse commit messages (e.g., Jira Smart Commits) — so the diagnosis and fix flow back to the issue and it closes on merge. Surface the resulting PR URL.
+3. **Invoke the `ce-commit-push-pr` skill with `branding:on`.** The explicit branding signal records that `ce-debug` produced the fix. When the entry came from an issue tracker, include the appropriate auto-close syntax for that tracker in the location it requires — most trackers parse PR descriptions (e.g., `Fixes #N` for GitHub, `Closes ABC-123` for Linear), but some only parse commit messages (e.g., Jira Smart Commits) — so the diagnosis and fix flow back to the issue and it closes on merge. Surface the resulting PR URL.
 
 #### Pre-existing branch (skill did not create it): ask the user
 
@@ -308,7 +301,7 @@ Use the platform's blocking question tool (`AskUserQuestion` in Claude Code, `re
 
 Options:
 
-1. **Open a PR with the reviewed fix (`/ce-commit-push-pr`)** — default for most cases
+1. **Open a PR with the reviewed fix (invoke the `ce-commit-push-pr` skill with `branding:on`)** — default for most cases
 2. **Commit the fix (`/ce-commit`)** — local commit only
 3. **Stop here** — user takes it from there
 

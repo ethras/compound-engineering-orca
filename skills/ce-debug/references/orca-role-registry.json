@@ -11,9 +11,6 @@
   "workflows": {
     "ce-debug": {
       "controller": "ce-controller",
-      "excludedPromptAssets": {
-        "repo-profiler": "ce-debug reads the shared cache opportunistically and does not dispatch its bundled repo-profiler asset."
-      },
       "mode": "mixed",
       "skill": "ce-debug",
       "stages": {

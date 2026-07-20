@@ -72,15 +72,16 @@ codex_session_roots() {
 
 discover_codex() {
     # Several configured roots can name the same physical directory (symlink,
-    # CODEX_HOME pointing at ~/.codex, explicit extra root). Deduplicate on
-    # device:inode so one session file yields one candidate. Plain string
-    # accumulation keeps this bash-3.2 compatible (no associative arrays).
+    # CODEX_HOME pointing at ~/.codex, explicit extra root). Deduplicate on the
+    # canonical physical path so one session file yields one candidate on both
+    # BSD and GNU userlands. Plain string accumulation keeps this bash-3.2
+    # compatible (no associative arrays).
     local seen_keys=""
     local base key
     while IFS= read -r base; do
         [ -n "$base" ] || continue
         [ -d "$base" ] || continue
-        key=$(stat -f '%d:%i' "$base" 2>/dev/null || stat -c '%d:%i' "$base" 2>/dev/null) || continue
+        key=$(cd "$base" 2>/dev/null && pwd -P) || continue
         case " $seen_keys " in *" $key "*) continue ;; esac
         seen_keys="$seen_keys $key"
 
