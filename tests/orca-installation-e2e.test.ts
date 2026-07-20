@@ -89,6 +89,8 @@ describe("standalone CE-Orca installation without Orca", () => {
       ...Bun.env,
       HOME: runtimeHome,
       CE_ORCA_COMMAND: missingOrca,
+      TERM_PROGRAM: undefined,
+      ORCA_TERMINAL_HANDLE: undefined,
     }
 
     for (const workflowId of firstWaveWorkflowIds()) {
@@ -125,8 +127,9 @@ describe("standalone CE-Orca installation without Orca", () => {
         runtime: {
           requested: "auto",
           selected: "native",
-          state: "absent",
+          state: "not-checked",
           fallback: true,
+          reason: "outside-orca-terminal",
         },
         targetApplication: {
           defaults: { appliedBy: "native-unconfigurable" },
@@ -191,8 +194,9 @@ describe("standalone CE-Orca installation without Orca", () => {
       workflowId: symlinkWorkflowId,
       runtime: {
         selected: "native",
-        state: "absent",
+        state: "not-checked",
         fallback: true,
+        reason: "outside-orca-terminal",
       },
     })
 
