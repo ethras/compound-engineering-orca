@@ -68,6 +68,15 @@ codex_session_roots() {
     # session roots, so its documented macOS location is probed directly;
     # the directory simply does not exist on other setups.
     printf '%s\n' "$HOME/Library/Application Support/Orca/codex-runtime-home/home/sessions"
+    # Orca 1.4.147+ keeps non-default Codex accounts in independent homes.
+    # The active account is already covered by CODEX_HOME; enumerate the
+    # siblings so a default-account session can still discover their history.
+    local account_root="$HOME/Library/Application Support/Orca/codex-accounts"
+    local account_sessions
+    for account_sessions in "$account_root"/*/home/sessions; do
+        [ -d "$account_sessions" ] || continue
+        printf '%s\n' "$account_sessions"
+    done
 }
 
 discover_codex() {
@@ -78,20 +87,25 @@ discover_codex() {
     # compatible (no associative arrays).
     local seen_keys=""
     local base key
-    while IFS= read -r base; do
-        [ -n "$base" ] || continue
-        [ -d "$base" ] || continue
-        key=$(cd "$base" 2>/dev/null && pwd -P) || continue
-        case " $seen_keys " in *" $key "*) continue ;; esac
-        seen_keys="$seen_keys $key"
+    {
+        while IFS= read -r base; do
+            [ -n "$base" ] || continue
+            [ -d "$base" ] || continue
+            key=$(cd "$base" 2>/dev/null && pwd -P) || continue
+            case " $seen_keys " in *" $key "*) continue ;; esac
+            seen_keys="$seen_keys $key"
 
-        # Use mtime-based discovery (consistent with Claude/Cursor) so that
-        # sessions started before the scan window but still active within it
-        # are not missed.
-        find "$base" -name "*.jsonl" -mtime "-${DAYS}" 2>/dev/null
-    done <<EOF
+            # Use mtime-based discovery (consistent with Claude/Cursor) so that
+            # sessions started before the scan window but still active within
+            # it are not missed.
+            find "$base" -name "*.jsonl" -mtime "-${DAYS}" 2>/dev/null
+        done <<EOF
 $(codex_session_roots)
 EOF
+    # Orca's real-home migration hardlinks/copies the same rollout into more
+    # than one root. Rollout basenames carry a session UUID, so the first root
+    # wins and replicated paths do not make session-history process it twice.
+    } | awk -F/ '!seen[$NF]++'
 }
 
 # --- Cursor ---
