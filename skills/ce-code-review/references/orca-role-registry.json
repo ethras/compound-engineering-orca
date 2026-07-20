@@ -16,7 +16,7 @@
       "stages": {
         "adversarial-peer": {
           "activation": "always",
-          "anchor": "Cross-model adversarial pass",
+          "anchor": "exclusive choice between a cross-model adversarial peer",
           "defaultOwner": "native",
           "mutation": "read-only",
           "nativeTargetHandling": "unconfigurable",
@@ -24,7 +24,7 @@
           "roles": {
             "adversarial-peer": {
               "activation": "conditional",
-              "anchor": "cross-model adversarial pass",
+              "anchor": "start the detached peer job",
               "modelTier": "parent",
               "mutation": "read-only",
               "required": false,
@@ -43,21 +43,21 @@
           "resultMode": "structured",
           "roles": {
             "finding-validator": {
-              "activation": "repeatable",
-              "anchor": "One sub-agent per finding",
+              "activation": "conditional",
+              "anchor": "deterministic validator batch",
               "modelTier": "mid",
               "mutation": "read-only",
               "required": false,
               "resultMode": "structured",
               "sourceKind": "workflow-role",
-              "sourcePath": "SKILL.md"
+              "sourcePath": "references/finish-review.md"
             }
           },
-          "sourcePath": "SKILL.md"
+          "sourcePath": "references/finish-review.md"
         },
         "persona-review": {
           "activation": "always",
-          "anchor": "### Stage 4: Spawn sub-agents",
+          "anchor": "### Stage 4: Dispatch and collect reviewers",
           "defaultOwner": "orca",
           "mutation": "read-only",
           "resultMode": "structured",
@@ -72,7 +72,7 @@
               "sourcePath": "references/personas/adversarial-reviewer.md"
             },
             "agent-native-reviewer": {
-              "activation": "always",
+              "activation": "conditional",
               "modelTier": "mid",
               "mutation": "read-only",
               "required": false,
@@ -126,7 +126,7 @@
               "sourcePath": "references/personas/julik-frontend-races-reviewer.md"
             },
             "learnings-researcher": {
-              "activation": "always",
+              "activation": "conditional",
               "modelTier": "mid",
               "mutation": "read-only",
               "required": false,
@@ -135,10 +135,10 @@
               "sourcePath": "references/personas/learnings-researcher.md"
             },
             "maintainability-reviewer": {
-              "activation": "always",
+              "activation": "conditional",
               "modelTier": "mid",
               "mutation": "read-only",
-              "required": true,
+              "required": false,
               "resultMode": "structured",
               "sourceKind": "prompt-asset",
               "sourcePath": "references/personas/maintainability-reviewer.md"
@@ -162,10 +162,10 @@
               "sourcePath": "references/personas/previous-comments-reviewer.md"
             },
             "project-standards-reviewer": {
-              "activation": "always",
+              "activation": "conditional",
               "modelTier": "mid",
               "mutation": "read-only",
-              "required": true,
+              "required": false,
               "resultMode": "structured",
               "sourceKind": "prompt-asset",
               "sourcePath": "references/personas/project-standards-reviewer.md"
@@ -198,32 +198,13 @@
               "sourcePath": "references/personas/swift-ios-reviewer.md"
             },
             "testing-reviewer": {
-              "activation": "always",
+              "activation": "conditional",
               "modelTier": "mid",
               "mutation": "read-only",
-              "required": true,
+              "required": false,
               "resultMode": "structured",
               "sourceKind": "prompt-asset",
               "sourcePath": "references/personas/testing-reviewer.md"
-            }
-          },
-          "sourcePath": "SKILL.md"
-        },
-        "project-profile": {
-          "activation": "always",
-          "anchor": "Resolve the question-agnostic project profile",
-          "defaultOwner": "orca",
-          "mutation": "read-only",
-          "resultMode": "structured",
-          "roles": {
-            "repo-profiler": {
-              "activation": "conditional",
-              "modelTier": "cheap",
-              "mutation": "read-only",
-              "required": false,
-              "resultMode": "artifact",
-              "sourceKind": "prompt-asset",
-              "sourcePath": "references/agents/repo-profiler.md"
             }
           },
           "sourcePath": "SKILL.md"

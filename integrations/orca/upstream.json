@@ -2,7 +2,7 @@
   "schema": "ce-orca.upstream-baseline/v1",
   "repository": "https://github.com/EveryInc/compound-engineering-plugin.git",
   "version": "3.19.0",
-  "commit": "cf6d37f1b5faa231a53273715065f4bbd8b5a17c",
+  "commit": "49e7d280f4877715a9f025e86e4b3e92d89a5fc6",
   "skillInventory": [
     "ce-babysit-pr",
     "ce-brainstorm",
@@ -15,6 +15,7 @@
     "ce-doc-review",
     "ce-dogfood",
     "ce-explain",
+    "ce-handoff",
     "ce-ideate",
     "ce-optimize",
     "ce-plan",
@@ -38,7 +39,6 @@
   "promptAssetSources": {
     "ce-code-review": "skills/ce-code-review/references/personas",
     "ce-compound": "skills/ce-compound/references/agents",
-    "ce-debug": "skills/ce-debug/references/agents",
     "ce-doc-review": "skills/ce-doc-review/references/personas",
     "ce-plan": "skills/ce-plan/references/agents",
     "ce-simplify-code": "skills/ce-simplify-code/references/personas",
@@ -70,12 +70,8 @@
       "framework-docs-researcher.md",
       "pattern-recognition-specialist.md",
       "performance-oracle.md",
-      "repo-profiler.md",
       "security-sentinel.md",
       "session-historian.md"
-    ],
-    "ce-debug": [
-      "repo-profiler.md"
     ],
     "ce-doc-review": [
       "adversarial-document-reviewer.md",
@@ -84,7 +80,8 @@
       "feasibility-reviewer.md",
       "product-lens-reviewer.md",
       "scope-guardian-reviewer.md",
-      "security-lens-reviewer.md"
+      "security-lens-reviewer.md",
+      "whole-doc-reviewer.md"
     ],
     "ce-plan": [
       "agent-native-planning-strategist.md",
@@ -98,7 +95,6 @@
       "learnings-researcher.md",
       "pattern-recognition-specialist.md",
       "performance-oracle.md",
-      "repo-profiler.md",
       "repo-research-analyst.md",
       "security-sentinel.md",
       "slack-researcher.md",
@@ -145,7 +141,12 @@
     {
       "id": "ce-code-review.persona-dispatch",
       "file": "skills/ce-code-review/SKILL.md",
-      "contains": "### Stage 4: Spawn sub-agents"
+      "contains": "### Stage 4: Dispatch and collect reviewers"
+    },
+    {
+      "id": "ce-code-review.finding-validation",
+      "file": "skills/ce-code-review/references/finish-review.md",
+      "contains": "deterministic validator batch"
     },
     {
       "id": "ce-debug.investigation-dispatch",

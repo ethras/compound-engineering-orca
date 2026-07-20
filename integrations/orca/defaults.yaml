@@ -17,13 +17,11 @@ workflows:
   ce-code-review:
     stages:
       scope-triage: { concurrency: 1 }
-      project-profile: { concurrency: 1, isolation: worktree-strict }
       persona-review: { concurrency: 4, isolation: worktree-strict }
       adversarial-peer: { concurrency: 1 }
-      finding-validation: { concurrency: 4, isolation: worktree-strict }
+      finding-validation: { concurrency: 1, isolation: worktree-strict }
   ce-compound:
     stages:
-      project-profile: { concurrency: 1, isolation: worktree-strict }
       research: { concurrency: 3, isolation: worktree-strict }
       session-history: { concurrency: 1, isolation: worktree-strict }
       grounding-validation: { concurrency: 4, isolation: worktree-strict }
@@ -36,7 +34,6 @@ workflows:
       persona-review: { concurrency: 4, isolation: worktree-strict }
   ce-plan:
     stages:
-      project-profile: { concurrency: 1, isolation: worktree-strict }
       local-research: { concurrency: 3, isolation: worktree-strict }
       organizational-research: { concurrency: 1 }
       external-research: { concurrency: 3 }

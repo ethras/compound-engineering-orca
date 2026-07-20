@@ -11,6 +11,9 @@
   "workflows": {
     "ce-doc-review": {
       "controller": "ce-controller",
+      "excludedPromptAssets": {
+        "whole-doc-reviewer": "Upstream uses this asset only for the detached cross-model whole-document sweep, not the local persona roster."
+      },
       "mode": "mixed",
       "skill": "ce-doc-review",
       "stages": {

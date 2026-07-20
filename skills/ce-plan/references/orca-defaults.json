@@ -53,10 +53,6 @@
         },
         "organizational-research": {
           "concurrency": 1
-        },
-        "project-profile": {
-          "concurrency": 1,
-          "isolation": "worktree-strict"
         }
       }
     }

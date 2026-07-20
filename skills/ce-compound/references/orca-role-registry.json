@@ -34,25 +34,6 @@
           },
           "sourcePath": "SKILL.md"
         },
-        "project-profile": {
-          "activation": "always",
-          "anchor": "Resolve the agnostic project orientation from the shared cache",
-          "defaultOwner": "orca",
-          "mutation": "read-only",
-          "resultMode": "structured",
-          "roles": {
-            "repo-profiler": {
-              "activation": "conditional",
-              "modelTier": "cheap",
-              "mutation": "read-only",
-              "required": false,
-              "resultMode": "artifact",
-              "sourceKind": "prompt-asset",
-              "sourcePath": "references/agents/repo-profiler.md"
-            }
-          },
-          "sourcePath": "SKILL.md"
-        },
         "research": {
           "activation": "always",
           "anchor": "Launch research subagents.",

@@ -33,6 +33,39 @@ But it stands alone just as well — many teams reach for `ce-plan` directly wit
 
 ---
 
+## Example invocations
+
+```text
+# Plan from the current conversation, including a completed ce-brainstorm
+/ce-plan
+
+# Enrich a requirements-only brainstorm artifact into an implementation-ready plan
+/ce-plan docs/plans/notification-mute.md
+
+# Plan directly from an issue or PRD
+/ce-plan https://github.com/acme/widgets/issues/1234
+/ce-plan docs/product/account-notifications-prd.md
+
+# Bootstrap planning from a clear rough idea
+/ce-plan add a background email digest at 8am UTC
+
+# Revisit and deepen an existing plan
+/ce-plan deepen docs/plans/auth-rewrite.md
+
+# Plan a non-software multi-step project
+/ce-plan organize a two-day customer advisory workshop
+
+# Ask for a self-contained HTML artifact in plain language
+/ce-plan turn the notification mute requirements into an implementation-ready plan and make it a self-contained HTML page
+
+# Equivalent shorthand when a repeatable automation needs it
+/ce-plan turn the notification mute requirements into an implementation-ready plan output:html
+```
+
+Start with `ce-brainstorm` when the product shape is still unsettled; direct planning works best when the intended outcome is already clear.
+
+---
+
 ## The Problem
 
 Plans written by humans (or AI without structure) tend to fail in predictable ways:
@@ -99,6 +132,10 @@ Universal planning also distinguishes two **dispositions**. *Plan-seeking* tasks
 ### 8. Approach altitude — a plan for the plan when a deliverable is hard
 
 For a hard problem, `ce-plan` can answer one level up: produce a grounded **approach-plan** (a plan for *how the deliverable will be made*) and hold at a checkpoint before committing — a way to get structure and certainty instead of zero-shotting a fragile result. It's entered explicitly ("plan for a plan", "don't write it yet — plan how you'd approach it") and, rarely, offered proactively — only when the method is genuinely unsettled *and* getting it wrong is costly, so it never becomes a nag. After light recon of the provided inputs (skim, not deep-read), it lays out the approach in chat, file-optional and deepenable. At the checkpoint you run it now or save it for later. The boundary it draws is **code vs. knowledge-work**, not plan vs. execute: code still flows to `ce-work`'s normal path, while a non-code deliverable is marked `execution: knowledge-work` and runs through `ce-work`'s lightweight carve-out (or any agent — the plan stays portable). `ce-plan` itself never executes; it produces the approach-plan and hands off.
+
+### 9. Session-settled decisions — carried, not re-asked
+
+When a decision was examined and chosen in the invoking conversation — or arrives distilled in a caller brief — `ce-plan` records it on its Key Technical Decision as a visible `(session-settled: user-directed|user-approved — chosen over X: reason)` annotation and never re-asks it: the scoping synthesis renders it as a `Carrying forward:` line, not a fork to reconfirm. Research augments settled decisions and may contradict them only on evidence, routed by a severity ladder — nothing found proceeds silently; suboptimal-but-workable proceeds as settled with a conflict call-out attached to the KTD; invalidating evidence (infeasible, wrong-thing, destructive) stops the run, and in pipeline mode returns a `settled-decision-invalidated` blocked report. An unexamined assertion isn't settled — it earns exactly one plan-time challenge, whose outcome is ledgered in the plan rather than re-litigated downstream.
 
 ---
 

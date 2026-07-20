@@ -20,6 +20,24 @@ Use it when you want the full agentic shipping path and are comfortable with the
 
 ---
 
+## Example invocations
+
+```text
+# Most common: settle an ambitious feature's requirements, then ship from that context
+/ce-brainstorm design account-level notification controls for enterprise teams
+/lfg
+
+# Ship a clear, already-well-bounded software task directly
+/lfg add a CSV export button to the account reports page
+
+# Ship an existing feedback-sweep plan after customer items are reconciled
+/lfg docs/plans/feedback-sweep-plan.md
+```
+
+The most common handoff is `/ce-brainstorm` -> `/lfg`: brainstorm settles the requirements and scenarios, then `lfg` turns that context into a plan and carries it through implementation, review, PR, and CI. Invoke `lfg` directly when the task is already equally well bounded. Use individual skills when you want to inspect or approve stages yourself.
+
+---
+
 ## The Problem
 
 The normal CE workflow is deliberately staged: plan, work, simplify, review, ship. That is useful when you want to inspect each step, but too much handoff when the task is well-bounded and you want the agent to carry the whole thing.
@@ -30,6 +48,7 @@ Without an explicit pipeline, autonomous runs tend to skip planning, treat revie
 
 `lfg` makes the sequence explicit and gated:
 
+- Step 1 composes a transient settled-decisions brief from the conversation — each decision with its class, rejected alternative, and reason, topically scoped to the feature — and passes it to `/ce-plan` so decisions the user already made are carried, not re-asked; the brief is skipped entirely when nothing is settled
 - `/ce-plan` must produce an implementation-ready code plan before work starts
 - `/ce-work` runs in return-to-caller mode so the pipeline regains control after implementation
 - Behavior-changing implementation must return verification evidence from `/ce-work`; if evidence is missing, `lfg` retries `/ce-work` once for evidence completion and then stops blocked rather than shipping blind
@@ -37,8 +56,9 @@ Without an explicit pipeline, autonomous runs tend to skip planning, treat revie
 - `/ce-code-review` reports findings, then `lfg` applies eligible fixes and commits them
 - Residual review findings are made durable in the PR body or a fallback tracked file
 - `/ce-test-browser` runs in pipeline mode
-- `/ce-commit-push-pr` ships remaining changes when a remote exists
+- `/ce-commit-push-pr mode:pipeline branding:on` ships remaining changes when a remote exists and explicitly marks the CE provenance
 - CI is watched for up to three repair iterations on an open PR
+- An invalidating settlement conflict surfaced by planning or review halts the pipeline before shipping rather than quietly overriding what was agreed; non-halting flagged conflicts become durable residuals that reach the PR body
 
 The pipeline also has a local-only path: if the repository has no git remote, it commits locally and skips push, PR creation, and CI watch instead of retrying impossible network steps.
 

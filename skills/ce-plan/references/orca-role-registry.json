@@ -288,25 +288,6 @@
             }
           },
           "sourcePath": "SKILL.md"
-        },
-        "project-profile": {
-          "activation": "always",
-          "anchor": "Resolve the project profile from the shared cache first.",
-          "defaultOwner": "orca",
-          "mutation": "read-only",
-          "resultMode": "structured",
-          "roles": {
-            "repo-profiler": {
-              "activation": "conditional",
-              "modelTier": "cheap",
-              "mutation": "read-only",
-              "required": false,
-              "resultMode": "artifact",
-              "sourceKind": "prompt-asset",
-              "sourcePath": "references/agents/repo-profiler.md"
-            }
-          },
-          "sourcePath": "SKILL.md"
         }
       }
     }
