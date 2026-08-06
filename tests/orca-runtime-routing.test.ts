@@ -258,6 +258,29 @@ describe("CE-Orca runtime routing", () => {
     await expect(fs.stat(observed.args[1])).rejects.toMatchObject({ code: "ENOENT" })
   })
 
+  test("keeps the default run wait outside the resolved worker budget", async () => {
+    const request = resolved()
+    request.executionConfig.defaults.budget = 2700
+    let runArgs: string[] = []
+    let commandTimeout = 0
+
+    await runResolvedRequest({
+      resolved: request,
+      workflowRegistryPath: DOC_REVIEW_REGISTRY,
+      execFile: async (_command: string, args: string[], options?: { timeout?: number }) => {
+        if (args[0] === "run-request") {
+          runArgs = [...args]
+          commandTimeout = options?.timeout ?? 0
+          return { stdout: JSON.stringify(resultEnvelope()), stderr: "", exitCode: 0 }
+        }
+        return { stdout: JSON.stringify(validDocReviewResult()), stderr: "", exitCode: 0 }
+      },
+    })
+
+    expect(runArgs[runArgs.indexOf("--wait") + 1]).toBe("2730")
+    expect(commandTimeout).toBe(2_760_000)
+  })
+
   test("rejects malformed confidential packet JSON before invoking Orca", async () => {
     const directory = await fs.mkdtemp(path.join(os.tmpdir(), "ce-orca-invalid-packet-"))
     const packetPath = path.join(directory, "packet.json")

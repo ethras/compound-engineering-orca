@@ -124,6 +124,12 @@ stage, or role target still wins. Changing a backend or model without naming a
 reasoning level keeps the effective higher-precedence target family instead of
 accidentally inheriting a provider-incompatible tier level.
 
+When dispatch does not provide an explicit `--wait`, the runtime derives the
+run-request wait from the largest resolved supervision budget plus 30 seconds
+for completion propagation. Its subprocess timeout sits another 30 seconds
+outside that wait, so a healthy worker can reach its own supervision deadline
+without being abandoned by the CE caller first.
+
 Cursor does not expose a separate reasoning control. A target that selects the
 `cursor` backend without a `reasoning` field is therefore canonicalized to the
 explicit, capability-attested sentinel `reasoning: "none"`; it never inherits a

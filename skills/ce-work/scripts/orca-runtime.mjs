@@ -40,6 +40,9 @@ const PROFILE_LOCK_TIMEOUT_MS = 5_000
 const PROFILE_LOCK_RETRY_MS = 25
 const PROFILE_LOCK_SCHEMA = "ce-orca.profile-lock/v1"
 const MKFIFO_COMMAND = "/usr/bin/mkfifo"
+const DEFAULT_RUN_BUDGET_SECONDS = 900
+const RUN_WAIT_GRACE_SECONDS = 30
+const RUN_COMMAND_GRACE_SECONDS = 30
 const RUN_RESULT_STATES = new Set(["succeeded", "failed", "stopped", "aborted", "timeout", "invalid", "not-found"])
 const TERMINAL_RUN_RESULT_STATES = new Set(["succeeded", "failed", "stopped", "aborted"])
 
@@ -1416,6 +1419,17 @@ function runFailureMessage(response) {
   return reason ? `Orca run ended ${response.state}: ${reason}` : `Orca run ended ${response.state}.`
 }
 
+function defaultRunWaitSeconds(executionConfig) {
+  const stages = Object.values(executionConfig?.stages || {})
+  const targets = [
+    executionConfig?.defaults,
+    ...stages,
+    ...stages.flatMap((stage) => Object.values(stage?.roles || {})),
+  ]
+  const budgets = targets.map((target) => target?.budget).filter(Number.isInteger)
+  return Math.max(DEFAULT_RUN_BUDGET_SECONDS, ...budgets) + RUN_WAIT_GRACE_SECONDS
+}
+
 export async function runResolvedRequest({
   resolved,
   workflowRegistryPath,
@@ -1423,7 +1437,7 @@ export async function runResolvedRequest({
   packetPath = "",
   inputsDir = "",
   approved = false,
-  waitSeconds = 900,
+  waitSeconds,
   worktree = "",
   command = resolveRuntimeCommand(),
   execFile = executeFile,
@@ -1455,7 +1469,10 @@ export async function runResolvedRequest({
     return { schema: DISPATCH_SCHEMA, action: "awaiting-confirmation", display }
   }
   if (!workflowRegistryPath) fail("workflow_registry_required", "An installed skill-local Orca workflow registry is required.")
-  if (!Number.isInteger(waitSeconds) || waitSeconds < 1) fail("invalid_wait", "waitSeconds must be a positive integer.")
+  const effectiveWaitSeconds = waitSeconds === undefined
+    ? defaultRunWaitSeconds(resolved.executionConfig)
+    : waitSeconds
+  if (!Number.isInteger(effectiveWaitSeconds) || effectiveWaitSeconds < 1) fail("invalid_wait", "waitSeconds must be a positive integer.")
   const resultContract = await loadRuntimeResultContract({ workflowRegistryPath, workflowId: resolved.workflowId })
   const scratch = await fs.mkdtemp(path.join(os.tmpdir(), "ce-orca-dispatch-"))
   await fs.chmod(scratch, 0o700)
@@ -1485,10 +1502,10 @@ export async function runResolvedRequest({
       args.push("--inputs-dir", path.resolve(inputsDir))
     }
     if (resolvedWorktree) args.push("--worktree", resolvedWorktree)
-    args.push("--wait", String(waitSeconds))
+    args.push("--wait", String(effectiveWaitSeconds))
     let result
     try {
-      result = await execFile(command, args, { timeout: (waitSeconds + 30) * 1_000 })
+      result = await execFile(command, args, { timeout: (effectiveWaitSeconds + RUN_COMMAND_GRACE_SECONDS) * 1_000 })
     } catch (error) {
       let response = null
       try {
@@ -1635,7 +1652,7 @@ async function cli() {
       packetPath: flags.packet ? String(flags.packet) : "",
       inputsDir: flags["inputs-dir"] ? String(flags["inputs-dir"]) : "",
       approved: flags.approved === "true",
-      waitSeconds: flags.wait ? Number(flags.wait) : 900,
+      waitSeconds: flags.wait ? Number(flags.wait) : undefined,
       worktree: String(flags.worktree || ""),
       onDisplay: async (display) => process.stderr.write(`Effective CE-Orca configuration:\n${canonicalJson(display)}`),
     })
