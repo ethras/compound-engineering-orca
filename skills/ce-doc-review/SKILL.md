@@ -180,7 +180,10 @@ Add activated conditional personas:
 ### Dispatch
 
 <!-- ce-orca-hook:start ce-doc-review.persona-dispatch -->
-Read `references/orca-routing.md` and resolve the current run before dispatch. If the resolved execution request assigns `persona-review` to Orca, read
+Read `references/orca-routing.md` and resolve the current run before dispatch.
+Routing is unresolved until the canonical `resolve` command succeeds. Do not
+infer or announce native versus Orca routing before that result exists. If the
+resolved execution request assigns `persona-review` to Orca, read
 `references/orca-dispatch.md` now and use that dispatch path for the selected
 reviewers. Otherwise, execute the native dispatch paragraph below unchanged.
 <!-- ce-orca-hook:end ce-doc-review.persona-dispatch -->

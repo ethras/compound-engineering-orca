@@ -109,6 +109,21 @@ The point in a calling Skill where completed work triggers a follow-on Skill in 
 ### Context-absent agent
 An agent performing a Skill-shaped action without that Skill's instructions loaded in context — typically reconstructing a half-remembered command, recognizable by parameter values that drift from the Skill's documented defaults. Prose in the unloaded Skill cannot reach it; the only channels that do are the seam it entered through and the output of the tools it runs, which is why fail-closed refusals in bundled CLIs carry their own recovery path.
 
+## CE-Orca execution
+
+### CE-Orca runtime
+The optional Orca-owned execution path for Compound Engineering workflow stages, distinct from execution by the host platform's native agents.
+
+### Attested Orca terminal
+A controller context whose Orca host identity is confirmed by both its terminal-program identity and a non-empty Orca terminal handle.
+
+Automatic runtime selection requires this attestation before Orca capability is considered; an open Orca app, integration hooks, endpoint health, or a registered worktree do not establish controller ownership.
+
+### Runtime selection
+The ordered CE-Orca decision that chooses native or Orca execution by evaluating the requested mode and controller attestation before any Orca endpoint health or compatibility check.
+
+Automatic selection remains native without probing outside an Attested Orca terminal, while an explicit Orca request outside that context fails rather than being silently downgraded.
+
 ## Review and workflow vocabulary
 
 ### Reviewer persona

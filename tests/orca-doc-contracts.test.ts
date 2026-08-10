@@ -43,6 +43,24 @@ describe("CE-Orca documentation contracts", () => {
     expect(prose).toContain("Leave the endpoint state unobserved")
   })
 
+  test("requires deterministic resolution before a controller announces routing", async () => {
+    const [routing, documentReview] = await Promise.all([
+      read("integrations/orca/references/execution-routing.md"),
+      read("skills/ce-doc-review/SKILL.md"),
+    ])
+    const routingProse = routing.replace(/\s+/g, " ")
+
+    expect(routingProse).toContain("Routing remains unresolved until this invocation runs the canonical `resolve` command")
+    expect(routingProse).toContain("Never infer terminal attestation from the host name, visible app, or environment prose")
+    expect(routingProse).toContain("An explicit current-prompt `runtime: native` override must be present in the patch")
+
+    const hookStart = documentReview.indexOf("<!-- ce-orca-hook:start ce-doc-review.persona-dispatch -->")
+    const hookEnd = documentReview.indexOf("<!-- ce-orca-hook:end ce-doc-review.persona-dispatch -->")
+    const hook = documentReview.slice(hookStart, hookEnd).replace(/\s+/g, " ")
+    expect(hook).toContain("Routing is unresolved until the canonical `resolve` command succeeds")
+    expect(hook).toContain("Do not infer or announce native versus Orca routing before that result exists")
+  })
+
   test("keeps the LFG child-patch command flatten-safe", async () => {
     const lfg = await read("skills/lfg/references/orca-lfg.md")
     const blocks = bashBlocks(lfg)

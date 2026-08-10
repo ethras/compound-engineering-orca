@@ -186,6 +186,62 @@ describe("CE-Orca canonical configuration resolution", () => {
     await expect(fs.stat(marker)).rejects.toMatchObject({ code: "ENOENT" })
   })
 
+  test("honors a prompt native override without probing from an attested Orca terminal", async () => {
+    const directory = await fs.mkdtemp(path.join(os.tmpdir(), "ce-orca-prompt-native-"))
+    scratch.push(directory)
+    const marker = path.join(directory, "probe-called")
+    const fakeOrca = path.join(directory, "fake-orca.mjs")
+    const patch = path.join(directory, "execution-patch.json")
+    await fs.writeFile(fakeOrca, [
+      "#!/usr/bin/env node",
+      "import fs from 'node:fs'",
+      "fs.writeFileSync(process.env.PROBE_MARKER, 'called')",
+      "process.stdout.write('{}')",
+      "",
+    ].join("\n"), { mode: 0o700 })
+    await fs.writeFile(patch, JSON.stringify({
+      schema: "ce-orca.execution-request/v1",
+      workflowId: "ce-doc-review",
+      runtime: "native",
+    }))
+
+    const child = Bun.spawn([
+      "bun",
+      path.join(ROOT, "integrations/orca/runtime-bundle.mjs"),
+      "resolve",
+      "--workflow", "ce-doc-review",
+      "--registry", path.join(ROOT, "skills/ce-doc-review/references/orca-role-registry.json"),
+      "--defaults", path.join(ROOT, "skills/ce-doc-review/references/orca-defaults.json"),
+      "--patch", patch,
+    ], {
+      cwd: directory,
+      env: {
+        ...Bun.env,
+        HOME: directory,
+        TERM_PROGRAM: "Orca",
+        ORCA_TERMINAL_HANDLE: "term_fixture",
+        CE_ORCA_COMMAND: fakeOrca,
+        PROBE_MARKER: marker,
+      },
+      stdout: "pipe",
+      stderr: "pipe",
+    })
+    const [exitCode, stdout, stderr] = await Promise.all([
+      child.exited,
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+    ])
+
+    expect(exitCode, stderr).toBe(0)
+    expect(JSON.parse(stdout).runtime).toEqual({
+      requested: "native",
+      selected: "native",
+      state: "not-checked",
+      fallback: false,
+    })
+    await expect(fs.stat(marker)).rejects.toMatchObject({ code: "ENOENT" })
+  })
+
   test("routes network, MCP, and mixed-tool stages natively with explicit target authority", async () => {
     const planningData = await data("ce-plan")
     const planning = resolveExecutionRequest({

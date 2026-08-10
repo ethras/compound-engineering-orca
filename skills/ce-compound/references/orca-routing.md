@@ -14,6 +14,16 @@ current-prompt patch. An override can configure a conditional role but never
 activates it; the upstream CE workflow alone decides which conditional roles
 run. Unknown or ambiguous IDs are preflight errors, not guesses.
 
+Routing remains unresolved until this invocation runs the canonical `resolve`
+command below and receives its structured result. Never infer terminal
+attestation from the host name, visible app, or environment prose, and never
+announce native versus Orca routing from such an inference. An explicit
+current-prompt `runtime: native` override must be present in the patch passed to
+`resolve`; an unambiguous request such as “use native agents for this run” is
+that override. The resolver applies the prompt layer at highest precedence and
+returns native without probing Orca. If no resolver result exists, do not
+dispatch either route.
+
 Runtime routing has four observed Orca states:
 
 | Orca state | `auto` | `orca` | `native` |
