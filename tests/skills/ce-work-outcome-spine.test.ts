@@ -240,6 +240,11 @@ describe("ce-work cross-model engine contract", () => {
     expect(worker).toContain("complete Git delta")
     expect(worker).toContain("disposable artifacts created by your own checks")
     expect(worker).toContain("every remaining changed path")
+    expect(worker).toContain("local implementation details")
+    expect(worker).toContain("nearby repository patterns")
+    expect(worker).toContain("observable behavior")
+    expect(worker).toContain("return `blocked`")
+    expect(worker).toContain("do not improvise")
     for (const dispatchPolicy of ["recipient", "model", "harness", "intermediary", "retry", "route", "additional workers"]) {
       expect(worker.toLowerCase()).not.toContain(dispatchPolicy)
     }

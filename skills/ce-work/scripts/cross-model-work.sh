@@ -95,12 +95,17 @@ validate_model_override() {
 adapter_argv() {
   case "$1" in
     codex)
+      local codex_model codex_reasoning
+      codex_model="$(route_model codex)"
+      codex_reasoning="high"
+      [ "$codex_model" = "gpt-5.6-luna" ] && codex_reasoning="xhigh"
       # --ignore-user-config drops the user's model_reasoning_effort, so pin the
-      # editorial tier explicitly, matching the claude/grok routes' --effort high.
+      # effective implementation tier explicitly. Luna is an explicit model
+      # binding and uses the requested very-high implementation posture.
       printf '%s\0' codex exec --ignore-user-config --ignore-rules --ephemeral \
         -s workspace-write -C "$WORKSPACE" --json -o "$RAW_RESULT" \
-        -c model_reasoning_effort=high
-      [ "$(route_model codex)" = auto ] || printf '%s\0' -m "$(route_model codex)"
+        -c "model_reasoning_effort=$codex_reasoning"
+      [ "$codex_model" = auto ] || printf '%s\0' -m "$codex_model"
       printf '%s\0' -
       ;;
     claude)

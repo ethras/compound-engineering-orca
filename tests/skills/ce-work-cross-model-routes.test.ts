@@ -234,6 +234,42 @@ describe("ce-work fixed write routes", () => {
     expect(emit("grok-cursor").stdout).toContain("--model cursor-grok-4.5-high")
   })
 
+  test("Codex elevates a controller-authorized GPT-5.6 Luna implementation route to xhigh", () => {
+    const f = fixture()
+    const bin = fakeBin("codex", f.capture)
+    const result = run(
+      "codex",
+      f,
+      { ...process.env, PATH: `${bin}:${process.env.PATH}` },
+      undefined,
+      { model_requested: "gpt-5.6-luna" },
+    )
+
+    expect(result.code).toBe(0)
+    const argv = readFileSync(path.join(f.capture, "argv"), "utf8")
+    expect(argv).toContain("gpt-5.6-luna")
+    expect(argv).toContain("model_reasoning_effort=xhigh")
+    expect(result.result.model_requested).toBe("gpt-5.6-luna")
+  })
+
+  test("Codex keeps an explicit non-Luna implementation route at high", () => {
+    const f = fixture()
+    const bin = fakeBin("codex", f.capture)
+    const result = run(
+      "codex",
+      f,
+      { ...process.env, PATH: `${bin}:${process.env.PATH}` },
+      undefined,
+      { model_requested: "gpt-5.6-sol" },
+    )
+
+    expect(result.code).toBe(0)
+    const argv = readFileSync(path.join(f.capture, "argv"), "utf8")
+    expect(argv).toContain("gpt-5.6-sol")
+    expect(argv).toContain("model_reasoning_effort=high")
+    expect(argv).not.toContain("model_reasoning_effort=xhigh")
+  })
+
   test.each(ROUTES)("%s receives one workspace and bounded packet", (route) => {
     const f = fixture()
     const bin = fakeBin(route, f.capture)
