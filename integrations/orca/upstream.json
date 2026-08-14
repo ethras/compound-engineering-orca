@@ -2,7 +2,7 @@
   "schema": "ce-orca.upstream-baseline/v1",
   "repository": "https://github.com/EveryInc/compound-engineering-plugin.git",
   "version": "3.21.4",
-  "commit": "a27aa2afa21d9a44d393dc3d73b068eab2bfeddf",
+  "commit": "421a33781b86ada0f4e7599792cf45a0363ae9ef",
   "skillInventory": [
     "ce-babysit-pr",
     "ce-brainstorm",
