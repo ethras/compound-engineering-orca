@@ -228,7 +228,7 @@ const PARITY_CASES: ParityCase[] = [
     reference: "skills/ce-doc-review/references/orca-dispatch.md",
     controllerAnchors: [
       "Keep document classification, persona selection, prompt construction",
-      "synthesis, `safe_auto` edits, interactive questions, and final presentation",
+      "synthesis, Apply-routed changes, grouped confirmation, decisions",
     ],
     contract: "integrations/orca/contracts/doc-review-result.schema.json",
     resultSchema: DOC_RESULT_SCHEMA,
@@ -700,7 +700,7 @@ describe("native and Orca document review parity", () => {
     expect(orcaResults).toEqual(nativeResults)
   })
 
-  test("preserves parent ownership of selection, synthesis, and safe fixes", async () => {
+  test("preserves parent ownership of selection, synthesis, and presentation", async () => {
     const [skill, dispatchReference] = await Promise.all([
       fs.readFile(SKILL_FILE, "utf8"),
       fs.readFile(
@@ -712,7 +712,7 @@ describe("native and Orca document review parity", () => {
     expect(skill).toContain("### Select Conditional Personas")
     expect(skill).toContain("read `references/synthesis-and-presentation.md` for the synthesis pipeline")
     expect(dispatchReference).toContain("Keep document classification, persona selection, prompt construction,")
-    expect(dispatchReference).toContain("synthesis, `safe_auto` edits, interactive questions, and final presentation")
+    expect(dispatchReference).toContain("synthesis, Apply-routed changes, grouped confirmation, decisions")
     expect(dispatchReference).toContain("An Orca reviewer must not")
   })
 
