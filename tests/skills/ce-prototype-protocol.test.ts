@@ -1,8 +1,11 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "fs"
 import path from "path"
+import { Glob } from "bun"
 import { describe, expect, test } from "bun:test"
+import { parseFrontmatter } from "../../src/utils/frontmatter"
 
-const SKILL_DIR = path.join(process.cwd(), "skills/ce-prototype")
+const SKILLS_ROOT = path.join(process.cwd(), "skills")
+const SKILL_DIR = path.join(SKILLS_ROOT, "ce-prototype")
 const SKILL_BODY = readFileSync(path.join(SKILL_DIR, "SKILL.md"), "utf8")
 const PREVIEW_BODY = readFileSync(path.join(SKILL_DIR, "references/preview.md"), "utf8")
 
@@ -59,6 +62,76 @@ describe("ce-prototype protocol", () => {
     expect(PREVIEW_BODY).toMatch(/SKILL_DIR="[^"]+";/)
     expect(PREVIEW_BODY).not.toContain("${CLAUDE_SKILL_DIR}")
     expect(SKILL_BODY).not.toContain("${CLAUDE_SKILL_DIR}")
+  })
+
+  test("one organizing rule governs modality, fidelity, and medium", () => {
+    const body = parseFrontmatter(SKILL_BODY).body
+    const firstSection = body.indexOf("\n## ")
+    expect(
+      firstSection,
+      "SKILL.md must have at least one `## ` section heading. Without one the spine slice below silently widens to the whole document and this test degrades from a placement guard into a presence check.",
+    ).toBeGreaterThan(-1)
+    const spine = body.slice(0, firstSection)
+    expect(
+      /do not fake the dimension being tested/i.test(spine),
+      "The organizing rule must sit in the spine, above the first section heading — not buried in a later section. Everything downstream (modality, fidelity, medium) derives from it, so it has to be read before any of them.",
+    ).toBe(true)
+    expect(
+      /(modality|fidelity|medium)[^.]{0,120}\b(follow|follows|derive|derives)\b[^.]{0,60}\b(from|that one rule|that rule)\b/i.test(
+        spine,
+      ),
+      "The derivation must sit in the spine beside the rule it derives from. If modality, fidelity, and medium read as independent axes again, the skill re-collapses into a drive-only prototype tool and a question settled by seeing goes uncovered.",
+    ).toBe(true)
+  })
+
+  test("web is the default substrate regardless of the product's stack", () => {
+    // Bound the assertions to the sentence that states the rule. Matching the
+    // keywords anywhere in the body lets a reversed default ("the product
+    // stack, not the web") satisfy every check while inverting the invariant.
+    const substrateRule = (SKILL_BODY.match(/[^.\n]*\bdefault substrate\b[^.\n]*/i) ?? [""])[0]
+    expect(
+      substrateRule,
+      "SKILL.md must state a default-substrate rule. Without that floor, a run in a native or non-web repo builds in the product's own stack — the expensive path a throwaway prototype exists to avoid.",
+    ).not.toBe("")
+    expect(
+      /\bdefault substrate\b[^.]{0,40}\bweb\b/i.test(substrateRule),
+      "The default substrate must be stated positively as the web, in the sentence that names the rule.",
+    ).toBe(true)
+    expect(
+      /\bnot the web\b|\bproduct(?:'s)? stack\b/i.test(substrateRule),
+      "The default-substrate rule must not be negated or made product-stack-first — that reverses the floor while still mentioning every keyword this test looks for.",
+    ).toBe(false)
+    expect(
+      /whatever the product is written in|regardless of[^.]{0,60}\b(product|implementation|stack|language|platform)\b/i.test(
+        substrateRule,
+      ),
+      "The web default must be stated as decoupled from the product's implementation language or platform, not as a web-repo-only convenience.",
+    ).toBe(true)
+  })
+
+  test("no skill reintroduces a retired ce-prototype routing predicate", () => {
+    // Exact retired wordings only. A looser semantic pattern would fire on the
+    // organizing rule's contrast pair in ce-prototype's own spine, which
+    // describes the dimension under test rather than the route to the skill.
+    const retired = [
+      "requires use, not inspection",
+      "inspection, not use",
+      "drive rather than look at",
+      "substantial behavior or interaction",
+    ]
+
+    const offenders: string[] = []
+    for (const rel of new Glob("**/*.md").scanSync({ cwd: SKILLS_ROOT })) {
+      const body = readFileSync(path.join(SKILLS_ROOT, rel), "utf8").toLowerCase()
+      for (const phrase of retired) {
+        if (body.includes(phrase)) offenders.push(`skills/${rel}: "${phrase}"`)
+      }
+    }
+
+    expect(
+      offenders,
+      `Retired ce-prototype routing wording found:\n${offenders.join("\n")}\n\nEvery site stating when ce-prototype applies uses one test: the decision is expensive to unravel and a cheap sketch cannot settle it. The drive-versus-look-at and use-versus-inspection predicates were removed, not qualified — they filter out decisions settled by seeing, which the skill now covers. State the test in full once per skill (ce-brainstorm's Interaction Rule 7, ce-plan's handoff menu) and cite that owner everywhere else in the same skill.`,
+    ).toEqual([])
   })
 
   test("repo grounding is scoped, not a tree scan", () => {
