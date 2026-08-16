@@ -61,12 +61,10 @@ codex_session_roots() {
     if [ -n "${CE_CODEX_SESSION_ROOTS:-}" ]; then
         printf '%s\n' "$CE_CODEX_SESSION_ROOTS" | tr ':' '\n'
     fi
-    if [ -n "${CODEX_HOME:-}" ] && [ -d "${CODEX_HOME%/}/sessions" ]; then
+    if [ -n "${CODEX_HOME:-}" ]; then
         printf '%s\n' "${CODEX_HOME%/}/sessions"
-    else
-        printf '%s\n' "$HOME/.codex/sessions"
     fi
-    printf '%s\n' "$HOME/.agents/sessions"
+    printf '%s\n' "$HOME/.codex/sessions" "$HOME/.agents/sessions"
     # Orca-managed runtime home. Orca exposes no CLI surface for adapter
     # session roots, so its documented macOS location is probed directly;
     # the directory simply does not exist on other setups.

@@ -2623,13 +2623,13 @@ describe("discover-sessions", () => {
     expect(files).not.toContain(ignored)
   })
 
-  test("--platform codex honors CODEX_HOME over ~/.codex and still scans ~/.agents/sessions", async () => {
+  test("--platform codex adds CODEX_HOME while still scanning conventional roots", async () => {
     const tempHome = fs.mkdtempSync(path.join(os.tmpdir(), "codex-home-"))
     const profileHome = fs.mkdtempSync(path.join(os.tmpdir(), "codex-profile-"))
     const relocated = await writeCodexSession(
       path.join(profileHome, "sessions")
     )
-    const ignored = await writeCodexSession(
+    const conventional = await writeCodexSession(
       path.join(tempHome, ".codex/sessions")
     )
     const agents = await writeCodexSession(
@@ -2644,8 +2644,7 @@ describe("discover-sessions", () => {
     expect(exitCode).toBe(0)
     expect(stderr).toBe("")
     const files = stdout.trim().split("\n").filter((l) => l.trim()).sort()
-    expect(files).toEqual([agents, relocated].sort())
-    expect(files).not.toContain(ignored)
+    expect(files).toEqual([agents, conventional, relocated].sort())
   })
 
   test("--platform claude lists every recent jsonl under ~/.claude/projects", async () => {
