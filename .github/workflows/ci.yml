@@ -51,12 +51,18 @@ jobs:
       - name: Fetch canonical upstream baseline
         run: |
           git remote add upstream https://github.com/EveryInc/compound-engineering-plugin.git
-          git fetch upstream main
+          # --tags: the provenance currency check resolves the latest
+          # compound-engineering-v* release tag, not the upstream/main tip.
+          git fetch --tags upstream main
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          # Pinned deliberately (same policy as the claude validator pin):
+          # bun 1.4.0 hangs the subprocess-heavy suites on Linux runners
+          # (ce-pov / cross-model timeouts, /tmp lock contention) that pass
+          # on 1.3.14. Bump intentionally after verifying those suites.
+          bun-version: 1.3.14
 
       - name: Install dependencies
         run: bun install
@@ -137,7 +143,11 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          # Pinned deliberately (same policy as the claude validator pin):
+          # bun 1.4.0 hangs the subprocess-heavy suites on Linux runners
+          # (ce-pov / cross-model timeouts, /tmp lock contention) that pass
+          # on 1.3.14. Bump intentionally after verifying those suites.
+          bun-version: 1.3.14
 
       - name: Install dependencies
         run: bun install
