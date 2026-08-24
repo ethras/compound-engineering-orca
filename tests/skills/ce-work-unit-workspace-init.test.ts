@@ -356,7 +356,7 @@ describe("ce-work unit workspace controller: init, identity, and dispatch author
     )
     expect(invalid.word).toBe("REFUSED")
     expect(invalid.stderr).toContain("unsupported egress route 'codex-local'")
-    expect(invalid.stderr).toContain("codex, claude, grok-cli, cursor, composer, grok-cursor, agy")
+    expect(invalid.stderr).toContain("codex, claude, grok-cli, cursor, composer, grok-cursor")
     expect(existsSync(path.join(runs, "invalid-route"))).toBe(false)
 
     for (const [runId, malformed, message] of [

@@ -98,13 +98,18 @@ Plans written by humans (or AI without structure) tend to fail in predictable wa
 - It does not pre-write code, exact API signatures, or step-by-step shell choreography
 - Stable U-IDs survive reordering, splitting, and deletion, so blocker references and PR mentions stay valid
 - Plan decisions are traceable back to origin (R-IDs from brainstorm; AE-IDs cited in test scenarios)
-- Research runs in parallel before structuring (repo, learnings, framework docs, best practices, spec flow)
-- A confidence check runs automatically after writing the plan and dispatches targeted sub-agents to strengthen weak sections
+- The output contract is decided at intake, before any research: a few sentences in chat (Direct), a chat brief with units and test expectations, or the Durable plan file — see below
+- On the Durable path, research runs in parallel before structuring (repo, learnings, framework docs, best practices, spec flow); a Lightweight Durable plan grounds from inline reads instead
+- A confidence check runs automatically after writing a Durable plan and dispatches targeted sub-agents to strengthen weak sections
 - Planning-time vs implementation-time questions are separated. No fake certainty.
 
 ---
 
 ## What Makes It Novel
+
+### Three output contracts, decided before research
+
+At intake, after resume and before depth classification, `ce-plan` grounds itself with a few bounded reads of the files the request names and picks one of three results. **Direct**: the work can be stated, done, and verified in one pass with no decision you would weigh — it says what changes in a few sentences and hands off to `ce-work` or to you. **Chat brief**: bounded work with at most one decision and no risk surface — a summary, implementation units with files and test expectations, and a one-line offer to save it or hand it to `ce-work`, all in chat. **Durable**: everything else — the unified plan file with its full floor, confidence check, document review, and handoff menu, exactly as before. When the tier is uncertain the heavier one wins; pipeline and headless runs, goal-driven runs, and risk surfaces (authentication, payments, migrations, external contracts) are always Durable. A saved chat brief is a plain markdown file without the unified-plan contract; re-invoke `ce-plan` on it when you want the full floor.
 
 ### Guardrails over choreography
 
@@ -140,11 +145,6 @@ Two dispositions:
 - Answer-seeking (investigative or analytical: "how often does X happen, is it a big deal?"): the answer is the deliverable. The skill states a brief plan-of-attack in chat, executes it (research and synthesis, never code), and does not write a plan file. Only a genuine single-fact lookup skips planning and gets answered outright.
 
 For a hard problem, you can ask one level up: produce a grounded **approach-plan** (a plan for how the deliverable will be made) and hold at a checkpoint. Enter it explicitly (`plan for a plan`, `don't write it yet, plan how you'd approach it`). Rarely, the skill offers this when the method is genuinely unsettled and getting it wrong is costly. After light recon it lays out the approach in chat, file-optional and deepenable. You run it now or save it for later. Code still flows to `ce-work`. A non-code deliverable is marked `execution: knowledge-work` and runs through `ce-work`'s lightweight carve-out. `ce-plan` itself never executes.
-### Domain vocabulary — planned in the project's own words
-
-Planning reads the project's glossary so the plan uses canonical names rather than synonyms. When the root `CONCEPTS.md` is an index over per-context glossaries, it reads the glossaries of the contexts the plan touches and qualifies a term by its context where the same word diverges across them.
-
-The silent gap-fill that adds a missing definition stays silent: it resolves which glossary owns the term first, and when ownership is ambiguous or the owning glossary does not exist yet, it records the term under Open Questions instead of guessing an owner or interrupting the run.
 
 ### Session-settled decisions are carried, not re-asked
 
@@ -178,9 +178,19 @@ Reach for `ce-plan` when:
 
 Skip `ce-plan` when:
 
-- The task is genuinely one-step (just do it, or `ce-work` for direct execution)
+- The change is already specified down to the files it touches and touches no risk surface (just do it, or `ce-work`); if it reaches `ce-plan` anyway, the Direct contract answers in a few sentences
 - The product or outcome is not yet decided → `ce-brainstorm` first
 - The bug has a known root cause and an obvious fix → `ce-debug` or just fix it
+
+---
+
+## Make It Automatic
+
+If you want planning to run on its own before implementation, add a standing instruction to your agent's instruction file (the repo's `AGENTS.md`/`CLAUDE.md`, or your global one). The activation condition is the part that keeps small changes cheap:
+
+> Before implementing work that spans several files or carries a design decision, invoke the `ce-plan` skill. Skip it for a change already specified down to the files it touches that touches no risk surface (authentication, payments, migrations, external contracts); do that directly or with the `ce-work` skill.
+
+Two phrases are load-bearing: "invoke the `ce-plan` skill", because the slash-command form is not agent-callable on every harness; and the skip clause, because `ce-plan` itself decides its output contract only after it fires — an instruction that invokes it on every change still pays the skill load for a typo.
 
 ---
 

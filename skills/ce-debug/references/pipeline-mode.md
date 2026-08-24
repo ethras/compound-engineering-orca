@@ -37,7 +37,7 @@ Never write a PR-body section. Never block. Surface it so the human sees it afte
 - If it maps to an **open review thread**, leave that thread open (and attach the `decision_context` as a reply when a thread reply is in scope).
 - Otherwise, **return it in the `residuals` list** for the caller to place in its single run-report comment. For a bare `ce-debug` invocation with no orchestrator and no PR, file it as a ticket in the project's tracker (detected in Phase 1.4) with enough background to action it standalone; when no tracker is reachable, return it in the structured result and say plainly that nothing else recorded it.
 
-`decision_context` uses the shape ce-debug already produces: what the failure is, what you found, why it needs a human decision, options + tradeoffs, and your lean.
+Return each decision in the shared typed residual contract. Its `sources` enumerate every item the decision owns: each failing check key with `kind: "check"`, plus the stable ID and kind of every open review thread, comment, or review body represented by the same decision. `decision_context` contains the quoted failure, investigation, decision reason, options with tradeoffs, and nullable recommendation. `thread_urls` includes every owned open thread and is empty only when no source is a thread. The caller persists and invalidates the complete source set as one unit, so never split, omit, or summarize source ownership.
 
 ## Structured return
 
@@ -45,16 +45,33 @@ The skill's final output in pipeline mode is machine-readable (the caller parses
 
 ```json
 {
-  "status": "fixed-and-pushed | diagnosed-no-fix | flaky-infra | needs-human",
+  "status": "fixed-and-pushed | fixed-not-pushed | diagnosed-no-fix | flaky-infra | needs-human",
   "summary": "<one line: what happened>",
   "root_cause": "<causal chain, brief>",
   "changed_files": ["..."],
-  "head_sha": "<sha after push, when fixed-and-pushed>",
-  "residuals": [ { "title": "...", "decision_context": "...", "thread": "<url|null>" } ]
+  "head_sha": "<sha of the fix commit, when fixed-and-pushed or fixed-not-pushed>",
+  "residuals": [
+    {
+      "type": "needs-human",
+      "sources": [
+        { "id": "<failing-check-key>", "kind": "check" },
+        { "id": "<owned-open-thread-id, when any>", "kind": "thread" }
+      ],
+      "decision_context": {
+        "quoted_feedback": "<the failure or constraint in tension>",
+        "investigation": "<what was inspected and found>",
+        "decision_reason": "<why no bounded convergent fix is safe>",
+        "options": [ { "option": "<choice>", "tradeoff": "<gain and loss>" } ],
+        "recommendation": "<lean and why, or null>"
+      },
+      "thread_urls": ["<URL for every owned open thread, or empty when none>"]
+    }
+  ]
 }
 ```
 
-- `fixed-and-pushed` — a convergent fix was applied, tests pass, committed and pushed.
+- `fixed-and-pushed` — a convergent fix was applied, tests pass, committed, and the push succeeded.
+- `fixed-not-pushed` — the same fix is applied and committed locally, but the push did not happen — no remote, no push access, an envelope that excludes pushing, a rejected push. `head_sha` is the local commit; the first residual says why. Never report this as `fixed-and-pushed` (the caller re-snapshots a remote head that has not moved) or as `diagnosed-no-fix` (the fix is applied).
 - `flaky-infra` — a flake or infrastructure failure, not a code defect (the caller may retry).
 - `needs-human` — the failure requires a divergent/product decision; nothing applied; see `residuals`.
 - `diagnosed-no-fix` — root cause found but no safe convergent fix available this run; see `residuals`.

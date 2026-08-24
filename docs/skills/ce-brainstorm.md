@@ -95,6 +95,8 @@ A typical "let's brainstorm" with an AI has shape problems too. It asks five que
 `ce-brainstorm` runs a structured conversation that can end in a durable artifact:
 
 - One question per turn, defaulting to the platform's blocking question tool
+- Facts the environment can answer are looked up, not asked; a running lookup does not stall independent questions
+- User terms or system-behavior claims that conflict with existing `CONCEPTS.md` or verified code are challenged when they would change a product decision
 - Ceremony matched to the work: Lightweight, Standard, Deep, or Deep-product
 - Named gap lenses on premises before approaches are generated
 - An opt-in blindspot pass when you do not know the territory well enough to weigh options
@@ -114,11 +116,11 @@ A typical "let's brainstorm" with an AI has shape problems too. It asks five que
 
 ### 1. One question at a time
 
-Stacking several questions in one message produces diluted answers. `ce-brainstorm` asks one question per turn and defaults to the platform's blocking question tool with single-select options when natural choices exist. Free-text is always available.
+Stacking several questions in one message produces diluted answers. `ce-brainstorm` asks one question per turn and defaults to the platform's blocking question tool with single-select options when natural choices exist. Free-text is always available. It also asks only decisions: if the repo, the grounding dossier, or another reachable source can settle the answer, it looks that up instead of putting it to you. A lookup in flight does not stall questions that do not depend on it. When your wording conflicts with existing `CONCEPTS.md` or with verified code in a way that would change a product decision, it surfaces that conflict before treating the wording as settled. It does not create `CONCEPTS.md`; glossary writes still land after the plan.
 
 ### 2. Ceremony scales with the work
 
-Lightweight covers small, well-bounded ideas. Standard handles ordinary features with some decisions. Deep adds probes for cross-cutting work. Deep-product also has to establish product shape (actors, core outcome, positioning, durability) rather than inherit it.
+Lightweight covers small, well-bounded ideas and ends in chat: a paragraph naming what is being built, the one or two decisions made, and where they go next — no file, no grounding scout, no approach generation. A file is written only when the dialogue produced a decision a downstream consumer needs in IDed form, or you ask for one. Standard handles ordinary features with some decisions. Deep adds probes for cross-cutting work. Deep-product also has to establish product shape (actors, core outcome, positioning, durability) rather than inherit it.
 
 ### 3. Named gap lenses, then approaches
 
@@ -156,14 +158,6 @@ When you flag unfamiliarity, or consecutive answers show you cannot weigh the op
 
 Non-software work uses a domain-agnostic facilitator with the same one-question discipline. It does not write a software unified-plan artifact.
 
-### 7. Domain tripwire — the wrong word is caught mid-dialogue
-
-Vocabulary problems are cheapest to fix on the turn they appear and most expensive once the Product Contract is written on top of them. Five falsifiable conditions fire the tripwire: a term contradicting a definition already loaded, a vague or overloaded word carrying a decision, a new entity or named process or status concept, a changed relation or invariant, and a term crossing a declared context boundary.
-
-When it fires, the conflict is named in the same turn rather than answered around, a precise term is proposed with its owning context, a relation or invariant is pressure-tested against one concrete scenario, and an asserted behavior is checked against the code. It deliberately does not fire on casual synonyms with no decision riding on them — auditing the user's diction is the failure mode this guards against as much as missing a real conflict.
-
-Resolved terms are captured only after settlement, into the glossary that owns them, so nothing provisional reaches the source of truth.
-
 ---
 
 ## Quick Example
@@ -195,7 +189,7 @@ Skip `ce-brainstorm` when:
 - Requirements are already specified (a PRD exists, the issue is detailed) → `/ce-plan`
 - The request is whether to adopt a named external candidate → `/ce-pov`
 - You have a known root cause for a bug → `/ce-debug`
-- The change is trivial and obvious → just do it
+- The change is already specified down to the files it touches → just do it, or `/ce-work`
 
 ---
 

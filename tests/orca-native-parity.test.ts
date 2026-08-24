@@ -28,7 +28,7 @@ const REPO_ROOT = path.resolve(import.meta.dir, "..")
 const SKILL_FILE = path.join(REPO_ROOT, "skills/ce-doc-review/SKILL.md")
 const tempRoots: string[] = []
 
-const NATIVE_DISPATCH = "Dispatch generic subagents with **bounded parallelism** using the platform's subagent primitive (e.g., `Agent` in Claude Code, `spawn_agent` in Codex) where available; otherwise run the work inline or serially. Omit the `mode` parameter so the user's configured permission settings apply. Respect the harness's active-subagent limit even at the 7-agent maximum: queue the selected reviewers, dispatch only as many as the harness accepts, and fill freed slots as reviewers complete. Treat active-agent/thread/concurrency-limit spawn errors as backpressure, not reviewer failure — leave the reviewer queued and retry after a slot frees, and if the harness cap is lower than the team size, queue the remainder rather than dropping it. Record a reviewer as failed only after a successful dispatch times out or fails, or when dispatch fails for a non-capacity reason that survives correcting the invocation."
+const NATIVE_DISPATCH = "Dispatch generic subagents with **bounded parallelism** through the platform's subagent primitive. Seed each one with the full content of its `references/personas/<reviewer-name>.md`. Never dispatch a standalone agent by type or name."
 
 const fixtureOutput = (reviewer: string) => ({
   reviewer,
@@ -50,6 +50,7 @@ type ParityCase = {
   workflowId: string
   controller: "ce-controller" | "lfg-controller"
   upstreamAnchor: string
+  upstreamFile?: string
   hooks: HookSeam[]
   reference: string
   controllerAnchors: string[]
@@ -99,8 +100,10 @@ const PARITY_CASES: ParityCase[] = [
   makeReadParityCase({
     adapter: planWorkflow,
     upstreamAnchor: "All specialist research and deepening prompts used in this phase are skill-local prompt assets",
+    upstreamFile: "skills/ce-plan/references/research.md",
     hooks: [{
       id: "ce-plan.read-analysis",
+      file: "skills/ce-plan/references/research.md",
       before: "All specialist research and deepening prompts used in this phase are skill-local prompt assets",
       after: "Model tiering lives in this caller, not in prompt assets.",
     }],
@@ -121,6 +124,7 @@ const PARITY_CASES: ParityCase[] = [
     workflowId: "ce-work",
     controller: "ce-controller",
     upstreamAnchor: "**Native dispatch (inline/subagent engines only)** uses your harness's subagent/worker mechanism.",
+    upstreamFile: "skills/ce-work/references/execution-strategy.md",
     hooks: [{
       id: "ce-work-execution-engine",
       file: "skills/ce-work/references/execution-engines.md",
@@ -168,12 +172,14 @@ const PARITY_CASES: ParityCase[] = [
   }),
   makeReadParityCase({
     adapter: codeReviewWorkflow,
-    upstreamAnchor: "### Stage 4: Dispatch and collect reviewers",
+    upstreamAnchor: "### Stage 4: Spawn sub-agents",
+    upstreamFile: "skills/ce-code-review/references/dispatch-reviewers.md",
     hooks: [
       {
         id: "ce-code-review.persona-dispatch",
-        before: "Only after Stage 3d has materialized the final local roster",
-        after: "### Stage 5: Finish the review",
+        file: "skills/ce-code-review/references/dispatch-reviewers.md",
+        before: "### Stage 4: Spawn sub-agents",
+        after: "#### Inline fast pass",
       },
       {
         id: "ce-code-review.finding-validation",
@@ -197,11 +203,13 @@ const PARITY_CASES: ParityCase[] = [
   }),
   makeReadParityCase({
     adapter: debugWorkflow,
-    upstreamAnchor: "**Parallel investigation option:**",
+    upstreamAnchor: "### Phase 1: Investigate",
+    upstreamFile: "skills/ce-debug/references/investigate.md",
     hooks: [{
       id: "ce-debug.hypothesis-investigation",
-      before: "| Fix works but prediction was wrong | Symptom fix, not root cause |",
-      after: "**Parallel investigation option:**",
+      file: "skills/ce-debug/references/investigate.md",
+      before: "### Phase 1: Investigate",
+      after: "#### 1.1 Reproduce the bug",
     }],
     reference: "skills/ce-debug/references/orca-investigation.md",
     controllerAnchors: [
@@ -222,7 +230,7 @@ const PARITY_CASES: ParityCase[] = [
     upstreamAnchor: "## Phase 2: Announce and Dispatch Personas",
     hooks: [{
       id: "ce-doc-review.persona-dispatch",
-      before: "### Dispatch",
+      before: "Announce the team with a per-persona justification before any dispatch.",
       after: NATIVE_DISPATCH,
     }],
     reference: "skills/ce-doc-review/references/orca-dispatch.md",
@@ -243,16 +251,19 @@ const PARITY_CASES: ParityCase[] = [
   makeReadParityCase({
     adapter: compoundWorkflow,
     upstreamAnchor: "Launch research subagents.",
+    upstreamFile: "skills/ce-compound/references/research.md",
     hooks: [
       {
         id: "ce-compound.research-dispatch",
+        file: "skills/ce-compound/references/research.md",
         before: "Launch research subagents.",
         after: "**Run ID and run dir (before dispatching any subagent):**",
       },
       {
         id: "ce-compound.grounding-validation",
+        file: "skills/ce-compound/references/assembly.md",
         before: "2. **Semantic grounding validator (Full mode, including non-interactive Full; lightweight skips it).**",
-        after: "### Phase 2.5: Selective Refresh Check",
+        after: "## What It Creates",
       },
     ],
     reference: "skills/ce-compound/references/orca-read-analysis.md",
@@ -269,11 +280,11 @@ const PARITY_CASES: ParityCase[] = [
   {
     workflowId: "lfg",
     controller: "lfg-controller",
-    upstreamAnchor: "Invoke the `ce-work` skill with `mode:return-to-caller",
+    upstreamAnchor: "invoke the `ce-work` skill with `mode:return-to-caller",
     hooks: [{
       id: "lfg-controller",
-      before: "**Sanitize product input.** Remove every routing directive from the feature request that enters planning",
-      after: "1. Invoke the `ce-plan` skill with the sanitized feature request prepared above",
+      before: "## Per-stage routing carriers",
+      after: "1. **Read `references/plan-brief.md` first**",
     }],
     reference: "skills/lfg/references/orca-lfg.md",
     controllerAnchors: [
@@ -471,13 +482,14 @@ describe("first-wave native and Orca parity matrix", () => {
       .toEqual(firstWaveWorkflowIds())
 
     for (const parity of PARITY_CASES) {
+      const upstreamFile = parity.upstreamFile ?? `skills/${parity.workflowId}/SKILL.md`
       const skill = await fs.readFile(
-        path.join(REPO_ROOT, "skills", parity.workflowId, "SKILL.md"),
+        path.join(REPO_ROOT, upstreamFile),
         "utf8",
       )
       expect(
         upstream.hookAnchors.some((anchor) =>
-          anchor.file === `skills/${parity.workflowId}/SKILL.md`
+          anchor.file === upstreamFile
           && anchor.contains === parity.upstreamAnchor),
         `${parity.workflowId}: recorded upstream seam`,
       ).toBe(true)
@@ -701,16 +713,20 @@ describe("native and Orca document review parity", () => {
   })
 
   test("preserves parent ownership of selection, synthesis, and presentation", async () => {
-    const [skill, dispatchReference] = await Promise.all([
+    const [skill, selectionReference, dispatchReference] = await Promise.all([
       fs.readFile(SKILL_FILE, "utf8"),
+      fs.readFile(
+        path.join(REPO_ROOT, "skills/ce-doc-review/references/persona-selection.md"),
+        "utf8",
+      ),
       fs.readFile(
         path.join(REPO_ROOT, "skills/ce-doc-review/references/orca-dispatch.md"),
         "utf8",
       ),
     ])
 
-    expect(skill).toContain("### Select Conditional Personas")
-    expect(skill).toContain("read `references/synthesis-and-presentation.md` for the synthesis pipeline")
+    expect(selectionReference).toContain("conditional persona")
+    expect(skill).toContain("read `references/synthesis-and-presentation.md`")
     expect(dispatchReference).toContain("Keep document classification, persona selection, prompt construction,")
     expect(dispatchReference).toContain("synthesis, Apply-routed changes, grouped confirmation, decisions")
     expect(dispatchReference).toContain("An Orca reviewer must not")

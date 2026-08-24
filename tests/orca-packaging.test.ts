@@ -41,7 +41,7 @@ describe("CE-Orca packaging", () => {
     }>("integrations/orca/protocol.json")
 
     expect(protocol.schema).toBe("ce-orca.protocol-compatibility/v1")
-    expect(protocol.integration.revision).toBe(5)
+    expect(protocol.integration.revision).toBe(6)
     expect(protocol.orca).toEqual({
       protocol: "orca.local-protocol/v1",
       envelopes: {
@@ -138,7 +138,7 @@ describe("CE-Orca packaging", () => {
     const claudeVersion = claude.version
     const codexVersion = codex.version
     expect(new Set([packageJson.version, claudeVersion, codexVersion]).size).toBe(1)
-    expect([upstream.version, `${upstream.version}-orca.2`]).toContain(packageJson.version)
+    expect([upstream.version, `${upstream.version}-orca.6`]).toContain(packageJson.version)
     expect(packageJson.repository).toBe("https://github.com/ethras/compound-engineering-orca")
     expect(claude).toMatchObject({
       name: "compound-engineering",
@@ -191,9 +191,9 @@ describe("CE-Orca packaging", () => {
     })
     expect(JSON.parse(stdout)).toEqual({
       name: "compound-engineering-orca",
-      version: "3.22.4-orca.5",
+      version: "3.23.2-orca.6",
       upstream,
-      integrationRevision: 5,
+      integrationRevision: 6,
       orca: {
         protocol: "orca.local-protocol/v1",
         requestVersions: ["orca.execution-config/v1"],

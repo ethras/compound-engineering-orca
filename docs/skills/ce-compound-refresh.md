@@ -94,12 +94,6 @@ It investigates each doc against the tree, then looks at the set (overlap, super
 
 Each doc gets a specific action and an evidence bar. Age alone is not staleness. Typos and wording are not a reason to edit. When the code and the doc disagree, the doc changes. The skill does not ask whether the code change was "intentional."
 
-### 1b. Domain-graph audit and legacy migration
-
-Refresh is the only skill that owns the shape of a project's vocabulary, not just its entries. When a project's root `CONCEPTS.md` has become an index over per-context glossaries, refresh audits the graph — links that do not resolve, a term defined twice inside one context, shared-vocabulary entries whose contexts do not actually share governance — while leaving a word that legitimately means different things in two contexts alone. It also recommends moving from a flat glossary to contexts, but only on evidence of real boundaries (divergent invariants, translation at a seam, separate ownership), never because a file got long.
-
-It also owns `migrate-domain-docs`, the one route that imports legacy `CONTEXT-MAP.md` / `CONTEXT.md` vocabulary. The route is inventory, deterministic proposal, human arbitration, dry-run preview, confirmed apply, then validation twice — before and after the legacy files are removed. Nothing is written until the user has seen the complete operation list, headless runs stop at the dry-run report, and legacy files are deleted only once every reference to them has moved and the user has reviewed the diff. Re-running the whole route on a migrated project proposes nothing.
-
 ### Two modes
 
 **Interactive** (default) applies Keep, Update, and obvious Consolidate directly. It asks before a Replace, a Split, a Delete that fails the auto-delete gate, or a Consolidate whose canonical doc is not obvious.

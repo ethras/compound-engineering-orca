@@ -173,10 +173,6 @@ def _native_completion_commit(unit: dict) -> str | None:
     claim_mode = claim.get("mode")
     if claim_mode not in {"prefer", "require"}:
         return None
-    if claim_mode == "require" and not (
-        claim.get("caller_mode") == "interactive" and claim.get("confirmed_native") is True
-    ):
-        return None
     accepted_head = completion.get("accepted_head")
     base = unit.get("workspace", {}).get("base")
     snapshot = completion.get("snapshot")
@@ -629,7 +625,6 @@ ROUTE_CONTRACTS = {
     "cursor": {"target": "cursor", "harness": "cursor-agent", "intermediaries": [], "default_model": "auto", "restriction_posture": "adapter-enforced"},
     "composer": {"target": "composer", "harness": "cursor-agent", "intermediaries": ["cursor"], "default_model": "composer-2.5-fast", "restriction_posture": "adapter-enforced"},
     "grok-cursor": {"target": "grok", "harness": "cursor-agent", "intermediaries": ["cursor"], "default_model": "cursor-grok-4.6-high", "restriction_posture": "adapter-enforced"},
-    "agy": {"target": "antigravity", "harness": "agy", "intermediaries": [], "default_model": "auto", "restriction_posture": "adapter-enforced"},
 }
 
 
@@ -650,8 +645,6 @@ def route_model_allowed(route: str, model: str) -> bool:
         return bool(re.fullmatch(r"composer-[A-Za-z0-9._-]+", model))
     if route == "grok-cursor":
         return bool(re.fullmatch(r"cursor-grok-[A-Za-z0-9._-]+", model))
-    if route == "agy":
-        return bool(re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:/-]*", model))
     return False
 
 

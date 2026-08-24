@@ -87,23 +87,23 @@ const WORKFLOW_DEFINITIONS = {
       "data-migration-reviewer": "The upstream asset is dormant in ce-plan and is not dispatched by the installed workflow.",
     },
     stages: {
-      "local-research": stage("skills/ce-plan/SKILL.md", "All specialist research and deepening prompts used in this phase are skill-local prompt assets", {
+      "local-research": stage("skills/ce-plan/references/research.md", "All specialist research and deepening prompts used in this phase are skill-local prompt assets", {
         "repo-research-analyst": promptRole("skills/ce-plan/references/agents/repo-research-analyst.md", { activation: "always", required: true, resultMode: "artifact" }),
         "learnings-researcher": promptRole("skills/ce-plan/references/agents/learnings-researcher.md", { activation: "always", resultMode: "artifact" }),
         "agent-native-planning-strategist": promptRole("skills/ce-plan/references/agents/agent-native-planning-strategist.md", { activation: "conditional", resultMode: "artifact" }),
       }),
-      "organizational-research": stage("skills/ce-plan/SKILL.md", "**Slack context** (opt-in) — never auto-dispatch. Route by condition:", {
+      "organizational-research": stage("skills/ce-plan/references/research.md", "**Slack context** (opt-in) — never auto-dispatch. Route by condition:", {
         "slack-researcher": promptRole("skills/ce-plan/references/agents/slack-researcher.md", { activation: "conditional", resultMode: "artifact" }),
       }, { defaultOwner: "native" }),
-      "external-research": stage("skills/ce-plan/SKILL.md", "External Research", {
+      "external-research": stage("skills/ce-plan/references/research.md", "External Research", {
         "best-practices-researcher": promptRole("skills/ce-plan/references/agents/best-practices-researcher.md", { resultMode: "artifact" }),
         "framework-docs-researcher": promptRole("skills/ce-plan/references/agents/framework-docs-researcher.md", { resultMode: "artifact" }),
         "web-researcher": promptRole("skills/ce-plan/references/agents/web-researcher.md", { resultMode: "artifact" }),
       }, { defaultOwner: "native" }),
-      "flow-analysis": stage("skills/ce-plan/SKILL.md", "spec-flow-analyzer", {
+      "flow-analysis": stage("skills/ce-plan/references/research.md", "spec-flow-analyzer", {
         "spec-flow-analyzer": promptRole("skills/ce-plan/references/agents/spec-flow-analyzer.md", { activation: "conditional", modelTier: "mid", resultMode: "artifact" }),
       }),
-      deepening: stage("skills/ce-plan/SKILL.md", "Confidence Check and Deepening", {
+      deepening: stage("skills/ce-plan/references/final-review.md", "Confidence Check and Deepening", {
         "repo-research-analyst": promptRole("skills/ce-plan/references/agents/repo-research-analyst.md", { resultMode: "artifact" }),
         "agent-native-planning-strategist": promptRole("skills/ce-plan/references/agents/agent-native-planning-strategist.md", { resultMode: "artifact" }),
         "framework-docs-researcher": promptRole("skills/ce-plan/references/agents/framework-docs-researcher.md", { resultMode: "artifact" }),
@@ -119,17 +119,17 @@ const WORKFLOW_DEFINITIONS = {
         "data-integrity-guardian": promptRole("skills/ce-plan/references/agents/data-integrity-guardian.md", { resultMode: "artifact" }),
         "deployment-verification-agent": promptRole("skills/ce-plan/references/agents/deployment-verification-agent.md", { resultMode: "artifact" }),
       }, { defaultOwner: "native" }),
-      authoring: stage("skills/ce-plan/SKILL.md", "### Phase 5: Final Review, Write File, and Handoff", {
+      authoring: stage("skills/ce-plan/references/final-review.md", "### Phase 5: Final Review, Write File, and Handoff", {
         "plan-author": workflowRole("skills/ce-plan/SKILL.md", "Research, decide, and write the plan", { activation: "always", required: true, resultMode: "controller" }),
       }, { defaultOwner: "native", mutation: "artifact-write", resultMode: "controller" }),
     },
   },
   "ce-code-review": {
     stages: {
-      "scope-triage": stage("skills/ce-code-review/SKILL.md", "Trivial-PR judgment", {
-        "trivial-pr-judge": workflowRole("skills/ce-code-review/SKILL.md", "Trivial-PR judgment", { activation: "conditional", modelTier: "cheap" }),
+      "scope-triage": stage("skills/ce-code-review/references/scope.md", "Trivial-PR judgment", {
+        "trivial-pr-judge": workflowRole("skills/ce-code-review/references/scope.md", "Trivial-PR judgment", { activation: "conditional", modelTier: "cheap" }),
       }, { defaultOwner: "native" }),
-      "persona-review": stage("skills/ce-code-review/SKILL.md", "### Stage 4: Dispatch and collect reviewers", {
+      "persona-review": stage("skills/ce-code-review/references/dispatch-reviewers.md", "### Stage 4: Spawn sub-agents", {
         "correctness-reviewer": promptRole("skills/ce-code-review/references/personas/correctness-reviewer.md", { activation: "always", required: true }),
         "testing-reviewer": promptRole("skills/ce-code-review/references/personas/testing-reviewer.md", { modelTier: "mid" }),
         "maintainability-reviewer": promptRole("skills/ce-code-review/references/personas/maintainability-reviewer.md", { modelTier: "mid" }),
@@ -147,8 +147,8 @@ const WORKFLOW_DEFINITIONS = {
         "swift-ios-reviewer": promptRole("skills/ce-code-review/references/personas/swift-ios-reviewer.md", { modelTier: "mid" }),
         "deployment-verification-agent": promptRole("skills/ce-code-review/references/personas/deployment-verification-agent.md", { modelTier: "mid" }),
       }),
-      "adversarial-peer": stage("skills/ce-code-review/SKILL.md", "exclusive choice between a cross-model adversarial peer", {
-        "adversarial-peer": workflowRole("skills/ce-code-review/SKILL.md", "start the detached peer job", { activation: "conditional" }),
+      "adversarial-peer": stage("skills/ce-code-review/references/select-and-route.md", "exclusive choice between a cross-model adversarial peer", {
+        "adversarial-peer": workflowRole("skills/ce-code-review/references/select-and-route.md", "start the detached peer job", { activation: "conditional" }),
       }, { defaultOwner: "native" }),
       "finding-validation": stage("skills/ce-code-review/references/finish-review.md", "### Stage 5b: Validation pass", {
         "finding-validator": workflowRole("skills/ce-code-review/references/finish-review.md", "deterministic validator batch", { activation: "conditional", modelTier: "mid" }),
@@ -166,53 +166,53 @@ const WORKFLOW_DEFINITIONS = {
   },
   "ce-debug": {
     stages: {
-      "hypothesis-investigation": stage("skills/ce-debug/SKILL.md", "Parallel investigation option", {
-        "hypothesis-probe": workflowRole("skills/ce-debug/SKILL.md", "each with an explicit hypothesis and a structured evidence-return format", { activation: "repeatable", modelTier: "mid" }),
+      "hypothesis-investigation": stage("skills/ce-debug/references/investigate.md", "### Phase 1: Investigate", {
+        "hypothesis-probe": workflowRole("skills/ce-debug/references/investigate.md", "Form hypotheses", { activation: "repeatable", modelTier: "mid" }),
       }),
     },
   },
   "ce-compound": {
     stages: {
-      research: stage("skills/ce-compound/SKILL.md", "Launch research subagents.", {
-        "context-analyzer": workflowRole("skills/ce-compound/SKILL.md", "Context Analyzer", { activation: "always", required: true, resultMode: "artifact" }),
-        "solution-extractor": workflowRole("skills/ce-compound/SKILL.md", "Solution Extractor", { activation: "always", required: true, resultMode: "artifact" }),
-        "related-docs-finder": workflowRole("skills/ce-compound/SKILL.md", "Related Docs Finder", { activation: "always", required: true, resultMode: "artifact" }),
+      research: stage("skills/ce-compound/references/research.md", "Launch research subagents.", {
+        "context-analyzer": workflowRole("skills/ce-compound/references/research.md", "Context Analyzer", { activation: "always", required: true, resultMode: "artifact" }),
+        "solution-extractor": workflowRole("skills/ce-compound/references/research.md", "Solution Extractor", { activation: "always", required: true, resultMode: "artifact" }),
+        "related-docs-finder": workflowRole("skills/ce-compound/references/research.md", "Related Docs Finder", { activation: "always", required: true, resultMode: "artifact" }),
       }),
-      "session-history": stage("skills/ce-compound/SKILL.md", "Session History", {
+      "session-history": stage("skills/ce-compound/references/session-history.md", "Session History", {
         "session-historian": promptRole("skills/ce-compound/references/agents/session-historian.md", { activation: "conditional", resultMode: "artifact" }),
       }),
-      "grounding-validation": stage("skills/ce-compound/SKILL.md", "### Phase 2.45: Grounding Validation", {
-        "grounding-validator": workflowRole("skills/ce-compound/SKILL.md", "Semantic grounding validator", { activation: "conditional", modelTier: "mid" }),
+      "grounding-validation": stage("skills/ce-compound/references/assembly.md", "### Phase 2.45: Grounding Validation", {
+        "grounding-validator": workflowRole("skills/ce-compound/references/assembly.md", "Semantic grounding validator", { activation: "conditional", modelTier: "mid" }),
       }),
-      "specialized-review": stage("skills/ce-compound/SKILL.md", "Skip Phase 3 entirely in non-interactive mode", {
+      "specialized-review": stage("skills/ce-compound/references/enhancement.md", "This phase is interactive-only", {
         "pattern-recognition-specialist": promptRole("skills/ce-compound/references/agents/pattern-recognition-specialist.md"),
         "performance-oracle": promptRole("skills/ce-compound/references/agents/performance-oracle.md"),
         "security-sentinel": promptRole("skills/ce-compound/references/agents/security-sentinel.md"),
         "data-integrity-guardian": promptRole("skills/ce-compound/references/agents/data-integrity-guardian.md"),
         "best-practices-researcher": promptRole("skills/ce-compound/references/agents/best-practices-researcher.md"),
         "framework-docs-researcher": promptRole("skills/ce-compound/references/agents/framework-docs-researcher.md"),
-        "code-simplification-reviewer": workflowRole("skills/ce-compound/SKILL.md", "read-only documentation review"),
+        "code-simplification-reviewer": workflowRole("skills/ce-compound/references/enhancement.md", "read-only documentation review"),
       }, { defaultOwner: "native" }),
     },
   },
   "ce-work": {
     stages: {
-      implementation: stage("skills/ce-work/SKILL.md", "**Native dispatch (inline/subagent engines only)** uses your harness's subagent/worker mechanism.", {
+      implementation: stage("skills/ce-work/references/execution-strategy.md", "**Native dispatch (inline/subagent engines only)** uses your harness's subagent/worker mechanism.", {
         "implementation-unit-worker": promptRole("skills/ce-work/references/agents/implementation-worker.md", { activation: "repeatable", mutation: "worktree-write", required: true, resultMode: "artifact" }),
       }, { mutation: "worktree-write", resultMode: "artifact" }),
-      "design-validation": stage("skills/ce-work/SKILL.md", "figma-design-sync", {
+      "design-validation": stage("skills/ce-work/references/implementation-loop.md", "figma-design-sync", {
         "figma-design-sync": promptRole("skills/ce-work/references/agents/figma-design-sync.md", { activation: "conditional", resultMode: "artifact" }),
       }, { defaultOwner: "native" }),
-      "review-fixes": stage("skills/ce-work/SKILL.md", "dispatch fix subagents", {
-        "review-fix-worker": workflowRole("skills/ce-work/SKILL.md", "dispatch fix subagents", { activation: "repeatable", mutation: "worktree-write", resultMode: "artifact" }),
+      "review-fixes": stage("skills/ce-work/references/shipping-workflow.md", "dispatch fix subagents", {
+        "review-fix-worker": workflowRole("skills/ce-work/references/shipping-workflow.md", "dispatch fix subagents", { activation: "repeatable", mutation: "worktree-write", resultMode: "artifact" }),
       }, { defaultOwner: "native", mutation: "worktree-write", resultMode: "artifact" }),
     },
   },
   lfg: {
     stages: {
-      planning: stage("skills/lfg/SKILL.md", "Invoke the `ce-plan` skill", {}, { defaultOwner: "native", nativeTargetHandling: "child-workflow", resultMode: "controller" }),
-      implementation: stage("skills/lfg/SKILL.md", "Invoke the `ce-work` skill", {}, { defaultOwner: "native", nativeTargetHandling: "child-workflow", mutation: "worktree-write", resultMode: "controller" }),
-      simplification: stage("skills/lfg/SKILL.md", "Invoke the `ce-simplify-code` skill", {}, { defaultOwner: "native", nativeTargetHandling: "child-workflow", mutation: "worktree-write", resultMode: "controller" }),
+      planning: stage("skills/lfg/SKILL.md", "invoke the `ce-plan` skill", {}, { defaultOwner: "native", nativeTargetHandling: "child-workflow", resultMode: "controller" }),
+      implementation: stage("skills/lfg/SKILL.md", "invoke the `ce-work` skill", {}, { defaultOwner: "native", nativeTargetHandling: "child-workflow", mutation: "worktree-write", resultMode: "controller" }),
+      simplification: stage("skills/lfg/SKILL.md", "invoke the `ce-simplify-code` skill", {}, { defaultOwner: "native", nativeTargetHandling: "child-workflow", mutation: "worktree-write", resultMode: "controller" }),
       review: stage("skills/lfg/SKILL.md", "Invoke the `ce-code-review` skill", {}, { defaultOwner: "native", nativeTargetHandling: "child-workflow", resultMode: "controller" }),
       "shipping-tail": stage("skills/lfg/SKILL.md", "Shipping precondition", {}, { defaultOwner: "native", mutation: "shipping-tail", resultMode: "controller" }),
     },

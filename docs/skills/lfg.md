@@ -97,7 +97,7 @@ Planning has to land an implementation-ready code plan. Implementation has to re
 
 Planning can be authored on a named model (`plan with fable`) via `ce-plan`'s model elevation. Implementation can be sent to a harness (`use Codex for implementation`, `only use Composer for implementation`). Unscoped assignments bind to implementation only. Standing defaults live in CE config (`plan_model`, `work_engine_mode`, `work_engine_preferences`). See [Implementation routing](./configuration.md#implementation-routing).
 
-A preference falls back to native and says so. A requirement that cannot run blocks. `lfg` does not ask whether to weaken it.
+Both a preference and a requirement fall back to the current harness/session model with one disclosure when the external route cannot run. A requirement keeps the requested external identity fixed while viable; it never authorizes another external recipient. `lfg` does not ask whether to weaken the route.
 
 On string-only hosts the implementation seam is `mode:return-to-caller implementation_engine:<compact-json> <plan-path>`. The `plan_model:<alias>` carrier rides beside, never inside, `ce-plan`'s request. Neither carrier becomes plan content, a settled product decision, or review input.
 
@@ -178,7 +178,7 @@ Direct invocation is fine for a clear software task. The planner has less produc
 You can ask `lfg` to have a specific model or harness author one stage while `lfg` keeps the rest of the run.
 
 - **Scoped to planning:** `plan with fable`, `plan with opus`. This is model elevation inside `ce-plan`. Planning has no cross-harness engine. Assigning a harness to planning (`plan with Codex`, `plan on Cursor`) blocks.
-- **Scoped to implementation:** `use Codex for implementation` (preference), `only use Composer for implementation` (requirement). `cursor` means the Cursor harness with its default model. `composer` means a Composer-family model through Cursor. `antigravity` means the Antigravity CLI (`agy`) with its configured default model.
+- **Scoped to implementation:** `use Codex for implementation` (preference), `only use Composer for implementation` (requirement). `cursor` means the Cursor harness with its default model. `composer` means a Composer-family model through Cursor.
 - **Unscoped:** `use fable`, `with Codex`. Binds to implementation only. In an interactive run that is genuinely ambiguous, `lfg` asks one question, then runs hands-off. In a headless run (scheduler, loop, nested orchestrator) it applies the implementation default and discloses it.
 - **No stage instruction:** `ce-plan` uses its `plan_model` config (or none). `ce-work` uses session/project instructions already in context, then checkout-local `work_engine_mode` and `work_engine_preferences`.
 

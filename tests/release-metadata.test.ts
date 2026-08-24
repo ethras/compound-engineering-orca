@@ -219,15 +219,55 @@ describe("release metadata", () => {
     })
   })
 
-  test("pins release-please to the current Orca fork identity", async () => {
-    const root = process.cwd()
-    const upstream = await Bun.file(path.join(root, "integrations/orca/upstream.json")).json()
-    const protocol = await Bun.file(path.join(root, "integrations/orca/protocol.json")).json()
-    const releasePlease = await Bun.file(path.join(root, ".github/release-please-config.json")).json()
-
-    expect(releasePlease.packages["."]["release-as"]).toBe(
-      `${upstream.version}-orca.${protocol.integration.revision}`,
+  // The root README carries skill *names* in its grouped overview while
+  // docs/skills/README.md owns the descriptions. That split only holds if the
+  // names and the stated count cannot drift, so both are pinned here rather
+  // than left to convention -- the three-way prose sync this replaced had
+  // already drifted before anyone noticed.
+  test("the README grouped overview names every skill, and only real skills", async () => {
+    const readme = await Bun.file(path.join(process.cwd(), "README.md")).text()
+    const section = readme.slice(
+      readme.indexOf("## Skills at a glance"),
+      readme.indexOf("**Learn more**"),
     )
+    expect(section.length).toBeGreaterThan(0)
+
+    const { readdir } = await import("fs/promises")
+    const skills = (await readdir(path.join(process.cwd(), "skills"), { withFileTypes: true }))
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name)
+      .sort()
+
+    const listed = [...section.matchAll(/`(ce-[a-z0-9-]+|lfg)`/g)].map((match) => match[1])
+    const listedSet = new Set(listed)
+
+    expect(skills.filter((skill) => !listedSet.has(skill))).toEqual([])
+    expect([...listedSet].filter((name) => !skills.includes(name)).sort()).toEqual([])
+
+    // Exactly once, not merely present: a skill left in its old row during a
+    // move reads as correct in a set-membership check. Which group a skill
+    // belongs in stays an author judgment -- deriving that here would mean
+    // maintaining a second canonical inventory, which is what this PR removed.
+    const duplicated = [...listedSet].filter(
+      (name) => listed.filter((entry) => entry === name).length > 1,
+    ).sort()
+    expect(duplicated).toEqual([])
+  })
+
+  test("every skill count stated in the README matches the skills directory", async () => {
+    const readme = await Bun.file(path.join(process.cwd(), "README.md")).text()
+    const { readdir } = await import("fs/promises")
+    const skillCount = (await readdir(path.join(process.cwd(), "skills"), { withFileTypes: true }))
+      .filter((entry) => entry.isDirectory()).length
+
+    const stated = [
+      readme.match(/badge\/skills-(\d+)-/)?.[1],
+      readme.match(/a plugin of (\d+) skills/)?.[1],
+      readme.match(/^(\d+) skills, grouped by/m)?.[1],
+    ]
+
+    expect(stated.every((value) => value !== undefined)).toBe(true)
+    expect(stated.map(Number)).toEqual([skillCount, skillCount, skillCount])
   })
 
   test("builds a stable compound-engineering manifest description", async () => {

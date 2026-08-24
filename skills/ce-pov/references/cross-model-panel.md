@@ -34,6 +34,7 @@ Attest the host harness and its serving family as two separate tokens:
 ```bash
 if [ "${CLAUDECODE:-}" = "1" ]; then XHOST_HARNESS=claude; XHOST_FAMILY=claude;
 elif [ -n "${CODEX_SANDBOX:-}${CODEX_SANDBOX_NETWORK_DISABLED:-}${CODEX_SESSION_ID:-}${CODEX_THREAD_ID:-}${CODEX_CI:-}" ]; then XHOST_HARNESS=codex; XHOST_FAMILY=codex;
+elif [ "${GROK_AGENT:-}" = "1" ] || [ -n "${GROK_SESSION_ID:-}" ]; then XHOST_HARNESS=grok; XHOST_FAMILY=grok;
 elif [ -n "${CURSOR_AGENT:-}${CURSOR_CONVERSATION_ID:-}" ]; then XHOST_HARNESS=cursor; XHOST_FAMILY=unknown;
 else XHOST_HARNESS=unknown; XHOST_FAMILY=unknown; fi
 ```
@@ -41,14 +42,22 @@ else XHOST_HARNESS=unknown; XHOST_FAMILY=unknown; fi
 Both tokens come from the same peer-key vocabulary as the targets above, never
 from a provider's corporate name: `<host-serving-family>` (`XHOST_FAMILY`) is
 `codex`, `claude`, `grok`, `composer`, or `unknown`. `<host-harness>`
-(`XHOST_HARNESS`) is `codex`, `claude`, `grok`, `cursor`, or `unknown`. Claude
-Code maps to harness/family `claude`; Codex maps to `codex`. Cursor maps to
-harness `cursor` and family `unknown` unless an observable serving-family
-attestation lets you set `XHOST_FAMILY` to `codex`, `claude`, `grok`, or
-`composer`. Never infer serving family from the Cursor brand. Section 4 passes
-`XHOST_FAMILY` as the worker's first argument and `XHOST_HARNESS` as
-`CROSS_MODEL_HOST_HARNESS`; a provider name such as `anthropic`, `openai`, or
-`xai` in either slot fail-closes the job with no artifact.
+(`XHOST_HARNESS`) is `codex`, `claude`, `grok`, `cursor`, or `unknown`. The
+snippet is evidence, not the verdict: it resolves the harnesses whose
+environment markers it already names, and where it yields `unknown` on a harness
+you can identify from your own runtime, attest what you know instead. A harness
+the snippet does not name needs no new branch here.
+
+Cursor is the one identity self-knowledge cannot complete, because the harness
+does not determine the serving model: it keeps harness `cursor` and family
+`unknown` unless an observable serving-family attestation lets you set
+`XHOST_FAMILY` to `codex`, `claude`, `grok`, or `composer`.
+Never infer serving family from the Cursor brand.
+
+Section 4 passes `XHOST_FAMILY` as the worker's first argument and
+`XHOST_HARNESS` as `CROSS_MODEL_HOST_HARNESS`; a provider name such as
+`anthropic`, `openai`, or `xai` in either slot fail-closes the job with no
+artifact.
 
 `Cursor` and `Composer` are distinct targets:
 
@@ -58,8 +67,8 @@ attestation lets you set `XHOST_FAMILY` to `codex`, `claude`, `grok`, or
   `independence_verified: false`.
 - `composer` requests the current compatible Composer model through
   `cursor-agent`.
-- `grok` prefers the native Grok CLI and may use a Grok model through Cursor
-  only when that intermediary is separately allowed and sanctioned.
+- `grok` prefers the native Grok CLI; Grok through Cursor is a different route
+  and recipient. Section 3 binds which token.
 
 Apply exactly one participation branch:
 
@@ -166,11 +175,14 @@ fail-closes on anything else (including route-shaped guesses like `codex-cli`):
 | `cursor` | `cursor` |
 | `composer` | `composer` |
 
-Binary presence proves only that a route is a candidate. Use an available
-non-egressing authentication or capability probe when the harness exposes one,
-and do not call a route usable until it returns a valid artifact. Classify a
-failed run from its structured diagnostics rather than guessing from a generic
-terminal state.
+The host harness does not choose the Grok route. Target `grok` binds `grok-cli` when that CLI is installed. Bind `grok-cursor` only when the user asked for Grok through Cursor, or when the grok CLI is absent and Cursor is a sanctioned recipient.
+
+Binary presence proves only that a route is a candidate. Pre-dispatch capability
+evidence may refine the fixed route only when the current host context makes that
+evidence authoritative. Do not preflight authentication there: the
+provider-capable worker attempt owns authentication truth, and a valid artifact
+is the usability proof. Classify a failed run from its structured diagnostics
+rather than guessing from a generic terminal state.
 
 The dispatched worker runs only the fixed route. It must return failure to the
 host rather than automatically hopping to another provider or intermediary. If
@@ -267,6 +279,33 @@ execution rather than presence.
 PY="$(for c in python3 python py; do command -v "$c" >/dev/null 2>&1 && "$c" -c '' >/dev/null 2>&1 && { echo "$c"; break; }; done)"; [ -n "$PY" ] || { echo "no working Python 3 interpreter on PATH" >&2; exit 1; };
 ```
 
+**Host command-sandbox boundary.** The detached worker inherits the permission
+context of the `start` call that launches it. Before executing that exact call,
+treat `CODEX_SANDBOX_NETWORK_DISABLED` as a positive signal that the current
+Codex command sandbox cannot reach the provider; unsetting it does not change
+the sandbox policy. A DNS or authentication failure alone is not proof of that
+condition. Use the narrowest host permission that restores the fixed route's
+provider connection. When Codex exposes only full command escalation, attach
+this request to the exact `peer-job-runner.py start ...` tool call after the
+existing egress disclosure:
+
+```json
+{
+  "sandbox_permissions": "require_escalated",
+  "justification": "Allow the disclosed read-only cross-model panel request to reach the fixed external provider."
+}
+```
+
+Disclose that this is not launcher-only isolation: the detached worker inherits
+that launch context for its lifetime, so the adapter's declared read-only/tool
+restrictions — not the Codex command sandbox — bound the peer while the subject
+egresses. If the grant is denied or unavailable, do not execute `start`; create
+no peer job, drop that voice, and continue with the surviving panel. After
+`start` returns a job id, any network, authentication, or provider failure is a
+started-job outcome and follows the ordinary terminal/recovery rules; keep
+`status`, `wait`, `result`, and `reap` sandboxed because they need no provider
+connection.
+
 Start one job per peer with the command below, filling every `<...>` slot. Set
 `SKILL_DIR` to the absolute directory of **this** skill's `SKILL.md`; the Bash
 tool's CWD is the user's project on every host, not the skill directory.
@@ -341,13 +380,13 @@ harness/intermediary route, requested model, served model, and
 `independence_verified` separately. A served model of `unverified` remains
 unverified. If a job yields no usable artifact, use bounded `peer skip evidence`
 from its log to state an observed quota, authentication, or route failure; never
-invent a cause. An authentication-shaped peer failure (`not logged in`, `please
-log in`, 401, or CLI text prompting login) describes only the peer's execution
-context: a sandboxed host — e.g. a restricted Codex task denying spawned commands
-network or keychain access — produces the identical signal to a genuine account
-logout, so state it as a cross-model execution-context authentication failure and
-never report it as the user's account being logged out or prompt the user to run
-a login command on that basis.
+invent a cause. Attribute an account authentication failure only after
+provider-capable dispatch is positively established by the launch context or
+provider response; then report the observed failure and login or
+credential-refresh remediation. Without that proof, authentication-shaped peer
+text describes only the peer's execution context: a sandboxed host can produce
+the same signal as a genuine logout, so never report it as the user's account
+being logged out or prompt a login command.
 
 ## 5. Detect dissent, verify claims, and reconcile
 
@@ -467,3 +506,10 @@ Remove every consumed job directory, round output directory, payload, raw log,
 and result beneath this run's private scratch root on success, failure, timeout,
 interruption, and reap. Never delete outside the current run root. Peer reasoning
 and project context must not outlive their use.
+
+## Participation, announcement, and disclosure (relocated from the body)
+
+A summons is an **affirmative** request to consult or reconcile peers, detected by reasoning over the invocation context — the user's wording or a calling skill's args. Wording that declines consultation ("solo POV, do not cross-check") or merely recounts a past cross-check names the same terms without asking for one, and is not a summons: peers are not dispatched and no project context leaves the run. For an affirmative request, a caller's paraphrase in one channel never cancels a summons still present in another; only a summons erased from every readable channel upstream is unrecoverable here.
+Invoking a named peer, an explicit cross-check, or `oracle` authorizes the panel protocol's normal read-only consultation against this project. Announce the selected peers before dispatch; ask only when a retry adds an unexpected recipient or intermediary, or an active instruction requires separate approval. Peers inspect the shared working tree directly and cannot edit it. The panel protocol preserves an unbiased initial round, bounds evidence-based reconciliation while honoring user-supplied pass limits, and attributes only receipt-supported independence.
+Any POV delivered after a summons states which peers ran, or that none did and the observed reason; if no panel runs after a summons, keep the verdict content unchanged but add that panel-status line rather than shipping a bare solo verdict. A POV with no summons keeps the solo result unchanged with no panel note.
+Keep the host's own frozen position out of an independent peer's initial context; expose it only when the requested task is to critique that position or when a later reconciliation round compares already-formed views.

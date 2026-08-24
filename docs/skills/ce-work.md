@@ -113,7 +113,7 @@ When the plan defines U-IDs, they propagate as task prefixes, into commit messag
 
 ### Test evidence, review, and operational validation
 
-A task is not done when the code compiles. Before changing behavior, `ce-work` discovers the existing test files and chooses the right proof: use an existing failing test, update or strengthen the existing test that owns the contract, add a focused failing test, capture characterization coverage, or record a deliberate exception with replacement verification. A red-then-green cycle is evidence only when the test observes the public seam the unit already names, uses an independent expected value, and mocks only boundaries this codebase does not control — one behavior slice at a time. Before marking a feature-bearing task complete, it checks that test scenarios cover the categories that apply (happy path, edges, error paths, integration) and traces two levels out for callbacks, middleware, and observers.
+A task is not done when the code compiles. Before changing behavior, `ce-work` discovers the existing test files and chooses the right proof: use an existing failing test, update or strengthen the existing test that owns the contract, add a focused failing test, capture characterization coverage, or record a deliberate exception with replacement verification. Before marking a feature-bearing task complete, it checks that test scenarios cover the categories that apply (happy path, edges, error paths, integration) and traces two levels out for callbacks, middleware, and observers.
 
 Standalone shipping is not done until a `ce-code-review` receipt exists or the shipping summary carries an exact skip phrase (`Code review: skipped (mechanical diff)` or `Code review: skipped (ce-code-review unavailable)`). Mechanical means formatting, dep bumps, lint-only, or generated artifacts only. Review is read-only. `ce-work` applies eligible fixes afterward, then sends any actionable remainder through a four-option residual gate (apply / file tickets / accept with durable sink / stop). "Accept" requires a real durable record. Return-to-caller mode leaves review to the caller (for example `lfg`).
 
@@ -121,7 +121,7 @@ Every PR description includes a `Post-Deploy Monitoring & Validation` section. I
 
 ### Smart triage on bare prompts
 
-Not every invocation has a plan. `ce-work` accepts a bare prompt and triages by complexity: trivial work (a couple of files, no behavioral change) goes straight to implementation; small or medium work builds a task list; large or sensitive work recommends `/ce-brainstorm` or `/ce-plan` first. The triage is what makes direct invocation reasonable for small work.
+Not every invocation has a plan. `ce-work` accepts a bare prompt and triages by complexity before its first reference read: trivial work (a couple of files, no behavioral change) goes straight to implementation with no task list, and a purely mechanical diff (formatting, dependency bump, lint-only, generated) also ships without a post-PR watch (`babysit:off` is passed to the shipping skill); a prompt that `ce-plan` already sized in this session — a Direct statement or a chat brief — is executed, never routed back to planning; small or medium work builds a task list; large or sensitive work recommends `/ce-brainstorm` or `/ce-plan` first. The triage is what makes direct invocation reasonable for small work.
 
 Invocation origin does not change this. Agent harnesses do not reliably tell the skill whether the user named it or the model selected it. If the conversation carries one unambiguous active plan (for example, the agent just authored it and the user says "proceed"), that plan is used before bare-prompt triage. Otherwise a concrete implementation request is the bare prompt.
 
@@ -159,6 +159,16 @@ Skip `ce-work` when:
 - Implementation guardrails are not established for non-trivial work → `/ce-plan`
 - The bug has a known root cause and an obvious fix → `/ce-debug`
 - The task is non-software and is not a marked `execution: knowledge-work` plan. Plain non-software work is a human activity. A marked knowledge-work plan does route to the carve-out.
+
+---
+
+## Make It Automatic
+
+If you want implementation to go through `ce-work` by default, add a standing instruction to your agent's instruction file (the repo's `AGENTS.md`/`CLAUDE.md`, or your global one):
+
+> When asked to build or change code, invoke the `ce-work` skill. For a change already specified down to the files it touches with no behavior change — a typo, a rename, a dependency bump — make the change directly instead.
+
+`ce-work` is cheap on that kind of work when it does fire — the Trivial route skips the task list, and a mechanical diff also skips the post-PR watch — but not invoking it at all is cheaper still, which is what the skip clause buys.
 
 ---
 
@@ -225,7 +235,7 @@ Native execution is the default. You can assign implementation to a target in th
 /ce-work use Codex to add retry limits to the existing webhook sender
 ```
 
-The first three are preferences: `ce-work` attempts the route and continues natively, with a prominent requested-versus-actual disclosure, if it is unavailable. The fourth is a requirement: an interactive standalone run asks before weakening it, while a headless or automatic caller returns a blocker without prompting. Intent matters, not a particular keyword.
+The first three are preferences: `ce-work` attempts the route and continues natively, with a prominent requested-versus-actual disclosure, if it is unavailable. The fourth is a requirement: `ce-work` keeps that external identity fixed while the route is viable and never substitutes another external recipient, but an unavailable route still continues on the current harness and session model after one disclosure. Intent matters, not a particular keyword.
 
 An explicit current task wins. A still-active session preference remains applicable. An implementation-only caller binding keeps its recorded provenance. Active project or user instructions already in context can supply a default. Per-checkout config is the final preference before native execution. An incidental model mention in feature prose, quoted text, examples, or filenames does nothing.
 
@@ -245,9 +255,9 @@ work_engine_preferences:
 
 The [central configuration reference](./configuration.md#implementation-routing) explains how this checkout-local default interacts with current-task, session, and project instructions.
 
-Each candidate has a `harness` (`codex`, `claude`, `grok`, `cursor`, or `antigravity`) and an optional `model`. Omitting `model` means that harness's configured default. Composer is a model family reached through Cursor, so it is written as `harness: cursor` plus `model: composer`. Keep CLI flags and commands out of config; the list describes the desired author, while `ce-work` starts from its qualified adapter recipe and can inspect the installed CLI's help/version when a compatible invocation has drifted.
+Each candidate has a `harness` (`codex`, `claude`, `grok`, or `cursor`) and an optional `model`. Omitting `model` means that harness's configured default. Composer is a model family reached through Cursor, so it is written as `harness: cursor` plus `model: composer`. Keep CLI flags and commands out of config.
 
-`off`, a commented or missing mode, and an invalid mode preserve the native default. `off` affects only standing config; it does not cancel applicable live intent or a caller binding. `prefer` tries ordered candidates, then falls back natively with disclosure. `require` asks only in an interactive standalone run; under `lfg` or another headless caller it blocks.
+`off`, a commented or missing mode, and an invalid mode preserve the native default. `off` affects only standing config; it does not cancel applicable live intent or a caller binding. Both `prefer` and `require` try ordered candidates, then fall back natively on the current harness and session model with one disclosure. `require` keeps the requested external identity fixed while viable and never substitutes an unrequested external recipient.
 
 A candidate is usable only after its unattended, write-capable, isolated-workspace route has qualified and the necessary CLI or authentication is available.
 

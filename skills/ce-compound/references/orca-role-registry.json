@@ -1,13 +1,13 @@
 {
   "identities": {
-    "ceVersion": "3.22.4",
-    "integrationVersion": "3.22.4-orca.5",
+    "ceVersion": "3.23.2",
+    "integrationVersion": "3.23.2-orca.6",
     "protocolVersion": "orca.local-protocol/v1",
-    "registryVersion": "ce-orca.registry/v1@3.22.4-orca.5",
+    "registryVersion": "ce-orca.registry/v1@3.23.2-orca.6",
     "requestVersion": "orca.execution-config/v1"
   },
   "schema": "ce-orca.role-registry/v1",
-  "version": "ce-orca.registry/v1@3.22.4-orca.5",
+  "version": "ce-orca.registry/v1@3.23.2-orca.6",
   "workflows": {
     "ce-compound": {
       "controller": "ce-controller",
@@ -29,10 +29,10 @@
               "required": false,
               "resultMode": "structured",
               "sourceKind": "workflow-role",
-              "sourcePath": "SKILL.md"
+              "sourcePath": "references/assembly.md"
             }
           },
-          "sourcePath": "SKILL.md"
+          "sourcePath": "references/assembly.md"
         },
         "research": {
           "activation": "always",
@@ -49,7 +49,7 @@
               "required": true,
               "resultMode": "artifact",
               "sourceKind": "workflow-role",
-              "sourcePath": "SKILL.md"
+              "sourcePath": "references/research.md"
             },
             "related-docs-finder": {
               "activation": "always",
@@ -59,7 +59,7 @@
               "required": true,
               "resultMode": "artifact",
               "sourceKind": "workflow-role",
-              "sourcePath": "SKILL.md"
+              "sourcePath": "references/research.md"
             },
             "solution-extractor": {
               "activation": "always",
@@ -69,10 +69,10 @@
               "required": true,
               "resultMode": "artifact",
               "sourceKind": "workflow-role",
-              "sourcePath": "SKILL.md"
+              "sourcePath": "references/research.md"
             }
           },
-          "sourcePath": "SKILL.md"
+          "sourcePath": "references/research.md"
         },
         "session-history": {
           "activation": "always",
@@ -91,11 +91,11 @@
               "sourcePath": "references/agents/session-historian.md"
             }
           },
-          "sourcePath": "SKILL.md"
+          "sourcePath": "references/session-history.md"
         },
         "specialized-review": {
           "activation": "always",
-          "anchor": "Skip Phase 3 entirely in non-interactive mode",
+          "anchor": "This phase is interactive-only",
           "defaultOwner": "native",
           "mutation": "read-only",
           "nativeTargetHandling": "unconfigurable",
@@ -118,7 +118,7 @@
               "required": false,
               "resultMode": "structured",
               "sourceKind": "workflow-role",
-              "sourcePath": "SKILL.md"
+              "sourcePath": "references/enhancement.md"
             },
             "data-integrity-guardian": {
               "activation": "conditional",
@@ -166,7 +166,7 @@
               "sourcePath": "references/agents/security-sentinel.md"
             }
           },
-          "sourcePath": "SKILL.md"
+          "sourcePath": "references/enhancement.md"
         }
       }
     }
