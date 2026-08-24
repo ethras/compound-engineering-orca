@@ -164,7 +164,7 @@ export function applyOverride(
 export function bumpVersion(version: string, bump: BumpLevel | null): string | null {
   if (!bump) return null
 
-  const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(version)
+  const match = /^(\d+)\.(\d+)\.(\d+)(-[0-9A-Za-z.-]+)?$/.exec(version)
   if (!match) {
     throw new Error(`Unsupported version format: ${version}`)
   }
@@ -172,14 +172,15 @@ export function bumpVersion(version: string, bump: BumpLevel | null): string | n
   const major = Number(match[1])
   const minor = Number(match[2])
   const patch = Number(match[3])
+  const prerelease = match[4] ?? ""
 
   switch (bump) {
     case "major":
-      return `${major + 1}.0.0`
+      return `${major + 1}.0.0${prerelease}`
     case "minor":
-      return `${major}.${minor + 1}.0`
+      return `${major}.${minor + 1}.0${prerelease}`
     case "patch":
-      return `${major}.${minor}.${patch + 1}`
+      return `${major}.${minor}.${patch + 1}${prerelease}`
   }
 }
 

@@ -283,8 +283,9 @@ const PARITY_CASES: ParityCase[] = [
     upstreamAnchor: "invoke the `ce-work` skill with `mode:return-to-caller",
     hooks: [{
       id: "lfg-controller",
-      before: "## Per-stage routing carriers",
-      after: "1. **Read `references/plan-brief.md` first**",
+      file: "skills/lfg/references/task-visibility.md",
+      before: "# Task visibility",
+      after: "",
     }],
     reference: "skills/lfg/references/orca-lfg.md",
     controllerAnchors: [

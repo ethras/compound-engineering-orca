@@ -20,6 +20,30 @@ It runs on 14 agent hosts, including Claude Code, Cursor, and Codex.
 
 ## Install
 
+### Existing Installs
+
+This fork uses its own marketplace source. If an existing installation still points at
+`EveryInc/compound-engineering-plugin`, remove that marketplace and register the fork before updating:
+
+```text
+/plugin marketplace remove compound-engineering-plugin
+/plugin marketplace add ethras/compound-engineering-orca
+```
+
+For Codex CLI:
+
+```bash
+codex plugin marketplace remove compound-engineering-plugin
+codex plugin marketplace add ethras/compound-engineering-orca
+```
+
+In the Codex app, edit the custom marketplace to source `ethras/compound-engineering-orca`.
+For other checkout-based installations, remove the old source and reinstall from the fork; a clean
+checkout can be prepared with `git clone https://github.com/ethras/compound-engineering-orca.git /tmp/compound-engineering-orca-cleanup`.
+
+Cursor remains catalogued for native CE routing, but cannot attest `orca.read-policy/v1`; strict
+Orca execution is therefore limited to runtimes that can enforce and attest that policy.
+
 ### Claude Code
 
 ```text

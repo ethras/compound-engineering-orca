@@ -38,7 +38,7 @@ describe("omp native install", () => {
       name: string
       manifest: { extensions?: string[]; skills?: string[]; version?: string }
     }
-    expect(result.name).toBe("compound-engineering")
+    expect(result.name).toBe("compound-engineering-orca")
     expect(result.manifest.skills).toContain("./skills")
     expect(result.manifest.extensions).toContain("./.pi/extensions/compound-engineering.ts")
     // The pi manifest does not pin its own version; omp then reports the

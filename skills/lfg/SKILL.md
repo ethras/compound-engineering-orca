@@ -18,10 +18,6 @@ Before step 1, interpret whether the invoking conversation expresses semantic in
 
 **When one exists, read `references/stage-routing.md` before step 1.** Only that file carries which stages are routable, how scope and requirement strength resolve, the `implementation_engine` grammar, the ordered-fallback case, the sanitization that keeps routing out of planning and review inputs, and the carrier strings for both seams. An improvised carrier drops the user's instruction or contaminates the plan with routing.
 
-<!-- ce-orca-hook:start lfg-controller -->
-When the Orca integration is available, load `references/orca-lfg.md` now. The resolved carriers above remain authoritative: the integration consumes that stage intent and the sanitized product request separately and never reinterprets the invoking conversation.
-<!-- ce-orca-hook:end lfg-controller -->
-
 1. **Read `references/plan-brief.md` first**, then invoke the `ce-plan` skill with the sanitized feature request — or the arguments you were invoked with, unchanged, when no routing directive was present — prefixed with the `plan_model:<alias>` carrier when a planning-stage directive resolved, and with the settled-decisions brief that file specifies. Only it carries the artifact-root rule this step's gate reads, the brief's required fields, demotion rule, topical scope bar, and skip-entirely case, and the readiness values the gate applies.
 
    GATE: STOP. Stop the pipeline and tell the user why when `ce-plan` reports the task is non-software (LFG requires software tasks), returns any explicit `status: blocked` report (including `settled-decision-invalidated`), or when the plan it wrote fails the readiness check in `references/plan-brief.md`. Blocked status outranks an existing artifact and is never retried. Only absence of both a blocker and a plan file `ce-plan` reported writing this run invokes `ce-plan` again with those same arguments, reusing the composed brief verbatim; never proceed to step 2 without a written plan.
