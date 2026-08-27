@@ -215,6 +215,27 @@ describe("CE-Orca upstream parity", () => {
     })
   })
 
+  test("ignores directories under skills that do not contain a skill marker", async () => {
+    const { baseline, root } = await makeUpstreamFixture()
+    await fs.mkdir(path.join(root, "skills", "guides"))
+
+    expect(await checkUpstreamParity(root, baseline)).toEqual([])
+  })
+
+  test("rejects a skill marker that is not a regular file", async () => {
+    const { baseline, root } = await makeUpstreamFixture()
+    const skill = baseline.skillInventory[0]
+    const marker = path.join(root, "skills", skill, "SKILL.md")
+    await fs.rm(marker)
+    await fs.mkdir(marker)
+
+    expect(await checkUpstreamParity(root, baseline)).toContainEqual({
+      code: "skill_inventory_drift",
+      expected: baseline.skillInventory,
+      actual: baseline.skillInventory.filter((candidate) => candidate !== skill),
+    })
+  })
+
   test("accepts a synchronized fork-release version while preserving the upstream base", async () => {
     const { baseline, root } = await makeUpstreamFixture(7)
     const releaseVersion = `${baseline.version}-orca.7`

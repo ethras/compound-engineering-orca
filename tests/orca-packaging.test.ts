@@ -125,6 +125,9 @@ describe("CE-Orca packaging", () => {
 
   test("keeps Claude and Codex native skill identity aligned with upstream", async () => {
     const upstream = await readJson<{ version: string }>("integrations/orca/upstream.json")
+    const releaseConfig = await readJson<{
+      packages: { ".": { "release-as"?: string } }
+    }>(".github/release-please-config.json")
     const packageJson = await readJson<{ version: string; repository: string }>("package.json")
     const claude = await readJson<{ name: string; version: string; repository: string }>(".claude-plugin/plugin.json")
     const codex = await readJson<{
@@ -138,7 +141,7 @@ describe("CE-Orca packaging", () => {
     const claudeVersion = claude.version
     const codexVersion = codex.version
     expect(new Set([packageJson.version, claudeVersion, codexVersion]).size).toBe(1)
-    expect([upstream.version, `${upstream.version}-orca.7`]).toContain(packageJson.version)
+    expect(releaseConfig.packages["."]["release-as"]).toBe(`${upstream.version}-orca.7`)
     expect(packageJson.repository).toBe("https://github.com/ethras/compound-engineering-orca")
     expect(claude).toMatchObject({
       name: "compound-engineering",

@@ -26,8 +26,8 @@ async function listSkillDirectories(directory) {
   for (const entry of entries) {
     if (!entry.isDirectory()) continue
     try {
-      await fs.access(path.join(directory, entry.name, "SKILL.md"))
-      skills.push(entry.name)
+      const marker = await fs.stat(path.join(directory, entry.name, "SKILL.md"))
+      if (marker.isFile()) skills.push(entry.name)
     } catch (error) {
       if (error?.code !== "ENOENT") throw error
     }
@@ -191,7 +191,14 @@ export async function checkUpstreamParity(repoRoot = DEFAULT_REPO_ROOT, supplied
     } catch (error) {
       if (error?.code !== "ENOENT") throw error
     }
-    if (actual !== baseline.version && actual !== releaseVersion) {
+    let pendingRelease = false
+    try {
+      const releaseConfig = await readJson(path.join(repoRoot, ".github", "release-please-config.json"))
+      pendingRelease = releaseConfig.packages?.["."]?.["release-as"] === releaseVersion
+    } catch (error) {
+      if (error?.code !== "ENOENT") throw error
+    }
+    if (actual !== baseline.version && actual !== releaseVersion && !pendingRelease) {
       issues.push({
         code: "upstream_version_drift",
         expected: [baseline.version, releaseVersion].filter(Boolean),
