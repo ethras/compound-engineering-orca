@@ -23,6 +23,7 @@ async function makeUpstreamFixture(integrationRevision = 1) {
 
   for (const skill of baseline.skillInventory) {
     await fs.mkdir(path.join(root, "skills", skill), { recursive: true })
+    await fs.writeFile(path.join(root, "skills", skill, "SKILL.md"), `# ${skill}\n`)
   }
 
   const anchorsByFile = new Map<string, string[]>()
@@ -74,8 +75,8 @@ describe("CE-Orca upstream parity", () => {
   test("matches the recorded upstream skill, role, hook, and version baseline", async () => {
     const baseline = await loadUpstreamBaseline(REPO_ROOT)
     expect(baseline).toMatchObject({
-      version: "3.23.2",
-      commit: "3722ca268347df88bb1e04d673fce7a6ef92f196",
+      version: "3.23.4",
+      commit: "33d9bd92689d60580e732890f94466e5793385b1",
     })
     expect(baseline.skillInventory).toContain("ce-retune")
     expect(baseline.promptAssets["ce-work"]).toContain("implementation-worker.md")
@@ -205,6 +206,7 @@ describe("CE-Orca upstream parity", () => {
   test("fails when the native skill inventory changes without a baseline decision", async () => {
     const { baseline, root } = await makeUpstreamFixture()
     await fs.mkdir(path.join(root, "skills", "ce-new-upstream-skill"))
+    await fs.writeFile(path.join(root, "skills", "ce-new-upstream-skill", "SKILL.md"), "# New skill\n")
 
     expect(await checkUpstreamParity(root, baseline)).toContainEqual({
       code: "skill_inventory_drift",

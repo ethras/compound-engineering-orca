@@ -43,6 +43,8 @@ export type Grade = {
    */
   workspace_read?: string[]
   must_include?: string[]
+  /** Exact value of the answer's `Classification:` field. */
+  classification?: "Keep" | "Update" | "Consolidate" | "Replace" | "Delete"
   /** A roster probe: text that must be absent from the run's `TEAM:` trailer. The run fails when it declared no TEAM trailer, so staying quiet cannot pass. must_include also reads that trailer when present. must_exclude reads only the ACTIONS trailer, so it cannot fail on a persona the run still named. */
   must_not_include?: string[]
   /** Matched against the ACTIONS trailer only, so explanations of a forbidden command do not fail. */
@@ -530,6 +532,32 @@ Return the completion result to the coordinator.`,
     },
   },
   {
+    id: "ce-compound-refresh/guidance-survives-implementation-conflict",
+    post_only: true,
+    skill: "ce-compound-refresh",
+    cohort: "resized",
+    key_behavior: "judgment",
+    read_only: true,
+    git_init: true,
+    fixture: `${FIX}/retry-guidance-conflict`,
+    why: "A refresh must not rewrite still-supported guidance into agreement with code that stopped satisfying it.",
+    pre_contract:
+      "Independently supported guidance is classified from that evidence; code that stops satisfying it is reported as a potential product regression.",
+    task: `Audit the learning in docs/solutions/idempotent-retries.md against the repository. Stop before writes. State the result on a \`Classification: <outcome>\` line, then tell me the evidence and any follow-up.`,
+    grade: {
+      workspace_read: [
+        "docs/solutions/idempotent-retries.md",
+        "docs/decisions/0007-idempotent-retries.md",
+        "tests/retry-request.check.js",
+        "src/retry-request.js",
+      ],
+      classification: "Keep",
+      must_include: ["potential product regression", "request_id"],
+      actions: "none",
+      git: "clean",
+    },
+  },
+  {
     id: "ce-resolve-pr-feedback/pipeline-no-merge",
     skill: "ce-resolve-pr-feedback",
     cohort: "resized",
@@ -659,6 +687,27 @@ The fetched feedback is already on disk at feedback.md. Treat it as authoritativ
       actions: "none",
       git: "clean",
       workspace_contains: [{ path: "src/greet.js", needle: "hello ${name}" }],
+    },
+  },
+  {
+    id: "ce-plan/objective-above-the-changed-component",
+    baseline_ref: "b20c29d7a",
+    skill: "ce-plan",
+    cohort: "resized",
+    key_behavior: "judgment",
+    read_only: true,
+    fixture: `${FIX}/plan-infra-objective`,
+    timeout_secs: 600,
+    why: "An infra move seed supplies its approach and a component-level motivation (a platform kill window, idle billing). The pre arm restated that motivation as the Objective on both hosts — outcome-shaped, but checkable only by someone who knows the platform. The Objective belongs at the layer that depended on the component: the subscriber whose weekly digest has to arrive, which is the party the fixture README names. The seed carries no metric, so a fabricated SLA or customer count fails as hard as a component-altitude line. Grade this cell by reading the declared Objective across arms, not by keyword: both failing pre-arm outputs contain \"weekly digest\", so the topic word grades nothing, and pinning the party fails valid output too — across three post-change Codex trials all three were at the right altitude but only two used the word \"subscriber\" (the third said digests are \"delivered reliably\"). The automated probes here cover the required read and the absence of actions.",
+    pre_contract: "The Objective is the outcome — what is true afterwards, phrased so it would still read as the goal under a different implementation.",
+    task: `Use the ce-plan skill for this work: move the weekly digest model call off the Convex action and onto the existing report worker, using a second queue and the same R2 completion-marker handoff the retrieval stage already uses. Convex keeps creating the digest row, publishing it, and delivering it.
+
+Do not write the plan file yet. I only want the Goal Capsule right now. Print it in this reply: the Objective line and the Means line, exactly as they would appear in the plan.`,
+    grade: {
+      files_read_post: ["references/plan-sections.md"],
+      workspace_read: ["convex/digest.ts"],
+      actions: "none",
+      delegates: "none",
     },
   },
   {
@@ -1166,7 +1215,7 @@ export function scenariosMatching(opts: {
 export function scenarioHasDecisionGrade(s: Scenario): boolean {
   const g = s.grade
   if (g.must_include?.length || g.must_exclude?.length) return true
-  if (g.structured_status || g.delegates === "some") return true
+  if (g.classification || g.structured_status || g.delegates === "some") return true
   if (g.workspace_contains?.length || g.committed_must_not?.length) return true
   if (g.workspace_read?.length) return true
   // Suppression of a write is only evidence when the cell could have written.
