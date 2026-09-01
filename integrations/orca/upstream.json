@@ -1,8 +1,8 @@
 {
   "schema": "ce-orca.upstream-baseline/v1",
   "repository": "https://github.com/EveryInc/compound-engineering-plugin.git",
-  "version": "3.22.4",
-  "commit": "76c7363e3e9a00465613a64ce8fb39958d72edd7",
+  "version": "3.24.0",
+  "commit": "3ad9b51bceecf0158e590c882034d0398dbb9c5c",
   "skillInventory": [
     "ce-babysit-pr",
     "ce-brainstorm",
@@ -117,17 +117,17 @@
   "hookAnchors": [
     {
       "id": "ce-plan.research-dispatch",
-      "file": "skills/ce-plan/SKILL.md",
+      "file": "skills/ce-plan/references/research.md",
       "contains": "All specialist research and deepening prompts used in this phase are skill-local prompt assets"
     },
     {
       "id": "ce-plan.organizational-research",
-      "file": "skills/ce-plan/SKILL.md",
+      "file": "skills/ce-plan/references/research.md",
       "contains": "**Slack context** (opt-in) \u2014 never auto-dispatch. Route by condition:"
     },
     {
       "id": "ce-work.unit-dispatch",
-      "file": "skills/ce-work/SKILL.md",
+      "file": "skills/ce-work/references/execution-strategy.md",
       "contains": "**Native dispatch (inline/subagent engines only)** uses your harness's subagent/worker mechanism."
     },
     {
@@ -142,8 +142,8 @@
     },
     {
       "id": "ce-code-review.persona-dispatch",
-      "file": "skills/ce-code-review/SKILL.md",
-      "contains": "### Stage 4: Dispatch and collect reviewers"
+      "file": "skills/ce-code-review/references/dispatch-reviewers.md",
+      "contains": "### Stage 4: Spawn sub-agents"
     },
     {
       "id": "ce-code-review.finding-validation",
@@ -152,8 +152,8 @@
     },
     {
       "id": "ce-debug.investigation-dispatch",
-      "file": "skills/ce-debug/SKILL.md",
-      "contains": "**Parallel investigation option:**"
+      "file": "skills/ce-debug/references/investigate.md",
+      "contains": "### Phase 1: Investigate"
     },
     {
       "id": "ce-doc-review.persona-dispatch",
@@ -162,18 +162,18 @@
     },
     {
       "id": "ce-compound.research-dispatch",
-      "file": "skills/ce-compound/SKILL.md",
+      "file": "skills/ce-compound/references/research.md",
       "contains": "Launch research subagents."
     },
     {
       "id": "ce-compound.specialized-review",
-      "file": "skills/ce-compound/SKILL.md",
-      "contains": "Skip Phase 3 entirely in non-interactive mode"
+      "file": "skills/ce-compound/references/enhancement.md",
+      "contains": "This phase is interactive-only"
     },
     {
       "id": "lfg.work-controller",
       "file": "skills/lfg/SKILL.md",
-      "contains": "Invoke the `ce-work` skill with `mode:return-to-caller"
+      "contains": "invoke the `ce-work` skill with `mode:return-to-caller"
     }
   ]
 }

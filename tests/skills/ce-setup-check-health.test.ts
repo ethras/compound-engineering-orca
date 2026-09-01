@@ -7,9 +7,9 @@ const repoRoot = path.join(import.meta.dir, "..", "..")
 const checkHealthScript = path.join(repoRoot, "skills", "ce-setup", "scripts", "check-health")
 const configTemplate = path.join(repoRoot, "skills", "ce-setup", "references", "config-template.yaml")
 const configExample = path.join(repoRoot, ".compound-engineering", "config.example.yaml")
-const configDocs = path.join(repoRoot, "docs", "skills", "configuration.md")
-const ceWorkDocs = path.join(repoRoot, "docs", "skills", "ce-work.md")
-const lfgDocs = path.join(repoRoot, "docs", "skills", "lfg.md")
+const configDocs = path.join(repoRoot, "docs", "guides", "configuration.md")
+const ceWorkDocs = path.join(repoRoot, "docs", "guides", "ce-work.md")
+const lfgDocs = path.join(repoRoot, "docs", "guides", "lfg.md")
 
 type RunResult = {
   exitCode: number
@@ -24,6 +24,8 @@ async function runCheckHealth(cwd: string, pathValue: string): Promise<RunResult
       ...process.env,
       HOME: cwd,
       PATH: pathValue,
+      // A host CODEX_HOME would otherwise decide what the tool-map scan reads.
+      CODEX_HOME: path.join(cwd, ".codex"),
     },
     stderr: "pipe",
     stdout: "pipe",
@@ -51,10 +53,75 @@ async function initConfiguredRepo(root: string, localConfig: string): Promise<vo
 }
 
 describe("ce-setup check-health", () => {
+  async function runWithCodexAgents(contents: string): Promise<RunResult> {
+    const root = await mkdtemp(path.join(os.tmpdir(), "ce-setup-health-codex-"))
+    try {
+      await initGitRepo(root)
+      await mkdir(path.join(root, ".codex"), { recursive: true })
+      await writeFile(path.join(root, ".codex", "AGENTS.md"), contents)
+      return await runCheckHealth(root, "/usr/bin:/bin")
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  }
+
+  test("reports the legacy Codex tool map and keeps the verdict from reading all-clear", async () => {
+    const result = await runWithCodexAgents(
+      [
+        "my notes",
+        "<!-- BEGIN COMPOUND CODEX TOOL MAP -->",
+        "Task (subagent dispatch): run sequentially in main thread",
+        "<!-- END COMPOUND CODEX TOOL MAP -->",
+        "",
+      ].join("\n"),
+    )
+
+    expect(result.exitCode).toBe(0)
+    expect(result.stdout).toContain("Legacy Compound Codex tool map in")
+    expect(result.stdout).toContain("references/legacy-codex-tool-map.md")
+    expect(result.stdout).toContain("legacy Codex tool map above still needs attention")
+  })
+
+  test("reports no tool map without an ordered pair of standalone sentinel lines", async () => {
+    const result = await runWithCodexAgents(
+      [
+        "The retired map used `<!-- BEGIN COMPOUND CODEX TOOL MAP -->` to `<!-- END COMPOUND CODEX TOOL MAP -->` inline.",
+        "<!-- END COMPOUND CODEX TOOL MAP -->",
+        "my notes",
+        "<!-- BEGIN COMPOUND CODEX TOOL MAP -->",
+        "",
+      ].join("\n"),
+    )
+
+    expect(result.exitCode).toBe(0)
+    expect(result.stdout).not.toContain("Legacy Compound Codex tool map")
+  })
+
   test("does not require temporary-file-backed here-strings", async () => {
     const script = await readFile(checkHealthScript, "utf8")
 
     expect(script).not.toMatch(/<<<\s/)
+  })
+
+  test("advertises agent-browser only for its current consumers", async () => {
+    const [script, setupDocs, polishSkill, polishRun, polishDocs] = await Promise.all([
+      readFile(checkHealthScript, "utf8"),
+      readFile(path.join(repoRoot, "docs", "guides", "ce-setup.md"), "utf8"),
+      readFile(path.join(repoRoot, "skills", "ce-polish", "SKILL.md"), "utf8"),
+      readFile(path.join(repoRoot, "skills", "ce-polish", "references", "run.md"), "utf8"),
+      readFile(path.join(repoRoot, "docs", "guides", "ce-polish.md"), "utf8"),
+    ])
+
+    const capability = "browser testing and dogfood QA"
+    expect(script).toContain(capability)
+    expect(setupDocs).toContain(capability)
+    expect(setupDocs).toContain("/ce-test-browser")
+    expect(setupDocs).toContain("/ce-dogfood")
+    expect(script).not.toMatch(/agent-browser[^\n]*polish/i)
+    expect(setupDocs).not.toMatch(/agent-browser[^\n]*polish/i)
+    for (const polishSurface of [polishSkill, polishRun, polishDocs]) {
+      expect(polishSurface).not.toContain("agent-browser")
+    }
   })
 
   test("keeps the committed example identical to the bundled template", async () => {
@@ -72,8 +139,8 @@ describe("ce-setup check-health", () => {
     const [template, docs, setupDocs, catalog, instructions] = await Promise.all([
       readFile(configTemplate, "utf8"),
       readFile(configDocs, "utf8"),
-      readFile(path.join(repoRoot, "docs", "skills", "ce-setup.md"), "utf8"),
-      readFile(path.join(repoRoot, "docs", "skills", "README.md"), "utf8"),
+      readFile(path.join(repoRoot, "docs", "guides", "ce-setup.md"), "utf8"),
+      readFile(path.join(repoRoot, "docs", "guides", "README.md"), "utf8"),
       readFile(path.join(repoRoot, "AGENTS.md"), "utf8"),
     ])
 
@@ -86,7 +153,7 @@ describe("ce-setup check-health", () => {
     expect(docs).toContain("CLAUDE.md")
     expect(setupDocs).toContain("./configuration.md")
     expect(catalog).toContain("./configuration.md")
-    expect(instructions).toContain("docs/skills/configuration.md")
+    expect(instructions).toContain("docs/guides/configuration.md")
 
     for (const consumer of [
       "ce-brainstorm",
@@ -101,7 +168,7 @@ describe("ce-setup check-health", () => {
       "ce-work",
       "lfg",
     ]) {
-      const consumerDocs = await readFile(path.join(repoRoot, "docs", "skills", `${consumer}.md`), "utf8")
+      const consumerDocs = await readFile(path.join(repoRoot, "docs", "guides", `${consumer}.md`), "utf8")
       expect(consumerDocs).toContain("./configuration.md")
     }
   })
@@ -127,9 +194,16 @@ describe("ce-setup check-health", () => {
   })
 
   test("routes retired and malformed dormant engine settings into preference repair", async () => {
+    // Split by load-time: Step 3 decides whether Phase 2 runs at all, so it stays in the
+    // always-loaded body; Step 6a is the repair procedure and lives in the reference the
+    // body requires before any repo-local write.
     const skill = await readFile(path.join(repoRoot, "skills", "ce-setup", "SKILL.md"), "utf8")
-    const step3 = skill.match(/### Step 3:[\s\S]*?(?=### Step 4:)/)?.[0] ?? ""
-    const step6a = skill.match(/### Step 6a:[\s\S]*?(?=### Step 7:)/)?.[0] ?? ""
+    const repoFixes = await readFile(
+      path.join(repoRoot, "skills", "ce-setup", "references", "repo-fixes.md"),
+      "utf8",
+    )
+    const step3 = skill.match(/### Step 3:[\s\S]*?(?=## Phase 2)/)?.[0] ?? ""
+    const step6a = repoFixes.match(/### Step 6a:[\s\S]*?(?=### Step 7:)/)?.[0] ?? ""
 
     for (const section of [step3, step6a]) {
       expect(section).toContain("retired scalar routing keys")
@@ -514,24 +588,6 @@ describe("ce-setup check-health", () => {
     }
   })
 
-  test("accepts antigravity with a Gemini model pin", async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), "ce-setup-health-"))
-
-    try {
-      await initConfiguredRepo(
-        root,
-        "work_engine_mode: prefer\nwork_engine_preferences:\n  - harness: antigravity\n    model: gemini-3.7-flash-high\n",
-      )
-
-      const result = await runCheckHealth(root, "/usr/bin:/bin")
-
-      expect(result.exitCode).toBe(0)
-      expect(result.stdout).toContain("CE Work implementation engine: prefer -> antigravity@gemini-3.7-flash-high")
-    } finally {
-      await rm(root, { recursive: true, force: true })
-    }
-  })
-
   test("rejects a model entry that is not attached to a harness", async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "ce-setup-health-"))
 
@@ -649,7 +705,14 @@ describe("ce-setup check-health", () => {
   })
 
   test("setup skill offers create config.yaml and never creates the override", async () => {
-    const skill = await readFile(path.join(repoRoot, "skills", "ce-setup", "SKILL.md"), "utf8")
+    // Corpus grep: these are Phase 2 mechanics, which the body requires the reference for
+    // before any repo-local write, so they may live in either file.
+    const skill = (
+      await Promise.all([
+        readFile(path.join(repoRoot, "skills", "ce-setup", "SKILL.md"), "utf8"),
+        readFile(path.join(repoRoot, "skills", "ce-setup", "references", "repo-fixes.md"), "utf8"),
+      ])
+    ).join("\n")
     expect(skill).toContain("Set up a repo config file for this project?")
     expect(skill).toContain("copy `references/config-template.yaml` to `<repo-root>/.compound-engineering/config.yaml`")
     expect(skill).toContain("Do not create `config.local.yaml`")

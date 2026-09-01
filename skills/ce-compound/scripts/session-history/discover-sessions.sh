@@ -51,63 +51,16 @@ discover_claude() {
 }
 
 # --- Codex ---
-# Codex session roots, one per line, highest priority first. Codex is the one
-# supported harness whose home is commonly relocated at launch (managed
-# runtimes set CODEX_HOME), so conventional home directories alone miss those
-# sessions. Callers that already resolved runtime roots pass them through
-# CE_CODEX_SESSION_ROOTS (colon-separated) instead of teaching this script
-# about their runtime.
-codex_session_roots() {
-    if [ -n "${CE_CODEX_SESSION_ROOTS:-}" ]; then
-        printf '%s\n' "$CE_CODEX_SESSION_ROOTS" | tr ':' '\n'
-    fi
-    if [ -n "${CODEX_HOME:-}" ]; then
-        printf '%s\n' "${CODEX_HOME%/}/sessions"
-    fi
-    printf '%s\n' "$HOME/.codex/sessions" "$HOME/.agents/sessions"
-    # Orca-managed runtime home. Orca exposes no CLI surface for adapter
-    # session roots, so its documented macOS location is probed directly;
-    # the directory simply does not exist on other setups.
-    printf '%s\n' "$HOME/Library/Application Support/Orca/codex-runtime-home/home/sessions"
-    # Orca 1.4.147+ keeps non-default Codex accounts in independent homes.
-    # The active account is already covered by CODEX_HOME; enumerate the
-    # siblings so a default-account session can still discover their history.
-    local account_root="$HOME/Library/Application Support/Orca/codex-accounts"
-    local account_sessions
-    for account_sessions in "$account_root"/*/home/sessions; do
-        [ -d "$account_sessions" ] || continue
-        printf '%s\n' "$account_sessions"
-    done
-}
-
 discover_codex() {
-    # Several configured roots can name the same physical directory (symlink,
-    # CODEX_HOME pointing at ~/.codex, explicit extra root). Deduplicate on the
-    # canonical physical path so one session file yields one candidate on both
-    # BSD and GNU userlands. Plain string accumulation keeps this bash-3.2
-    # compatible (no associative arrays).
-    local seen_keys=""
-    local base key
-    {
-        while IFS= read -r base; do
-            [ -n "$base" ] || continue
-            [ -d "$base" ] || continue
-            key=$(cd "$base" 2>/dev/null && pwd -P) || continue
-            case " $seen_keys " in *" $key "*) continue ;; esac
-            seen_keys="$seen_keys $key"
+    local codex_home="${CODEX_HOME:-$HOME/.codex}"
+    for base in "$codex_home/sessions" "$HOME/.agents/sessions"; do
+        [ -d "$base" ] || continue
 
-            # Use mtime-based discovery (consistent with Claude/Cursor) so that
-            # sessions started before the scan window but still active within
-            # it are not missed.
-            find "$base" -name "*.jsonl" -mtime "-${DAYS}" 2>/dev/null
-        done <<EOF
-$(codex_session_roots)
-EOF
-    # Orca's real-home migration hardlinks/copies the same rollout into more
-    # than one root. Real rollout basenames carry a session UUID, so the first
-    # root wins. Preserve non-rollout files with coincidentally equal basenames:
-    # tests, imports, and alternate session stores need not share that identity.
-    } | awk -F/ '{ key = ($NF ~ /^rollout-.*\.jsonl$/ ? $NF : $0); if (!seen[key]++) print }'
+        # Use mtime-based discovery (consistent with Claude/Cursor) so that
+        # sessions started before the scan window but still active within it
+        # are not missed.
+        find "$base" -name "*.jsonl" -mtime "-${DAYS}" 2>/dev/null
+    done
 }
 
 # --- Cursor ---

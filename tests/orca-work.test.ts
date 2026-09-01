@@ -292,8 +292,14 @@ describe('ce-work Orca workflow', () => {
 
   test('keeps upstream SKILL dispatch canonical and gates Orca after route resolution', async () => {
     const skill = await readFile(path.join(import.meta.dir, '..', 'skills', 'ce-work', 'SKILL.md'), 'utf8')
-    expect(skill).toContain('For the inline/subagent engine, **prefer subagents for any structured multi-unit plan**')
+    expect(skill).toContain('Before choosing inline, serial, or parallel execution or dispatching a worker')
     expect(skill).not.toContain('<!-- ce-orca-hook:')
+
+    const strategy = await readFile(
+      path.join(import.meta.dir, '..', 'skills', 'ce-work', 'references', 'execution-strategy.md'),
+      'utf8',
+    )
+    expect(strategy).toContain('prefer subagents for any structured multi-unit plan')
 
     const engines = await readFile(
       path.join(import.meta.dir, '..', 'skills', 'ce-work', 'references', 'execution-engines.md'),

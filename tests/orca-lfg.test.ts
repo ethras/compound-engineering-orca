@@ -903,17 +903,22 @@ describe('LFG Orca ownership gate', () => {
 
   test('keeps the native pipeline and shipping tail in upstream order with one bounded hook', async () => {
     const skill = await readFile(path.join(import.meta.dir, '..', 'skills', 'lfg', 'SKILL.md'), 'utf8')
-    expect(skill).toContain('<!-- ce-orca-hook:start lfg-controller -->')
+    expect(skill).not.toContain('<!-- ce-orca-hook:')
+    const taskVisibility = await readFile(
+      path.join(import.meta.dir, '..', 'skills', 'lfg', 'references', 'task-visibility.md'),
+      'utf8',
+    )
+    expect(taskVisibility).toContain('<!-- ce-orca-hook:start lfg-controller -->')
     const orderedAnchors = [
-      '1. Invoke the `ce-plan` skill',
-      '2. Invoke the `ce-work` skill with `mode:return-to-caller',
-      '3. Invoke the `ce-simplify-code` skill',
+      '1. **Read `references/plan-brief.md` first**, then invoke the `ce-plan` skill',
+      '2. **Read `references/work-return.md` first**',
+      '3. **Read `references/review-followup.md` now**, then invoke the `ce-simplify-code` skill',
       '4. Invoke the `ce-code-review` skill with `mode:agent',
       '5. **Apply and persist review fixes**',
       '6. **Autonomous residual handoff**',
       '7. Invoke the `ce-test-browser` skill with `mode:pipeline`',
       '8. Ship:',
-      'Invoke the `ce-commit-push-pr` skill with `mode:pipeline branding:on`',
+      'invoke the `ce-commit-push-pr` skill with `mode:pipeline branding:on`',
       '9. **Watch the PR to CI-decided via `ce-babysit-pr`**',
       '10. Output `<promise>DONE</promise>`',
     ]

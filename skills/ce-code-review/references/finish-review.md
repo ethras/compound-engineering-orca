@@ -1,5 +1,7 @@
 ### Stage 5: Merge findings
 
+Read `references/action-class-rubric.md` before routing any finding: it owns the severity scale and the action-routing rules synthesis applies, including that synthesis owns the final route.
+
 Convert multiple reviewer compact JSON returns into one deduplicated, confidence-gated finding set. Use `scripts/findings-mechanics.py` from this skill's directory for schema/value validation, exact-fingerprint deduplication, conservative route merging, quote/confidence gates, deterministic sorting, and stable numbering. These are mechanics, not model judgment.
 
 Write the compact reviewer returns as a JSON array, then run the command below exactly. Do not inspect the helper source or run its `--help`; its contract is this reference and its JSON output.
@@ -17,6 +19,8 @@ Before the first helper run, load every available per-reviewer artifact and buil
 Inspect the helper's `findings`, `pre_existing_findings`, and `suppressed_findings` for semantic duplicates that use different wording or nearby anchors, for the direct-dependency exception, and for settlement conflicts below. Merge only when candidates describe the same defect and fix path. If semantic reconciliation, direct-dependency reclassification, or settlement stamping changed the set, serialize every reconciled candidate from all three partitions as one valid synthetic reviewer return and run the helper again to restore deterministic gates, partitions, sort order, and numbering. Never ask the helper to decide semantic equivalence or settlement conflicts. When reconciling a semantic duplicate, carry its original source-map keys alongside the candidate in working memory so detail hydration does not depend on the rewritten title. The helper's deterministic `suppressed_findings` partition is not primary review output; after settlement reconciliation, inspect it for the soft-bucket route below, then discard the remainder while preserving `suppressed_by_confidence` counts.
 
 Then apply only the judgment the helper cannot own:
+
+**Scoped standards authority.** The local `project-standards` review and synthesis are the sole owners of scoped-rule coverage; the external adversarial peer is corroborative. A peer candidate enters the final report only when it is compatible with every applicable scoped rule established locally; reject it otherwise. A replacement candidate requires independent local evidence.
 
 1. **Semantic reconciliation.** Merge differently worded findings only when they describe the same defect and fix path. Keep disagreements visible. Union the mechanics-produced `reviewers` and `independent_reviewers` lists from the merged candidates; never add an identity to `independent_reviewers` merely because it appears in `reviewers`. A pre-existing gap stays primary only when the new change directly depends on it for correctness; mark that reconciled candidate `pre_existing: false` before the final helper pass. Nearby cleanup remains pre-existing.
 2. **Settled decisions.** Inspect both surviving `findings` and `suppressed_findings`. If a finding merely prefers an alternative to a `session-settled:` KTD, stamp `settled_conflict`, route it advisory/human, and include it in the synthetic rerun so the helper preserves it in the primary report. Never apply it. Do not demote a real defect or evidence that the settled approach cannot work. Honor inferred-plan settlements only when the match is unambiguous.
@@ -49,12 +53,11 @@ Independent verification remains required for findings that lack cross-model cor
 1. Skip a validator only when the finding has `first_evidence` and both an ordinary reviewer plus an `adversarial-<provider>` reviewer whose artifact records `independence_verified:true`. Same-model corroboration never licenses this shortcut. Record the skip count in Coverage.
 2. Select every remaining P0/P1 and every remaining actionable finding, except preference-grade `settled_conflict` items. Single-source P0s are always selected. P2/P3 advisory items should already have moved to the soft buckets; do not validate them merely to keep them primary.
 3. Put the selected set into **one** deterministic validator batch, ordered by severity and stable `#`, using `references/validator-batch-template.md`. Eight findings is the normal cap. When more than eight P0/P1 survive, expand that same batch past the normal cap to include every surviving P0/P1 rather than silently omitting a blocker; never split the work into another batch. The validator returns one independent verdict per finding. Cost, elapsed time, confidence, or a finding appearing mechanically obvious never licenses an additional skip; when the required validator cannot run, keep P0/P1 as validation-degraded and say so.
-
 <!-- ce-orca-hook:start ce-code-review.finding-validation -->
 When `finding-validation` resolves to Orca, read `references/orca-routing.md` and `references/orca-review-dispatch.md`, then send the single already-selected validator-batch node through Orca with the complete native batch prompt. Do not also run that batch through the native foreground path. Validator eligibility, ordering, cap expansion, verdict application, and degraded-review behavior remain controller-owned.
 <!-- ce-orca-hook:end ce-code-review.finding-validation -->
 
-4. Run the validator batch foreground with background execution off. A foreground Agent call is the wait. Never use shell no-ops (`echo waiting`, `noop`, `yield turn`, `end turn`, `true`, or sleeps), scheduled wakeups, status/list calls, or narrated "still waiting" turns.
+4. Run the validator batch foreground with background execution off, then classify the observed return rather than trusting that request as a wait guarantee. Collection completes when the successful launch reaches a terminal outcome. Consume a valid compact validator verdict whether returned in-band or collected asynchronously; classify a terminal tool error or malformed output as validator infrastructure failure under step 5. A launch receipt is uncollected, not a validator return: use the host's blocking collection capability until the validator reaches a terminal outcome. If no reliable blocking collection exists, stop the launched validator and treat it as validator infrastructure failure under step 5. Never use shell no-ops (`echo waiting`, `noop`, `yield turn`, `end turn`, `true`, or sleeps), detached status polls, scheduled wakeups, or narrated "still waiting" turns.
 5. A valid `validated:false` drops that finding and records the reason. On malformed output or validator infrastructure failure, drop affected P2/P3 findings; keep affected P0/P1 as validation-degraded. Prune triage groups after drops and record the batch, per-finding verdicts, failures, and degraded blockers in Coverage.
 
 ### Stage 5c: Act on findings (explicit local apply only)
@@ -97,9 +100,9 @@ If this self-review changes files, rerun the affected tests or lint for those fo
 
 Assemble the final report. **Default:** human-readable markdown. **`mode:agent`:** skip markdown and emit JSON (see ### JSON output format) — the structured fields are how a downstream agent consumes the review. Put `---` before the verdict in markdown mode.
 
-**Report completion gate:** do not finish until stable `#` identifiers appear on every primary finding and the report contains `### Actionable Findings`, `### Coverage`, and `### Verdict` (or their exact JSON fields in `mode:agent`). Coverage must name the cross-model outcome and validator shortcut/batch outcome. The Actionable section must include every `downstream-resolver` finding; never silently replace it with a count.
+**Report completion gate:** do not finish until stable `#` identifiers appear on every primary finding, the report contains `### Actionable Findings`, `### Coverage`, and `### Verdict` (or their exact JSON fields in `mode:agent`), and the run artifacts named at the end of this reference are on disk — `report.md` in default mode, `review.json` in `mode:agent`, and `metadata.json` in both. Coverage must name the cross-model outcome and validator shortcut/batch outcome. The Actionable section must include every `downstream-resolver` finding; never silently replace it with a count.
 
-**Before writing, load `references/review-output-template.md` and mirror its section skeleton** — that file is the canonical skeleton for *which sections appear and in what order*; its example shows one good rendering, not the only permitted layout. The direction below is the always-loaded fallback so it survives a long session even if the template was not reloaded.
+**Before writing, load `references/review-output-template.md` and mirror its section skeleton** — that file is the canonical skeleton for *which sections appear and in what order*; its example shows one good rendering, not the only permitted layout. The direction below is the in-place fallback, so it still governs if the template was not reloaded in a long session.
 
 **Presentation direction — optimize for the reader's next action (goal + considerations, not a fixed layout).** The report is *acted on*: by a human deciding what to fix and whether to merge, or by a downstream agent applying fixes. Shape it so that action is fast and well-founded.
 
@@ -195,5 +198,66 @@ Before delivering the review, verify:
 2. **No false positives from skimming.** For each finding, verify the surrounding code was actually read. Check that the "bug" isn't handled elsewhere in the same function, that the "unused import" isn't used in a type annotation, that the "missing null check" isn't guarded by the caller.
 3. **Severity is calibrated.** A style nit is never P0. A SQL injection is never P3. Re-check every severity assignment.
 4. **Line numbers are accurate.** Verify each cited line number against the file content. A finding pointing to the wrong line is worse than no finding.
-5. **Protected artifacts are respected.** Discard any finding that recommends deleting or gitignoring a CE pipeline artifact, per the Protected Artifacts rule in SKILL.md: any file under a `plans/`, `solutions/`, or legacy `brainstorms/` directory whose immediate parent is the artifact root (a directory named `docs`, or the configured `docs_root` when resolved). Categories nest (`solutions/<category>/`); a `references/personas/` skill asset, parented by `references`, is not a protected artifact.
+5. **Protected artifacts are respected.** Discard any finding that recommends deleting or gitignoring a CE pipeline artifact, per the Protected Artifacts rule at the end of this reference: any file under a `plans/`, `solutions/`, or legacy `brainstorms/` directory whose immediate parent is the artifact root (a directory named `docs`, or the configured `docs_root` when resolved). Categories nest (`solutions/<category>/`); a `references/personas/` skill asset, parented by `references`, is not a protected artifact.
 6. **Findings don't duplicate linter output.** Don't flag things the project's linter/formatter would catch (missing semicolons, wrong indentation). Focus on semantic issues.
+
+## Protected Artifacts
+
+Compound-engineering pipeline artifacts must never be flagged for deletion, removal, or gitignore by any reviewer. A protected artifact is any file **under** a `plans/`, `solutions/`, or legacy `brainstorms/` directory **whose immediate parent is the artifact root** — a directory named `docs` (the default, and where unmigrated legacy artifacts stay even after a project sets `docs_root`) or the configured `docs_root` when this run resolved it:
+
+- `plans/` under the artifact root -- unified plan artifacts created by ce-brainstorm or ce-plan (decision artifacts; execution progress is derived from git, not stored in plan bodies)
+- `solutions/` under the artifact root -- solution documents created during the pipeline (categories nest, e.g. `solutions/<category>/foo.md`)
+- the legacy `brainstorms/` -- requirements documents created by older ce-brainstorm versions
+
+Matching by the immediate parent covers nested category files while leaving a same-named directory elsewhere — a skill's own `references/personas/` prompt assets, parented by `references` — as ordinary code whose deletion finding stands. A run that never resolved a configured root still protects the `docs`-parented tree; a configured-root artifact seen by such a run is the one honest gap. Discard any such file's cleanup or removal finding during synthesis.
+
+## After Review
+
+After Stage 6, stop. When local apply was explicitly authorized, Stage 5c may already have applied and, on a clean pre-review tree, committed verified fixes. Otherwise the caller or user decides what to apply from the report and artifacts.
+
+### Emit actionable findings summary (default mode only)
+
+After Stage 6 **in default mode**, emit a compact **Actionable Findings** summary for callers:
+
+- List each actionable finding (`gated_auto` or `manual` with `downstream-resolver`) with stable `#`, severity, file:line, title, `autofix_class`, whether `suggested_fix` is present, and `confidence`.
+- Include the resolved run-artifact path when one was written.
+- When the actionable queue is empty, state `Actionable findings: none.` explicitly.
+
+In `mode:agent` do **not** emit this markdown summary — the actionable findings are carried solely by the `actionable_findings` field of the JSON object. Emit nothing after the JSON object, so the response stays a single parseable JSON value.
+
+Do not run post-review triage (no per-finding walk-through, bulk ticket filing, or routing questions). The report and summary are the complete handoff.
+
+### Mode-specific completion
+
+| Mode | After Stage 6 + actionable summary |
+|------|-----------------------------------|
+| **Default** | Markdown tables + Actionable Findings summary. |
+| **`mode:agent`** | JSON object + `review.json` in run artifact dir. |
+
+Do not offer push/PR/create-branch next steps from this skill.
+
+#### Run artifacts
+
+Always write run artifacts under the resolved `<run-dir>`:
+
+- synthesized findings
+- actionable findings list
+- advisory outputs
+- per-agent `{reviewer_name}.json` from Stage 4
+- `adversarial-review-constraints.md` when the cross-model route starts — the host-vetted project review criteria, separate from review data
+- `adversarial-review-brief.md` when the cross-model route starts — the orchestrator's compact semantic divisions, never a copied diff
+- `report.md` — the rendered markdown report exactly as presented to the user (default mode only), so format and numbering stay auditable after the run
+
+`metadata.json` minimum fields:
+
+```json
+{
+  "run_id": "<run-id>",
+  "branch": "<git branch --show-current at dispatch time>",
+  "head_sha": "<git rev-parse HEAD at dispatch time>",
+  "verdict": "<Ready to merge | Ready with fixes | Not ready>",
+  "completed_at": "<ISO 8601 UTC timestamp>"
+}
+```
+
+Capture `branch` and `head_sha` at dispatch time (no in-skill fixes will land afterward).

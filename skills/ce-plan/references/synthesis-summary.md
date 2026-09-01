@@ -240,7 +240,7 @@ Fires only when:
 - AND Phase 0.5 cleared (no unresolved blockers)
 - AND not on Phase 0.1 fast paths (resume normal, deepen-intent)
 
-Each guard is an explicit conditional in SKILL.md, not implicit. R2 solo does NOT fire on resume/deepen, route-out, or brainstorm-sourced paths.
+Each guard is an explicit conditional in `references/intake.md`, not implicit. R2 solo does NOT fire on resume/deepen, route-out, or brainstorm-sourced paths.
 
 **Content focus**: full-breadth internal draft. Phase 0.4 bootstrap is brief by design ("ask one or two clarifying questions"), so the agent has made substantial inferences before Phase 0.7 fires. The Inferred bucket in the internal draft is especially load-bearing here — the agent's bets are widest. Stage 2 compression still applies: most of those inferences will not survive the keep test, and that is correct — the user should only see the forks they can meaningfully redirect.
 
@@ -345,12 +345,12 @@ Track which call-outs the user touched per round. The soft-cut blocking question
 
 **Identity across rounds is by decision dimension, not surface wording.** A revision may cause stage 2 to re-derive — the same underlying fork can come back rephrased, merged with another call-out, or split into two. "Same call-out" means the same decision being made (e.g., "where does the scan run" stays one decision whether it's worded as "promote scans the working-dir snapshot" or "scan target: pre-copy working dir"). When a re-cut collapses multiple prior call-outs into one, the new combined call-out inherits the "touched" status of any of its constituents — soft-cut fires if any of those underlying decisions was already revised once before.
 
-When the soft-cut fires, use the platform's blocking question tool with two options:
+When the soft-cut fires, use the host's blocking question tool already in the current tool list (match by capability, not by a host-specific name) with two options:
 
 - `Proceed and continue to [research / plan-write]`
 - `Hold off — keep discussing before continuing`
 
-Fall back to a numbered list on the host's user-visible chat surface only when no blocking tool exists or the call errors. Never silently skip.
+Presence in the list is proof; never call a user-facing question tool to discover whether it exists. Fall back to a numbered list on the host's user-visible chat surface only when no such tool is in the list or a real question call errors. Never silently skip.
 
 ---
 

@@ -10,12 +10,13 @@ const SYNTHESIS = read("skills/ce-doc-review/references/synthesis-and-presentati
 const WALKTHROUGH = read("skills/ce-doc-review/references/walkthrough.md")
 const OPEN_QUESTIONS = read("skills/ce-doc-review/references/open-questions-defer.md")
 const REVIEWER_TEMPLATE = read("skills/ce-doc-review/references/subagent-template.md")
+const INTAKE = read("skills/ce-doc-review/references/document-intake.md")
 const PLAN_HANDOFF = read("skills/ce-plan/references/plan-handoff.md")
 const BRAINSTORM_HANDOFF = read("skills/ce-brainstorm/references/handoff.md")
 const PLAN_HTML = read("skills/ce-plan/references/html-rendering.md")
 const BRAINSTORM_HTML = read("skills/ce-brainstorm/references/html-rendering.md")
-const BRAINSTORM_DOCS = read("docs/skills/ce-brainstorm.md")
-const DOC_REVIEW_DOCS = read("docs/skills/ce-doc-review.md")
+const BRAINSTORM_DOCS = read("docs/guides/ce-brainstorm.md")
+const DOC_REVIEW_DOCS = read("docs/guides/ce-doc-review.md")
 
 describe("ce-doc-review HTML editing", () => {
   test("applies review fixes in the document's native format", () => {
@@ -31,9 +32,11 @@ describe("ce-doc-review HTML editing", () => {
     expect(REVIEWER_TEMPLATE).toMatch(
       /Deferred \/ Open Questions[\s\S]{0,240}Markdown or HTML/i,
     )
-    expect(DOC_REVIEW).toMatch(
-      /ID-bearing[\s\S]{0,240}nearest sibling[\s\S]{0,240}anchor[\s\S]{0,120}visible ID/i,
-    )
+    // The rule is stated where it is decided (Phase 1 intake) and where it fires
+    // (fix application in synthesis); the body keeps the native-format rule.
+    const idBearing = /ID-bearing[\s\S]{0,240}nearest sibling[\s\S]{0,240}anchor[\s\S]{0,120}visible ID/i
+    expect(INTAKE).toMatch(idBearing)
+    expect(SYNTHESIS).toMatch(idBearing)
   })
 
   test("keeps HTML deferrals format-neutral and separate from plan questions", () => {

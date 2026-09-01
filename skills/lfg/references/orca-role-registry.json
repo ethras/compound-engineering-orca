@@ -1,13 +1,13 @@
 {
   "identities": {
-    "ceVersion": "3.22.4",
-    "integrationVersion": "3.22.4-orca.5",
+    "ceVersion": "3.24.0",
+    "integrationVersion": "3.24.0-orca.7",
     "protocolVersion": "orca.local-protocol/v1",
-    "registryVersion": "ce-orca.registry/v1@3.22.4-orca.5",
+    "registryVersion": "ce-orca.registry/v1@3.24.0-orca.7",
     "requestVersion": "orca.execution-config/v1"
   },
   "schema": "ce-orca.role-registry/v1",
-  "version": "ce-orca.registry/v1@3.22.4-orca.5",
+  "version": "ce-orca.registry/v1@3.24.0-orca.7",
   "workflows": {
     "lfg": {
       "controller": "lfg-controller",
@@ -16,7 +16,7 @@
       "stages": {
         "implementation": {
           "activation": "always",
-          "anchor": "Invoke the `ce-work` skill",
+          "anchor": "invoke the `ce-work` skill",
           "defaultOwner": "native",
           "mutation": "worktree-write",
           "nativeTargetHandling": "child-workflow",
@@ -26,7 +26,7 @@
         },
         "planning": {
           "activation": "always",
-          "anchor": "Invoke the `ce-plan` skill",
+          "anchor": "invoke the `ce-plan` skill",
           "defaultOwner": "native",
           "mutation": "read-only",
           "nativeTargetHandling": "child-workflow",
@@ -56,7 +56,7 @@
         },
         "simplification": {
           "activation": "always",
-          "anchor": "Invoke the `ce-simplify-code` skill",
+          "anchor": "invoke the `ce-simplify-code` skill",
           "defaultOwner": "native",
           "mutation": "worktree-write",
           "nativeTargetHandling": "child-workflow",

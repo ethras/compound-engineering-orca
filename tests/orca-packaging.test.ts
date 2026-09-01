@@ -41,7 +41,7 @@ describe("CE-Orca packaging", () => {
     }>("integrations/orca/protocol.json")
 
     expect(protocol.schema).toBe("ce-orca.protocol-compatibility/v1")
-    expect(protocol.integration.revision).toBe(5)
+    expect(protocol.integration.revision).toBe(7)
     expect(protocol.orca).toEqual({
       protocol: "orca.local-protocol/v1",
       envelopes: {
@@ -125,6 +125,9 @@ describe("CE-Orca packaging", () => {
 
   test("keeps Claude and Codex native skill identity aligned with upstream", async () => {
     const upstream = await readJson<{ version: string }>("integrations/orca/upstream.json")
+    const releaseConfig = await readJson<{
+      packages: { ".": { "release-as"?: string } }
+    }>(".github/release-please-config.json")
     const packageJson = await readJson<{ version: string; repository: string }>("package.json")
     const claude = await readJson<{ name: string; version: string; repository: string }>(".claude-plugin/plugin.json")
     const codex = await readJson<{
@@ -138,7 +141,7 @@ describe("CE-Orca packaging", () => {
     const claudeVersion = claude.version
     const codexVersion = codex.version
     expect(new Set([packageJson.version, claudeVersion, codexVersion]).size).toBe(1)
-    expect([upstream.version, `${upstream.version}-orca.2`]).toContain(packageJson.version)
+    expect(releaseConfig.packages["."]["release-as"]).toBe(`${upstream.version}-orca.7`)
     expect(packageJson.repository).toBe("https://github.com/ethras/compound-engineering-orca")
     expect(claude).toMatchObject({
       name: "compound-engineering",
@@ -191,9 +194,9 @@ describe("CE-Orca packaging", () => {
     })
     expect(JSON.parse(stdout)).toEqual({
       name: "compound-engineering-orca",
-      version: "3.22.4-orca.5",
+        version: "3.24.0-orca.7",
       upstream,
-      integrationRevision: 5,
+      integrationRevision: 7,
       orca: {
         protocol: "orca.local-protocol/v1",
         requestVersions: ["orca.execution-config/v1"],

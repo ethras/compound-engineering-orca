@@ -20,12 +20,19 @@ function sameItems(left, right) {
   return left.length === right.length && left.every((item, index) => item === right[index])
 }
 
-async function listDirectories(directory) {
+async function listSkillDirectories(directory) {
   const entries = await fs.readdir(directory, { withFileTypes: true })
-  return entries
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => entry.name)
-    .sort()
+  const skills = []
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue
+    try {
+      const marker = await fs.stat(path.join(directory, entry.name, "SKILL.md"))
+      if (marker.isFile()) skills.push(entry.name)
+    } catch (error) {
+      if (error?.code !== "ENOENT") throw error
+    }
+  }
+  return skills.sort()
 }
 
 async function listMarkdownFiles(directory) {
@@ -117,7 +124,7 @@ export async function checkUpstreamParity(repoRoot = DEFAULT_REPO_ROOT, supplied
   const issues = await checkUpstreamCommit(repoRoot, baseline)
 
   const expectedSkills = [...baseline.skillInventory].sort()
-  const actualSkills = await listDirectories(path.join(repoRoot, "skills"))
+  const actualSkills = await listSkillDirectories(path.join(repoRoot, "skills"))
   if (!sameItems(expectedSkills, actualSkills)) {
     issues.push({
       code: "skill_inventory_drift",
@@ -184,7 +191,14 @@ export async function checkUpstreamParity(repoRoot = DEFAULT_REPO_ROOT, supplied
     } catch (error) {
       if (error?.code !== "ENOENT") throw error
     }
-    if (actual !== baseline.version && actual !== releaseVersion) {
+    let pendingRelease = false
+    try {
+      const releaseConfig = await readJson(path.join(repoRoot, ".github", "release-please-config.json"))
+      pendingRelease = releaseConfig.packages?.["."]?.["release-as"] === releaseVersion
+    } catch (error) {
+      if (error?.code !== "ENOENT") throw error
+    }
+    if (actual !== baseline.version && actual !== releaseVersion && !pendingRelease) {
       issues.push({
         code: "upstream_version_drift",
         expected: [baseline.version, releaseVersion].filter(Boolean),

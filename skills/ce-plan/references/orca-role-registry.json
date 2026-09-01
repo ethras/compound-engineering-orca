@@ -1,13 +1,13 @@
 {
   "identities": {
-    "ceVersion": "3.22.4",
-    "integrationVersion": "3.22.4-orca.5",
+    "ceVersion": "3.24.0",
+    "integrationVersion": "3.24.0-orca.7",
     "protocolVersion": "orca.local-protocol/v1",
-    "registryVersion": "ce-orca.registry/v1@3.22.4-orca.5",
+    "registryVersion": "ce-orca.registry/v1@3.24.0-orca.7",
     "requestVersion": "orca.execution-config/v1"
   },
   "schema": "ce-orca.role-registry/v1",
-  "version": "ce-orca.registry/v1@3.22.4-orca.5",
+  "version": "ce-orca.registry/v1@3.24.0-orca.7",
   "workflows": {
     "ce-plan": {
       "controller": "ce-controller",
@@ -36,7 +36,7 @@
               "sourcePath": "SKILL.md"
             }
           },
-          "sourcePath": "SKILL.md"
+          "sourcePath": "references/final-review.md"
         },
         "deepening": {
           "activation": "always",
@@ -173,7 +173,7 @@
               "sourcePath": "references/agents/web-researcher.md"
             }
           },
-          "sourcePath": "SKILL.md"
+          "sourcePath": "references/final-review.md"
         },
         "external-research": {
           "activation": "always",
@@ -211,7 +211,7 @@
               "sourcePath": "references/agents/web-researcher.md"
             }
           },
-          "sourcePath": "SKILL.md"
+          "sourcePath": "references/research.md"
         },
         "flow-analysis": {
           "activation": "always",
@@ -230,7 +230,7 @@
               "sourcePath": "references/agents/spec-flow-analyzer.md"
             }
           },
-          "sourcePath": "SKILL.md"
+          "sourcePath": "references/research.md"
         },
         "local-research": {
           "activation": "always",
@@ -267,7 +267,7 @@
               "sourcePath": "references/agents/repo-research-analyst.md"
             }
           },
-          "sourcePath": "SKILL.md"
+          "sourcePath": "references/research.md"
         },
         "organizational-research": {
           "activation": "always",
@@ -287,7 +287,7 @@
               "sourcePath": "references/agents/slack-researcher.md"
             }
           },
-          "sourcePath": "SKILL.md"
+          "sourcePath": "references/research.md"
         }
       }
     }

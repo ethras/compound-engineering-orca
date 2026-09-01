@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
+import { execFileSync } from "node:child_process"
 import { promises as fs } from "node:fs"
 import os from "node:os"
 import path from "node:path"
@@ -473,11 +474,15 @@ describe("CE-Orca first-wave read adapters", () => {
 
     for (const name of names) {
       const source = path.join(REPO_ROOT, "integrations/orca/workflows", `${name}.mjs`)
-      const snapshot = path.join(directory, `${name}.mjs`)
+      const snapshot = path.join(directory, `${name.replaceAll("-", "_")}.mjs`)
       await fs.copyFile(source, snapshot)
-      const module = await import(`${pathToFileURL(snapshot).href}?snapshot=${name}`)
-      expect(module.PACKET_SCHEMA).toBe("ce-orca.packet/v1")
-      expect(module.RESULT_SCHEMA).toBe("ce-orca.read-result/v1")
+      const moduleIdentity = JSON.parse(execFileSync("node", [
+        "--input-type=module",
+        "--eval",
+        `const module = await import(${JSON.stringify(pathToFileURL(snapshot).href)}); process.stdout.write(JSON.stringify({ packet: module.PACKET_SCHEMA, result: module.RESULT_SCHEMA }))`,
+      ], { encoding: "utf8" }))
+      expect(moduleIdentity.packet).toBe("ce-orca.packet/v1")
+      expect(moduleIdentity.result).toBe("ce-orca.read-result/v1")
     }
   })
 
@@ -679,15 +684,15 @@ export async function integrateChange(change) {
 
   test("keeps native workflow prose behind bounded hooks", async () => {
     const checks = [
-      ["ce-plan", "ce-plan.read-analysis", "All specialist research and deepening prompts used in this phase are skill-local prompt assets"],
-      ["ce-code-review", "ce-code-review.persona-dispatch", "### Stage 4: Dispatch and collect reviewers"],
+      ["ce-plan/references", "ce-plan.read-analysis", "All specialist research and deepening prompts used in this phase are skill-local prompt assets", "research.md"],
+      ["ce-code-review/references", "ce-code-review.persona-dispatch", "### Stage 4: Spawn sub-agents", "dispatch-reviewers.md"],
       ["ce-simplify-code", "ce-simplify-code.reviewer-analysis", "Dispatch three generic subagents"],
-      ["ce-debug", "ce-debug.hypothesis-investigation", "**Parallel investigation option:**"],
-      ["ce-compound", "ce-compound.research-dispatch", "Launch research subagents."],
+      ["ce-debug/references", "ce-debug.hypothesis-investigation", "### Phase 1: Investigate", "investigate.md"],
+      ["ce-compound/references", "ce-compound.research-dispatch", "Launch research subagents.", "research.md"],
     ]
 
-    for (const [skillName, hook, nativeText] of checks) {
-      const skill = await fs.readFile(path.join(REPO_ROOT, "skills", skillName, "SKILL.md"), "utf8")
+    for (const [skillName, hook, nativeText, fileName = "SKILL.md"] of checks) {
+      const skill = await fs.readFile(path.join(REPO_ROOT, "skills", skillName, fileName), "utf8")
       expect(skill).toContain(`<!-- ce-orca-hook:start ${hook} -->`)
       expect(skill).toContain(`<!-- ce-orca-hook:end ${hook} -->`)
       expect(skill).toContain(nativeText)

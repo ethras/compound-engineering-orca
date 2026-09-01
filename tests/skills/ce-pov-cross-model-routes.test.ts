@@ -15,7 +15,7 @@ import {
 import { tmpdir } from "node:os"
 import path from "node:path"
 
-setDefaultTimeout(20_000)
+setDefaultTimeout(30_000)
 
 const roots: string[] = []
 function temp(prefix: string): string {
@@ -26,7 +26,7 @@ function temp(prefix: string): string {
 afterAll(() => roots.forEach((dir) => rmSync(dir, { recursive: true, force: true })))
 
 const SCRIPT = path.join(__dirname, "../../skills/ce-pov/scripts/cross-model-pov.sh")
-const ROUTES = ["codex", "claude", "grok-cli", "grok-cursor", "cursor", "composer"] as const
+const ROUTES = ["codex", "claude", "grok-cli", "grok-cursor", "cursor", "composer", "opencode"] as const
 const NEVER_FLAGS = ["--yolo", "--force", "-f", "--always-approve", "--dangerously-skip-permissions"]
 const REAL_TOOLS = [
   "bash", "sh", "jq", "python3", "date", "sed", "tr", "cat", "wc", "dirname",
@@ -89,6 +89,32 @@ function emit(route: string, env: NodeJS.ProcessEnv = process.env) {
 }
 
 describe("ce-pov cross-model route safety", () => {
+  test("a provider-qualified codex model id is accepted; family is still checked", () => {
+    const accepted = emit("codex", {
+      ...process.env,
+      CROSS_MODEL_MODEL_OVERRIDE_TARGET: "codex",
+      CROSS_MODEL_MODEL_OVERRIDE: "openai.gpt-5.6-sol",
+    })
+    expect(accepted).toContain("openai.gpt-5.6-sol")
+    const acceptedSlash = emit("codex", {
+      ...process.env,
+      CROSS_MODEL_MODEL_OVERRIDE_TARGET: "codex",
+      CROSS_MODEL_MODEL_OVERRIDE: "openai/gpt-5.6-sol",
+    })
+    expect(acceptedSlash).toContain("openai/gpt-5.6-sol")
+
+    const crossFamily = spawnSync("bash", [SCRIPT, "--emit-adapter", "codex"], {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        CROSS_MODEL_MODEL_OVERRIDE_TARGET: "codex",
+        CROSS_MODEL_MODEL_OVERRIDE: "bedrock.claude-opus-5",
+      },
+    })
+    expect(crossFamily.status).toBe(2)
+    expect(crossFamily.stderr).toContain("not compatible with route")
+  })
+
   test("all routes preserve read/write/exec denial and avoid never-use flags", () => {
     for (const route of ROUTES) {
       const command = emit(route)
@@ -122,6 +148,13 @@ describe("ce-pov cross-model route safety", () => {
     expect(emit("cursor")).not.toContain("--model")
     expect(emit("composer")).toContain("--model")
     expect(emit("grok-cursor")).toContain("--model cursor-grok-4.6-high")
+    expect(emit("opencode")).toContain("opencode run")
+    expect(emit("opencode")).toContain('OPENCODE_CONFIG_CONTENT={"permission":{"edit":"deny","bash":"deny","webfetch":"deny","task":"deny"}}')
+    expect(emit("opencode")).toContain("OPENCODE_DISABLE_PROJECT_CONFIG=1")
+    expect(emit("opencode")).toContain("--dir <read-root>")
+    expect(emit("opencode")).toContain("--format json")
+    expect(emit("opencode")).toContain("--file <prompt-file>")
+    expect(emit("opencode")).not.toContain("--auto")
     const source = readFileSync(SCRIPT, "utf8")
     // Zombies report as Z+ on macOS; exact "Z" alone leaves them "alive".
     expect(source).toContain('[ "${st#Z}" = "$st" ]')
@@ -538,6 +571,21 @@ printf '%s' '${placeholder}'
 })
 
 describe("ce-pov fixed route and egress allowlist", () => {
+  test("installed opencode satisfies the fixed opencode route", () => {
+    const { env } = sandbox(["opencode"])
+    const dir = runDir()
+    const result = run(["codex", "opencode", payload(), dir], dir, env)
+    expect(result.stderr).not.toContain("is unavailable")
+    expect(result.stderr).not.toContain("not fully sanctioned")
+  })
+
+  test("missing opencode CLI skips the fixed opencode route as unavailable", () => {
+    const { env } = sandbox([])
+    const dir = runDir()
+    const result = run(["codex", "opencode", payload(), dir], dir, env)
+    expect(result.stderr).toContain("is unavailable")
+  })
+
   test("an app-bundled codex CLI off PATH satisfies the fixed codex route (issue #1272)", () => {
     const { env } = sandbox([])
     const bundle = path.join(temp("pov-bundle-"), "Codex.app", "Contents", "Resources")

@@ -84,12 +84,9 @@ A conditional section of a generated PR description, added by agent judgment whe
 ## Skill orchestration
 
 ### Dispatch skill
-A Skill whose workflow depends on delegating work to shipped subagents — reviewers, scouts, fixers — rather than performing every pass in the orchestrator's own context, and that therefore carries the shared Skill-context directives so a harness default cannot silently strip the delegation its flow assumes.
+A Skill whose workflow delegates work to subagents — reviewers, scouts, fixers — rather than performing every pass in the orchestrator's own context.
 
-Membership follows whether the workflow depends on dispatch actually happening — for independent contexts whose agreement carries evidential weight, or for the isolation and coverage a single context cannot provide. A skill stays outside the set only when performing the delegated work in its own context is a first-class path rather than a degrade: delegation that exists purely for parallelism can be spent as time instead, so such a skill applies its work sequentially in-context and ships no directives.
-
-### Skill-context directives
-The counter-directive block a Dispatch skill emits as tool output at the start of each invocation — authorizing its shipped subagents against harness defaults that gate agent use, forbidding a harness constraint from being re-narrated as a user preference, keeping confirmation steps live under standing autonomy framing, and refusing independence credit for lens work done in one context. Delivery as tool output is the mechanism, not a packaging detail: the same text as static skill prose fails to outrank the harness default, and evidence that prose sufficed for one Skill transfers to no other.
+Each dispatch boundary owns its failure direction. Work whose value is parallelism may run serially or inline when dispatch is unavailable. Work whose correctness depends on separation must stop or withhold independence credit unless it actually ran in a separate context.
 
 ### Model tier
 A semantic cost class for a dispatched sub-agent — extraction (cheapest capable, for retrieval and quoting), generation (mid-tier, for evidence-driven work and mechanical verification), or ceiling (the orchestrator's own model, inherited by omitting any model selection) — declared once per Skill and referenced by tier name so model names never hardcode into skill content.
@@ -99,8 +96,27 @@ When a platform cannot select models per agent, every role runs on the inherited
 ### Evidence dossier
 A bulk evidence artifact — verbatim quotes with source pointers, gathered by a cheap scout agent — written to scratch storage instead of returned inline, so the orchestrator carries only a short gist and downstream agents read the full dossier themselves.
 
+### Outcome spine
+The part of a Skill that must hold without any reference loaded: the result it produces and who consumes it next, the done condition, the safe failure direction, and the facts the agent cannot derive from the repository in front of it. Everything else in the skill is protocol or judgment attached to that spine, and a block that cannot name its spine is restated before it is edited.
+
+### Host prompt budget
+The ceiling a specific agent host places on how much of a Skill's body it will keep in the model-visible prompt, enforced by that host's own loader rather than by any plugin or skill specification. Each host sets its own and reaches it by a different route — one may truncate the body outright and only for packages declaring a particular manifest shape, another may re-attach a shortened copy of each invoked skill after summarizing a long conversation — so a body that survives intact on one host can silently lose its tail on another.
+
+Every known truncation keeps the beginning of the body and discards the rest, and none of them reports an error. That is what makes ordering load-bearing: what must survive belongs above what may be cut, and a stop class or boundary rule sitting below a long routing block can disappear while every mechanical check still passes. A repository that ratchets body size sets that ratchet from the tightest bound among the hosts it ships against — a scoped engineering constraint whose owner and scope are re-verified at the source, not a conformance requirement of any specification. Such a ratchet bounds only the per-skill budgets: where a host also caps the *combined* size of everything invoked in one session, that aggregate is a separate invariant no per-file check can express, so a green per-file gate is not evidence it holds. Load stub and Phase-loaded kernel are the two shapes content takes when it moves out of the body to fit.
+
 ### Load stub
 The inline remnant left in a Skill when load-bearing content moves to a reference file: a load instruction that names what the reference contains and the failure mode of skipping it, while keeping no detail an agent could improvise from — making the load structurally necessary rather than advisory.
+
+### Output contract
+The shape a planning Skill commits to delivering for one run, chosen by its proportionality gate at intake before any research or subagent spend: Direct (a few sentences in chat handed to execution), Chat brief (a chat-only summary with units and test expectations, file-optional), or Durable (the unified plan artifact with its full floor). The gate is a condition on the work's shape with a safe failure direction toward the heavier contract; pipeline and headless runs, and any run without a synchronous user, always take Durable.
+
+### Phase-loaded kernel
+A Skill body reduced to what must fire without a read — outcome, done bar, authority, phase order, the stop classes that hold when a reference is never opened, and a required read named immediately before each acting step — with each phase's mechanics owned by one reference loaded at that step. The design assumes the load happens at the acting point; a host that reads every reference at kernel load satisfies the letter of "read before the step" while losing both the context saving and any safety path that depends on a late read, so the kernel must state that an earlier read does not satisfy the acting-point read.
+
+### Skill-eval cell
+One graded scenario that runs a Skill on a real coding-agent host and scores the surviving artifacts of that run — actions taken, files written, required reads the Skill itself declared undefendable — not whether the model's essay mentioned a command or opened a procedure file.
+
+A required-read miss fails the cell only when the always-loaded body makes the decision undefendable without that file. Omitting the probe is the correct negative when the body still states the gate; a complementary cell is what measures extraction on a path the reference actually owns.
 
 ### Detached job
 A delegated worker process launched into its own session so it outlives the shell tool call that started it, with its state — status word, log, identity, and result — kept in a durable job directory the orchestrator polls between turns instead of awaiting in place.
@@ -112,7 +128,7 @@ Liveness and progress are distinct signals, and an idle window detects only whic
 ### Cross-model pass
 An additive delegated run that sends the host workflow's review or judgment brief through a different model-provider route and folds the structured result back into the host's synthesis. It stays non-blocking when the peer cannot run, and it counts as independent corroboration only when the serving model family can be verified rather than merely requested.
 
-A peer result is usable only when it is a settled answer to the framed question — a settled Blocked verdict with its reason included. Settledness is declared by the peer in the output contract itself, never inferred from its prose; a result that satisfies the schema but is not declared final is a placeholder: it earns one bounded retry on the same route with the same target, model, and scope, inside the same time window, and if it recurs the voice is dropped with the observed reason rather than folded in as a position.
+A peer result is usable only after the route reports a successful terminal outcome and the result satisfies that consumer's output contract. Provider-failure retry allowances belong to the route worker and remain inside the original route deadline; once a provider no-review outcome reaches the host, that peer is not restarted. POV position results additionally declare settledness in their output contract: a schema-shaped result not declared final is a placeholder, never a peer voice.
 
 ### Terminalize
 The host-owned step that turns a finished external worker's working tree into one inspectable Transport commit, without requiring the worker to stage or commit.
@@ -121,6 +137,11 @@ The snapshot includes committed, uncommitted, and untracked output. The worker m
 
 ### Transport commit
 A synthetic, base-parented commit the host builds from an external worker's complete final tree so the host can inspect and fold the result. It is intermediate evidence, not the canonical checkout commit, and it is never the worker's own tip.
+
+### Wave contract
+The condition set under which parallel implementation workers may write one shared working directory: a committed baseline before dispatch, exclusive per-worker ownership of every write surface including hidden ones (lockfiles, generated artifacts, snapshots, manifests), no worker Git operations, verification and commits held by the orchestrator, and an abort, on any write outside every owned set, that rolls back only worker-attributable changes and preserves anything it cannot attribute.
+
+It replaces workspace isolation as the entry requirement for concurrency: isolation is the escalation for a worker that must commit, must run its own authoritative verification, or whose write surfaces cannot be audited, not the fee every parallel wave pays. A unit that cannot meet the contract serializes or takes isolation.
 
 ### Warm checkout
 A checkout whose git-ignored inventory already contains what the project's verification command needs to run: installed dependencies, virtualenvs, build caches. It is the normal state of a developer's canonical checkout, and it is the opposite of a fresh clone or newly added worktree, where verification cannot run until something installs those artifacts.
@@ -133,6 +154,22 @@ The serving backend's own report of which model actually handled a delegated run
 ### Handoff seam
 The point in a calling Skill where completed work triggers a follow-on Skill in the same run — distinct from a Session handoff, which carries continuity to a fresh session. A seam that states only intent ("auto-invoke X") invites the caller's agent to reproduce the callee's mechanics from memory; a hardened seam pins the invocation mechanism (the platform's skill-invocation primitive, so the callee's instructions actually load) and, when the callee runs a stateful protocol, explicitly forbids starting that protocol's mechanics directly.
 
+### Engine carrier
+A structured implementation binding — mode, target, model, source — that an orchestrating Skill serializes into the invocation string it hands the implementing Skill, so the route decision travels as data beside the request rather than as prose woven into the plan. The callee validates the carrier before any workspace action and rejects a malformed, duplicated, or out-of-order one instead of interpreting it; the resolved binding then appears in the return envelope so the caller can compare the route it asked for with the route that actually served.
+
+### Owning layer
+The single Skill, reference, script, or host surface that is responsible for a mechanism — its commands, exit semantics, or byte-level validation — and the only place that mechanism may be spelled out. A Skill that delegates the work states the condition and the safe failure direction and leaves the mechanism to its owner; a mechanism prescribed outside its owning layer drifts from the owner's copy and, for data the model itself transcribes, cannot be enforced by prose at all because the model is the transport.
+
+### Subordinated shape
+A concrete failing instance kept in a skill's prose underneath the condition that decides it, phrased so it illustrates that condition rather than ruling on its own. It is what separates a permitted example from a case list: a case list carries its own decision and can therefore contradict the condition beside it, while a subordinated shape carries none and cannot.
+
+It exists because a condition is an abstraction, and the most literal host a skill ships to may fail to instantiate it — the shape is insurance for that reader rather than decoration for a capable one. Removing one is a behavior change and is verifiable only by running the skill on that host, never by re-reading the block. A shape can sit after the exclusion it illustrates without weakening it, because it rules on nothing; what does weaken an exclusion is a later clause that decides something, since that gives the reader somewhere else to land.
+
+### Proxy rule
+A rule that states its condition correctly and then enforces it with an absolute about form, order, or placement — where text may sit, what a section may contain — so that the absolute, rather than the condition, is what later readers apply. It differs from a case list in looking complete: the condition is present, and the absolute agrees with it on every case the author had in mind.
+
+A proxy holds only while the condition's usual case is its only case, and it forbids the input for which the condition demands the opposite form. Replication is how the defect spreads rather than an aggravating detail — a copy placed at a site that does not own the decision gets rewritten for that site's local job, which compresses the condition into whatever that job can act on, and the compression then contradicts the owner. The characteristic failure is an audit built on the proxy: it does not merely fail to catch bad work, it instructs a reader to degrade correct work. A proxy also reads differently across hosts, since a literal reader obeys the absolute where a permissive one treats it as style, so a single-host evaluation can pass one.
+
 ### Context-absent agent
 An agent performing a Skill-shaped action without that Skill's instructions loaded in context — typically reconstructing a half-remembered command, recognizable by parameter values that drift from the Skill's documented defaults. Prose in the unloaded Skill cannot reach it; the only channels that do are the seam it entered through and the output of the tools it runs, which is why fail-closed refusals in bundled CLIs carry their own recovery path.
 
@@ -140,6 +177,9 @@ An agent performing a Skill-shaped action without that Skill's instructions load
 
 ### Reviewer persona
 A single-lens reviewer role that evaluates work from one specific perspective — security, correctness, scope, design, and so on. Review Skills dispatch a panel of personas as subagents and merge their findings.
+
+### Detection condition
+The stated, observable circumstance under which a Reviewer persona check fires — what must be visible in the work under review, not a topic to opine on. When a check carries a canonical framework name from the design or security literature, the name supplies shared vocabulary for the finding while the detection condition alone decides whether the finding exists; a check may also attach an evidence guard, a requirement to quote the occurrences that satisfy the condition before claiming a high Confidence anchor.
 
 ### Confidence anchor
 A discrete, self-scored confidence value on a fixed small scale, each level tied to a behavioral criterion the model can honestly apply, used to gate and rank review findings instead of a continuous score that invites false precision. Each review Skill sets its own actionable threshold; corroboration across personas promotes a finding by one level, but only when those personas meet the bar in Independence.
@@ -168,7 +208,7 @@ The classification judgment a writer skill (ce-plan, ce-brainstorm) applies to c
 A configured origin of customer or user feedback — a Slack channel, a GitHub Issues repo, an email inbox — declared in repo CE config (`config.yaml`, optionally overridden in `config.local.yaml`) under a generic key so any Skill can read the list. Each source entry has its own identity and ingestion cursor; the Skill that ingests from it owns the per-item state, not the source declaration.
 
 ### Beta skill
-A parallel copy of a stable Skill, suffixed `-beta`, used to trial a new version alongside the stable one without disrupting users. Invoked manually (model auto-invocation is disabled); promoting it to stable is more than a rename — every caller must move in the same change so none silently inherits stale defaults, and the retired beta name must be registered for stale-artifact cleanup so upgrading users don't keep a dead duplicate of the skill alongside the promoted one.
+A parallel copy of a stable Skill, suffixed `-beta`, used to trial a high-blast-radius rewrite alongside the stable one without disrupting users. Optional containment, not standing shipping practice — every known CE beta has been promoted, and recent work often ships the stable skill in phases instead. When used: invoked manually (model auto-invocation is disabled); promoting it to stable is more than a rename — every caller must move in the same change so none silently inherits stale defaults, and the retired beta name must be registered for stale-artifact cleanup so upgrading users don't keep a dead duplicate of the skill alongside the promoted one.
 
 ### Offered work
 Work the user has put up for review, as distinct from work that merely exists in the tree or on a remote. Commits in an open pull request are offered; uncommitted edits, local commits, and commits pushed only for backup or to trigger CI are not.
@@ -187,28 +227,3 @@ Later phases link it rather than opening a second record for the same bug elsewh
 
 ### Residual
 A review finding a run accepted or deferred rather than fixed, which must reach a durable sink before the run reports itself done — a section in the pull request body, or a ticket in the project's tracker. A finding that lives only in the session is lost when the session ends, so an accepted residual blocks a merge-ready claim until it is recorded somewhere a human will find it.
-
-## Domain vocabulary
-
-### Context index
-The form the root `CONCEPTS.md` takes once a project holds more than one bounded context: a `## Contexts` section naming each context, linking its glossary, stating its ownership in one line, and recording the relations and translations between contexts. The root stops being a glossary when it becomes an index — its only remaining definitions are the Shared vocabulary.
-
-The index is a structural sentinel, not a setting: its presence is what switches every reader and writer from flat to routed resolution, so no configuration key selects the mode. A `## Contexts` section that does not parse as the index grammar is a collision rather than an index, and is reported instead of reinterpreted.
-
-### Bounded context glossary
-A `CONCEPTS.md` living under a named context rather than at the repo root, holding the terms that context owns. It uses the same entry rules as a flat glossary; only its scope differs.
-
-The unit of canonicality is the pair of context and term, not the term alone. The same word may be defined differently in two context glossaries — that is polysemy, and both entries are correct — so neither retires the other as an alias.
-
-### Shared vocabulary
-The small governed section of a Context index holding terms whose model, invariants, and governance are genuinely shared across contexts. It is the one exception to the rule that a term is written to its owning context rather than the root.
-
-Promotion into it requires explicit user approval. A large Shared vocabulary is evidence the context boundaries are drawn wrong, not evidence of a well-factored domain.
-
-### Domain graph
-The resolved structure of a project's vocabulary — the root, the contexts it declares, their glossaries, and the relations between them — as computed from the files rather than declared separately. Mechanical questions about it (which files exist, whether links resolve, whether a term is defined twice inside one context) are answered by a script; which context owns a term is a judgment left to the model and the user.
-
-### Vocabulary blocked state
-A repository condition in which vocabulary writes are refused because two canonical sources would otherwise coexist. It has two shapes: a legacy import format defining terms alongside an existing glossary, and a legacy format defining terms where no glossary exists yet.
-
-Both are resolved by an explicit migration, never by editing around them. Treating either as a supported configuration is what makes authority undecidable for later agents, so the block is the mechanism that keeps a hybrid state temporary.

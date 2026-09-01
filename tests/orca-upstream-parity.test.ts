@@ -23,6 +23,7 @@ async function makeUpstreamFixture(integrationRevision = 1) {
 
   for (const skill of baseline.skillInventory) {
     await fs.mkdir(path.join(root, "skills", skill), { recursive: true })
+    await fs.writeFile(path.join(root, "skills", skill, "SKILL.md"), `# ${skill}\n`)
   }
 
   const anchorsByFile = new Map<string, string[]>()
@@ -74,8 +75,8 @@ describe("CE-Orca upstream parity", () => {
   test("matches the recorded upstream skill, role, hook, and version baseline", async () => {
     const baseline = await loadUpstreamBaseline(REPO_ROOT)
     expect(baseline).toMatchObject({
-      version: "3.22.4",
-      commit: "76c7363e3e9a00465613a64ce8fb39958d72edd7",
+      version: "3.24.0",
+      commit: "3ad9b51bceecf0158e590c882034d0398dbb9c5c",
     })
     expect(baseline.skillInventory).toContain("ce-retune")
     expect(baseline.promptAssets["ce-work"]).toContain("implementation-worker.md")
@@ -205,11 +206,33 @@ describe("CE-Orca upstream parity", () => {
   test("fails when the native skill inventory changes without a baseline decision", async () => {
     const { baseline, root } = await makeUpstreamFixture()
     await fs.mkdir(path.join(root, "skills", "ce-new-upstream-skill"))
+    await fs.writeFile(path.join(root, "skills", "ce-new-upstream-skill", "SKILL.md"), "# New skill\n")
 
     expect(await checkUpstreamParity(root, baseline)).toContainEqual({
       code: "skill_inventory_drift",
       expected: baseline.skillInventory,
       actual: [...baseline.skillInventory, "ce-new-upstream-skill"].sort(),
+    })
+  })
+
+  test("ignores directories under skills that do not contain a skill marker", async () => {
+    const { baseline, root } = await makeUpstreamFixture()
+    await fs.mkdir(path.join(root, "skills", "guides"))
+
+    expect(await checkUpstreamParity(root, baseline)).toEqual([])
+  })
+
+  test("rejects a skill marker that is not a regular file", async () => {
+    const { baseline, root } = await makeUpstreamFixture()
+    const skill = baseline.skillInventory[0]
+    const marker = path.join(root, "skills", skill, "SKILL.md")
+    await fs.rm(marker)
+    await fs.mkdir(marker)
+
+    expect(await checkUpstreamParity(root, baseline)).toContainEqual({
+      code: "skill_inventory_drift",
+      expected: baseline.skillInventory,
+      actual: baseline.skillInventory.filter((candidate) => candidate !== skill),
     })
   })
 
