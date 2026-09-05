@@ -60,7 +60,7 @@ Most teams solve the same problem twice, sometimes with the same person, because
 
 `ce-compound` runs as a structured capture flow at the moment context is freshest:
 
-- Two modes: Full (parallel subagents for cross-referencing and duplicate detection) and Lightweight (single-pass, faster)
+- Two modes: Full (cross-referencing, duplicate detection, and grounding validation) and Lightweight (reduced research and validation)
 - Bug track and knowledge track produce different section structures matched to the doc type
 - An overlap check decides whether to update an existing doc rather than create a duplicate
 - A discoverability check ensures the project's instruction file surfaces `docs/solutions/` so future agents find it (interactive Full asks consent before editing; non-interactive and lightweight report or tip only)
@@ -72,7 +72,7 @@ Most teams solve the same problem twice, sometimes with the same person, because
 
 ### Two modes, agent-selected
 
-**Full mode** runs three research subagents in parallel (Context Analyzer, Solution Extractor, Related Docs Finder), plus an automatic session-history probe across Claude Code, Codex, Cursor, Pi, and oh-my-pi (omp). It cross-references existing docs, detects duplicates, and runs specialized reviews.
+**Full mode** completes three research roles (Context Analyzer, Solution Extractor, Related Docs Finder), plus an automatic session-history probe across Claude Code, Codex, Cursor, Pi, and oh-my-pi (omp). In this fork, the main agent can do Phase 1 locally when the session contains the solved problem and verification evidence and the source and corpus fit its context. Broader research or applicable execution assignments retain the three-subagent dispatch. Both placements preserve fresh overlap research, later grounding validation, and the existing specialized-review gates.
 
 **Lightweight mode** writes the same solution-doc artifact type in a single pass, with no subagents or cross-referencing. It skips overlap detection, session-history research, and semantic grounding validation.
 
@@ -105,7 +105,7 @@ Before the doc compounds, claims are checked against the tree. A deterministic s
 
 ### Session history, refresh, and auto-invoke
 
-Full mode always runs a cheap two-stage session-history probe. A discovery+metadata pass runs in parallel with the research subagents. Claude sessions are listed from `~/.claude/projects/` (or `CLAUDE_CONFIG_DIR/projects` when that env var is set) and kept when the recorded `cwd` is the repo root, a parent of it, or a path inside it — including sessions started from a parent directory. Codex sessions come from `~/.codex/sessions/` (or `CODEX_HOME/sessions` when set) plus `~/.agents/sessions/`. It escalates to extraction and synthesis only when a candidate session clears a relevance bar (current-branch match or at least two topic-keyword hits). On a hit, findings fold into "What Didn't Work" (bug track) or "Context" (knowledge track). Lightweight skips this entirely.
+Full mode always runs a cheap two-stage session-history probe. A discovery+metadata pass overlaps delegated research, or follows completed local research. Claude sessions are listed from `~/.claude/projects/` (or `CLAUDE_CONFIG_DIR/projects` when that env var is set) and kept when the recorded `cwd` is the repo root, a parent of it, or a path inside it — including sessions started from a parent directory. Codex sessions come from `~/.codex/sessions/` (or `CODEX_HOME/sessions` when set) plus `~/.agents/sessions/`. It escalates to extraction and synthesis only when a candidate session clears a relevance bar (current-branch match or at least two topic-keyword hits). On a hit, findings fold into "What Didn't Work" (bug track) or "Context" (knowledge track). Lightweight skips this entirely.
 
 After capturing the new learning, `ce-compound` checks whether it should invoke `/ce-compound-refresh` on a narrow scope hint. It does not default to running refresh. Only when the new learning suggests a specific older doc may now be stale.
 
@@ -119,7 +119,7 @@ You've just spent 45 minutes debugging an N+1 query in the brief-generation flow
 
 `ce-compound` auto-invokes (or you call it explicitly). With plenty of context left, it picks Full mode and notes "Ran Full mode." at the top of its output. No prompt.
 
-Three subagents dispatch in parallel. Context Analyzer classifies the work as `performance_issue` (bug track) and proposes the filename and category. Solution Extractor structures the fix with before/after code. Related Docs Finder reports moderate overlap with an older doc on a different N+1 case. Alongside them, the session-history probe scans recent sessions; none clear the relevance bar, so it records "no relevant prior sessions."
+The agent completes the three research roles locally. Context Analyzer classifies the work as `performance_issue` (bug track) and proposes the filename and category. Solution Extractor structures the fix with before/after code. Related Docs Finder reports moderate overlap with an older doc on a different N+1 case. Next, the session-history probe scans recent sessions; none clear the relevance bar, so it records "no relevant prior sessions."
 
 The orchestrator assembles the doc, validates frontmatter, and writes `docs/solutions/performance-issues/n-plus-one-brief-generation.md`. Grounding validation then runs: the mechanical script confirms every cited path and SHA resolves, and the validator subagent quotes the defining source line behind the doc's claim about the ORM's default batching behavior. The discoverability check finds `AGENTS.md` does not mention `docs/solutions/`, proposes a one-line addition to the existing directory listing, and applies it after you confirm.
 
@@ -236,7 +236,7 @@ A standalone request to create or bootstrap `CONCEPTS.md` is redirected to `ce-c
 ## FAQ
 
 **Why two modes, and why doesn't it ask me which one?**
-Full mode is for most cases: the parallel subagents catch duplicates, find related docs, and run specialized reviews. Lightweight mode exists for simple fixes or sessions running tight on context. The skill picks between them itself rather than prompting, because the deciding factor (how much context budget is left) is something the agent can see and you cannot. It reports the choice in its output. Re-running is a cheap correction if it guessed wrong.
+Full mode is for most cases: it checks duplicates and related docs, probes session history, and validates grounding. Its initial research can run locally; later validator or history delegates still follow their own gates. Lightweight mode exists for simple fixes or sessions running tight on context. The skill picks between them itself rather than prompting, because the deciding factor (how much context budget is left) is something the agent can see and you cannot. It reports the choice in its output. Re-running is a cheap correction if it guessed wrong.
 
 **What's the difference between bug track and knowledge track?**
 Bug track captures incident-level fixes: "X broke, here's why and how we fixed it." Knowledge track captures durable guidance: "this is how we do X here, and why." Bug track has Symptoms / What Didn't Work / Solution. Knowledge track has Context / Guidance / When to Apply.

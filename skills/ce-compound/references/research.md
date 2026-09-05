@@ -28,6 +28,7 @@ If no relevant entries are found, proceed to Phase 1 without passing memory cont
 Launch research subagents. Each writes its full output to a per-run scratch artifact and returns only the artifact path to the orchestrator.
 
 <!-- ce-orca-hook:start ce-compound.research-dispatch -->
+Read `references/orca-delegation.md` before Phase 1 dispatch to choose local or delegated research. A local pass completes all three research contracts and returns to Full mode's session-history step; only a delegated pass enters the dispatch instructions below.
 Before any Phase 1 subagent dispatch, read `references/orca-routing.md` and `references/orca-read-analysis.md`. For a selected stage resolved to Orca, replace only its already-selected subagent calls with that packet path and do not launch them natively. This controller keeps session gates, assembly, scratch persistence, and every product write. Lightweight mode remains subagent-free. For native routing, continue below unchanged.
 <!-- ce-orca-hook:end ce-compound.research-dispatch -->
 

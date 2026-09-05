@@ -71,6 +71,32 @@ const READ_OWNERSHIP = {
   synthesis: "ce-controller",
 }
 
+test("local placement hooks preserve upstream bodies and ship their owned policies", async () => {
+  // These hooks change execution placement, not required coverage. Compare the
+  // entire body outside the bounded hooks so a routing edit cannot quietly
+  // remove upstream verification, role contracts, or downstream phases.
+  const { execFileSync } = await import("node:child_process")
+  const baseline = await loadUpstreamBaseline(REPO_ROOT)
+  const stripHooks = (text: string) => text
+    .replace(/<!-- ce-orca-hook:start [^>]+ -->[\s\S]*?<!-- ce-orca-hook:end [^>]+ -->\n/g, "")
+    .replace(/\n{3,}/g, "\n\n")
+  for (const [skill, file, source] of [
+    ["ce-simplify-code", "SKILL.md", "simplify-delegation.md"],
+    ["ce-compound", "references/research.md", "compound-delegation.md"],
+  ]) {
+    const relative = `skills/${skill}/${file}`
+    const current = await fs.readFile(path.join(REPO_ROOT, relative), "utf8")
+    const upstream = execFileSync("git", ["show", `${baseline.commit}:${relative}`], {
+      cwd: REPO_ROOT,
+      encoding: "utf8",
+    })
+    expect(stripHooks(current), relative).toBe(stripHooks(upstream))
+    expect(current.toLowerCase()).toContain("read `references/orca-delegation.md`")
+    const policy = await fs.readFile(path.join(REPO_ROOT, "integrations/orca/references", source), "utf8")
+    expect(await fs.readFile(path.join(REPO_ROOT, `skills/${skill}/references/orca-delegation.md`), "utf8")).toBe(policy)
+  }
+})
+
 function makeReadParityCase(input: {
   adapter: ReadAdapter
   upstreamAnchor: string

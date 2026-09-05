@@ -18,7 +18,7 @@ tags:
   - protocol
   - judgment
   - skill-eval
-last_updated: 2026-08-21
+last_updated: 2026-09-05
 ---
 
 # Portable Agent Skill Authoring
@@ -302,6 +302,8 @@ Always-loaded skill prose remains in context throughout the workflow. Extract su
 - Pass large context to subagents by file path plus a short gist rather than duplicating it into prompts.
 
 When delegation is used, each task needs a distinct scope, output contract, and synthesis owner. Use parallel work for genuinely independent questions, not as a reflex. A single capable model may be better when the work depends on one evolving context or requires tight synthesis.
+
+Required coverage and execution placement are separate contracts. Several review lenses or research outputs can share one context when independence is not required and the agent can cover their evidence; preserve every output and validation gate, and never describe local agreement as independent corroboration. Reducing worker count does not by itself justify a reduction in research or validation depth.
 
 Stable cross-skill fields, enums, and return statuses are protocols. Version or parity-test them when independently evolving skills depend on exact agreement.
 

@@ -32,6 +32,11 @@ const CONTRACT_FILES = {
   lfg: "lfg-result.schema.json",
 }
 
+const DELEGATION_REFERENCES = {
+  "ce-simplify-code": "simplify-delegation.md",
+  "ce-compound": "compound-delegation.md",
+}
+
 async function maybeRead(filePath) {
   try {
     return await fs.readFile(filePath, "utf8")
@@ -99,6 +104,12 @@ async function expectedBundleFiles() {
     expected.set(path.join(skillRoot, "references", "orca-routing.md"), routing)
     expected.set(path.join(skillRoot, "references", "orca-role-registry.json"), canonicalJson(localizedRegistry(registry, workflowId)))
     expected.set(path.join(skillRoot, "references", "orca-defaults.json"), canonicalJson(localizedDefaults(defaults, workflowId)))
+
+    const delegationReference = DELEGATION_REFERENCES[workflowId]
+    if (delegationReference) {
+      const policy = await fs.readFile(path.join(HERE, "references", delegationReference), "utf8")
+      expected.set(path.join(skillRoot, "references", "orca-delegation.md"), policy)
+    }
 
     const workflowSource = path.join(HERE, "workflows", WORKFLOW_FILES[workflowId])
     const workflow = await maybeRead(workflowSource)

@@ -2,6 +2,31 @@
 
 This directory is the fork-owned boundary between upstream Compound Engineering and the local Orca runtime. Upstream remains authoritative for the `skills/` tree, prompt assets, roles, gates, and workflow semantics. Orca-specific protocol metadata, resolvers, adapters, and workflows belong here.
 
+## Proportional delegation
+
+The fork's bounded placement hooks let `ce-simplify-code` and `ce-compound`
+complete their core analysis in the main agent when its context can cover the
+work. Simplification still applies all three persona rubrics. Full compounding
+still produces all three research outputs, searches the live learning corpus,
+and runs its later session-history and validation gates. Local research does
+not switch to Lightweight or count as independent grounding validation.
+
+Separate substantial investigations retain the existing delegated rosters.
+Applicable user, caller, or project execution assignments also retain the
+existing routing, including configured model targets. A `.ce-orca.json` file,
+selected profile, or caller execution patch is checked before local placement;
+invalid configuration is not ignored. No new configuration option or model
+default is introduced. The summary identifies actual placement and worker count,
+with later compounding delegates reported separately.
+
+The policies are authored in `references/simplify-delegation.md` and
+`references/compound-delegation.md` and generated into each affected skill as
+`references/orca-delegation.md`. Hook parity tests preserve upstream content
+outside the two dispatch seams. The existing Orca packet schemas and required
+role sets remain unchanged when delegation is selected.
+
+## Workflow ownership
+
 Orca dispatch is activated only at the bounded hooks of the eight first-wave
 skills. Every integrated skill remains a mixed workflow: the CE controller
 keeps selection, synthesis, mutations, and shipping surfaces that its adapter

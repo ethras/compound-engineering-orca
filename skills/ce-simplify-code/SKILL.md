@@ -24,6 +24,7 @@ When the platform's task-tracking capability is available, show the review, appl
 ## Step 2: Launch 3 review agents in parallel
 
 <!-- ce-orca-hook:start ce-simplify-code.reviewer-analysis -->
+Before Step 2, read `references/orca-delegation.md` to choose local or delegated review. A local pass completes all three lenses and resumes at Step 3; only a delegated pass enters the dispatch instructions below.
 When `references/orca-routing.md` resolves `reviewer-analysis` to Orca, dispatch via `references/orca-review-dispatch.md`, not natively.
 <!-- ce-orca-hook:end ce-simplify-code.reviewer-analysis -->
 

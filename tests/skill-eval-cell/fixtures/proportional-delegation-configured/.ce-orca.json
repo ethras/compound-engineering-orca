@@ -1,0 +1,11 @@
+{
+  "schema": "ce-orca.project-config/v1",
+  "workflows": {
+    "ce-compound": {
+      "runtime": "orca",
+      "stages": {
+        "research": { "backend": "codex", "model": "gpt-5.6-sol", "reasoning": "medium" }
+      }
+    }
+  }
+}

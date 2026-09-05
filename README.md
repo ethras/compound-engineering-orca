@@ -16,6 +16,8 @@ Compound Engineering is a plugin of 33 skills for AI coding agents. It structure
 
 This fork tracks upstream Compound Engineering and adds optional, bounded Orca orchestration. The upstream skill semantics remain authoritative; see the [Orca integration overlay](integrations/orca/README.md) for runtime details.
 
+For bounded work, the fork can run simplification reviews and Full-mode learning research in the main agent, preserving their required coverage and checks. Broader investigations and explicit execution assignments retain delegated execution.
+
 It runs on 14 agent hosts, including Claude Code, Cursor, and Codex.
 
 ## Install

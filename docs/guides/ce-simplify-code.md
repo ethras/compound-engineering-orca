@@ -64,7 +64,7 @@ One "review and improve" prompt usually finds the obvious items and misses the o
 
 ## The Solution
 
-Three reviewers, then apply, then verify:
+Three review lenses, then apply, then verify:
 
 - **Reuse** searches for existing utilities, stdlib/runtime primitives, and platform guarantees the new code reimplements
 - **Quality** flags hacky structure, dead code, context-only names, leftover pre-release compatibility, and comments that only restate the code
@@ -78,7 +78,7 @@ The skill applies what is worth keeping, notes false positives as skipped, and r
 
 ### Three reviews of the same scope
 
-A single "review and improve" prompt tends to follow the model's usual cleanup habits. Separate reuse, quality, and efficiency reviews cover the cross-tree search a generalist often skips. Dispatch is parallel when the host can run subagents; otherwise the same prompts run inline.
+Reuse, quality, and efficiency each have a required rubric and outcome. In this fork, a bounded scope that fits the main agent's context runs locally with all three rubrics. Separate substantial investigations use the existing three-reviewer dispatch. Applicable execution assignments retain their configured route. The final summary names the placement and actual worker count; three local lenses are not three independent reviews.
 
 ### Scope you name is the mutation boundary
 
@@ -163,8 +163,8 @@ Callers may also pass a plan path as structure-pin context. That is not the simp
 
 ## FAQ
 
-**Why three reviewers instead of one?**
-One reviewer follows the usual cleanup paths. Reuse in particular needs a search for existing helpers, which a generalist often skips.
+**Does every run need three agents?**
+No. Every substantive scope gets three review lenses, but the fork can apply them in the main agent when coverage fits its context. Broader investigations or explicit execution assignments retain delegation. All three outcomes are required before edits, regardless of placement.
 
 **What if a finding is wrong?**
 The skill applies findings directly. False positives are skipped and mentioned in the summary. It does not stop to argue.
