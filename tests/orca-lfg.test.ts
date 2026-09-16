@@ -910,17 +910,18 @@ describe('LFG Orca ownership gate', () => {
     )
     expect(taskVisibility).toContain('<!-- ce-orca-hook:start lfg-controller -->')
     const orderedAnchors = [
-      '1. **Read `references/plan-brief.md` first**, then invoke the `ce-plan` skill',
+      '1. **Produce the work source**',
       '2. **Read `references/work-return.md` first**',
-      '3. **Read `references/review-followup.md` now**, then invoke the `ce-simplify-code` skill',
+      '3. **Read `references/review-followup.md` now**',
       '4. Invoke the `ce-code-review` skill with `mode:agent',
       '5. **Apply and persist review fixes**',
       '6. **Autonomous residual handoff**',
-      '7. Invoke the `ce-test-browser` skill with `mode:pipeline`',
-      '8. Ship:',
+      '7. Invoke the `ce-compound` skill',
+      '8. Invoke the `ce-test-browser` skill with `mode:pipeline`',
+      '9. **Read `references/shipping.md` first**',
       'invoke the `ce-commit-push-pr` skill with `mode:pipeline branding:on`',
-      '9. **Watch the PR to CI-decided via `ce-babysit-pr`**',
-      '10. Output `<promise>DONE</promise>`',
+      '10. Watch the PR to CI-decided',
+      '11. Output `<promise>DONE</promise>`',
     ]
     const positions = orderedAnchors.map((anchor) => skill.indexOf(anchor))
     expect(positions.every((position) => position >= 0)).toBe(true)

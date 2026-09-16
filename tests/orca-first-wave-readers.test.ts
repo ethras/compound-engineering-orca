@@ -77,6 +77,41 @@ function fakeEngine(outputs: Record<string, unknown | Error>) {
 }
 
 describe("CE-Orca first-wave read adapters", () => {
+  test("preserves full artifacts, compact returns, prose, and validator verdicts for native finish leaves", async () => {
+    const directory = await runDir()
+    const finding = {
+      title: "Missing await", severity: "P2", file: "src/task.ts", line: 4,
+      confidence: 100, autofix_class: "gated_auto", owner: "downstream-resolver",
+      requires_verification: false, pre_existing: false, suggested_fix: "Await save().",
+      why_it_matters: "The response precedes persistence.", evidence: ["src/task.ts:4 save()"],
+    }
+    const { why_it_matters, evidence, ...compact } = finding
+    const artifact = { reviewer: "correctness-reviewer", findings: [finding], residual_risks: [], testing_gaps: [] }
+    const compactReturn = { ...artifact, findings: [{ ...compact, first_evidence: evidence[0] }] }
+    const outputs = {
+      correctness: { artifact, compact_return: compactReturn },
+      learnings: "Known pattern: preserve the commit boundary.",
+      validator: { verdicts: [{ finding_id: "1", verdict: "confirmed" }] },
+    }
+    const result = await codeReview.executeReadWorkflow({
+      engine: fakeEngine(outputs), runDir: directory,
+      packet: packetFor(codeReview, [
+        { id: "correctness", stage: "persona-review", role: "correctness-reviewer" },
+        { id: "learnings", stage: "persona-review", role: "learnings-researcher" },
+        { id: "validator", stage: "finding-validation", role: "finding-validator", wave: 1 },
+      ]),
+    })
+    // The controller owns native file materialization; the adapter must retain
+    // both independent payloads, including detail absent from compact returns.
+    const hydrated = Object.fromEntries(await Promise.all(result.nodes.map(async (node) => [
+      node.id, JSON.parse(await fs.readFile(path.join(directory, node.artifactRef), "utf8")).output,
+    ])))
+    expect(hydrated).toEqual(outputs)
+    expect(hydrated.correctness.artifact.findings[0].why_it_matters).toBe(why_it_matters)
+    expect(hydrated.correctness.compact_return.findings[0]).not.toHaveProperty("evidence")
+    expect(hydrated.correctness.compact_return.findings[0].first_evidence).toBe(evidence[0])
+  })
+
   test("builds the fixed simplification packet from raw prompt files without JSON escaping hazards", async () => {
     const directory = await runDir()
     const prompts = path.join(directory, "prompts")

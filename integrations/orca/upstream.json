@@ -1,10 +1,11 @@
 {
   "schema": "ce-orca.upstream-baseline/v1",
   "repository": "https://github.com/EveryInc/compound-engineering-plugin.git",
-  "version": "3.24.0",
-  "commit": "3ad9b51bceecf0158e590c882034d0398dbb9c5c",
+  "version": "3.26.3",
+  "commit": "082c83e0537c803ac1d927daafc2e6eb6962dedf",
   "skillInventory": [
     "ce-babysit-pr",
+    "ce-bakeoff",
     "ce-brainstorm",
     "ce-code-review",
     "ce-commit",
@@ -17,6 +18,7 @@
     "ce-explain",
     "ce-handoff",
     "ce-ideate",
+    "ce-noslop",
     "ce-optimize",
     "ce-plan",
     "ce-polish",
@@ -123,7 +125,7 @@
     {
       "id": "ce-plan.organizational-research",
       "file": "skills/ce-plan/references/research.md",
-      "contains": "**Slack context** (opt-in) \u2014 never auto-dispatch. Route by condition:"
+      "contains": "**Slack context** (opt-in) — never auto-dispatch. Route by condition:"
     },
     {
       "id": "ce-work.unit-dispatch",
@@ -147,8 +149,8 @@
     },
     {
       "id": "ce-code-review.finding-validation",
-      "file": "skills/ce-code-review/references/finish-review.md",
-      "contains": "deterministic validator batch"
+      "file": "skills/ce-code-review/references/finish-input.md",
+      "contains": "## The validator (dispatch context)"
     },
     {
       "id": "ce-debug.investigation-dispatch",
@@ -157,8 +159,8 @@
     },
     {
       "id": "ce-doc-review.persona-dispatch",
-      "file": "skills/ce-doc-review/SKILL.md",
-      "contains": "## Phase 2: Announce and Dispatch Personas"
+      "file": "skills/ce-doc-review/references/dispatch.md",
+      "contains": "# Dispatching the reviewers"
     },
     {
       "id": "ce-compound.research-dispatch",

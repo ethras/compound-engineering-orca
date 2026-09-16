@@ -8,7 +8,6 @@
     ".": {
       "release-type": "simple",
       "package-name": "compound-engineering",
-      "release-as": "3.24.0-orca.7",
       "changelog-sections": [
         {
           "type": "feat",
@@ -97,7 +96,8 @@
           "path": "plugin.json",
           "jsonpath": "$.version"
         }
-      ]
+      ],
+      "release-as": "3.26.3-orca.7"
     },
     ".claude-plugin": {
       "release-type": "simple",

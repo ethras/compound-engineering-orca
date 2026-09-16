@@ -2,6 +2,12 @@
 
 LFG remains the single lifecycle and shipping controller. Orca may own the subagent fan-out inside a child skill; it never owns LFG's stage order, fix decisions, commits, push, pull request, or CI-repair loop. This is an explicit mixed workflow, not a nested autonomous LFG run.
 
+This overlay applies only to the plan-based code-change route. Defect diagnosis,
+judgment, discovery, and non-code requests follow upstream intake until they
+either finish or reach that route. Do not derive child patches or submit this
+plan/work ledger for a route that never invokes `ce-work`. Child skills retain
+their own execution routing when this overlay does not apply.
+
 This reference loads only after upstream LFG has resolved its planning and
 implementation carriers and sanitized the product request. That upstream
 resolution is authoritative. For workflow `lfg`, follow
@@ -47,10 +53,13 @@ For a healthy Orca route:
    never append its path or JSON to product input and never call
    `save-profile`. Remove `LFG_DIR` after the last child returns, including on
    failure.
-2. Invoke `ce-plan` with the sanitized product request. Preserve the exact
-   upstream `plan_model:<alias>` carrier when present; otherwise attach the
-   emitted `planning` patch. Record and reuse the exact returned plan path.
-   It may be under configured `<root>/plans/`; never reconstruct it under a
+2. Obtain the work source exactly as upstream intake requires. When that
+   route invokes `ce-plan`, pass the sanitized product request and preserve the
+   exact upstream `plan_model:<alias>` carrier when present; otherwise attach
+   the emitted `planning` patch. Record the exact selected plan path and the
+   upstream readiness evidence in the plan ledger entry. Reusing an accepted
+   plan does not launch a new planning run. The plan may be under configured
+   `<root>/plans/`; never reconstruct it under a
    hardcoded default artifact root.
 3. Invoke `ce-work` with the exact upstream step-2 arguments, including the
    scalar `implementation_engine` carrier or retained ordered assignment when

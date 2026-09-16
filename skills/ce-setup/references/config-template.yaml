@@ -51,8 +51,8 @@
 # HTML styling. Precedence: a format request in your prompt for that run wins
 # (e.g. "output:html" or "make it HTML"); a preference you established earlier
 # (in-session, saved to memory, or in your agent instructions) overrides these
-# keys (this config is the persisted fallback); pipeline contexts (e.g., LFG,
-# disable-model-invocation) always force `md`.
+# keys (this config is the persisted fallback). A headless or pipeline run
+# resolves the format the same way; nothing forces `md`.
 
 # plan_output: html              # md | html (default: md)
 # brainstorm_output: html        # md | html (default: md)
@@ -71,8 +71,8 @@
 # on your session model and the run says so. Invalid/commented/missing -> no
 # elevation.
 
-# plan_model: fable              # model alias for the plan-authoring step (no default)
-# brainstorm_model: fable        # model alias for approach generation (no default)
+# plan_model: fable              # model alias for plan authoring; candidate preference when a Bake-off runs (no default)
+# brainstorm_model: fable        # model alias for approach generation; candidate preference when a Bake-off runs (no default)
 
 # --- PR concept teaching (ce-commit-push-pr) ---
 # When a PR introduces a concept new to the codebase, the generated PR
@@ -88,7 +88,9 @@
 # --- ce-commit-push-pr babysit handoff ---
 # After a full-workflow PR is opened, ce-commit-push-pr auto-invokes ce-babysit-pr
 # to watch CI + incoming review and drive the PR toward merge-ready. Set false to
-# opt out standing (per-run override: the babysit:off token).
+# opt out standing (per-run override: the babysit:off token). This governs that
+# standing watch only -- lfg's in-pipeline babysit is bounded (3 fix rounds) and
+# still runs, since it is how that pipeline reaches "CI decided".
 # auto_babysit: false            # true | false (default: true)
 
 # --- ce-plan scoping confirmation ---
@@ -172,3 +174,23 @@
 # sweep_ack_cap: 25                                 # max acks per source per run before the circuit breaker
 # sweep_lease_ttl_minutes: 60                       # single-writer lease staleness threshold
 # sweep_shared_branch: false                        # true: push-gated lease for shared-docs-branch topology
+
+# --- Compound Packs ---
+
+# Prescriptive domain knowledge folders that planning reads and cites.
+# Declared, never scanned: an entry names a source (repo-relative path,
+# ~/absolute path, or git URL) and what to install from it. Lists from this
+# file and config.local.yaml concatenate -- local adds packs, never replaces
+# the team's. Git sources require ref (tag or sha reproduce exactly; a branch
+# freezes at its cached resolution and can drift across machines). path: and
+# pasted GitHub /tree/<ref>/<sub> URLs scope a source to a subfolder.
+# pack: picks one id or a list; omit it to install everything the source
+# publishes. id: renames a single-pack entry.
+# Rules are top-level .md files with title + applies_when; subfolders are storage.
+
+# packs:
+#   - source: compound-packs/local-rules                       # repo-relative, read live
+#   - source: ~/compound-packs/kk-style                        # machine-local, read live
+#   - source: https://github.com/org/rails-ce-pack    # git, cached at ref
+#     ref: v1.2.0
+#     pack: [rails, inertia]

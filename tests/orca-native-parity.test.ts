@@ -95,6 +95,17 @@ test("local placement hooks preserve upstream bodies and ship their owned polici
     const policy = await fs.readFile(path.join(REPO_ROOT, "integrations/orca/references", source), "utf8")
     expect(await fs.readFile(path.join(REPO_ROOT, `skills/${skill}/references/orca-delegation.md`), "utf8")).toBe(policy)
   }
+  for (const relative of [
+    "skills/ce-code-review/references/dispatch-reviewers.md",
+    "skills/ce-code-review/references/finish-input.md",
+    "skills/ce-code-review/references/finish-review.md",
+    "skills/ce-doc-review/SKILL.md",
+    "skills/ce-doc-review/references/dispatch.md",
+    "skills/lfg/references/task-visibility.md",
+  ]) {
+    const upstream = execFileSync("git", ["show", baseline.commit + ":" + relative], { cwd: REPO_ROOT, encoding: "utf8" })
+    expect(stripHooks(await fs.readFile(path.join(REPO_ROOT, relative), "utf8")), relative).toBe(stripHooks(upstream))
+  }
 })
 
 function makeReadParityCase(input: {
@@ -131,7 +142,7 @@ const PARITY_CASES: ParityCase[] = [
       id: "ce-plan.read-analysis",
       file: "skills/ce-plan/references/research.md",
       before: "All specialist research and deepening prompts used in this phase are skill-local prompt assets",
-      after: "Model tiering lives in this caller, not in prompt assets.",
+        after: "This skill, not the prompt assets, decides which model tier",
     }],
     reference: "skills/ce-plan/references/orca-read-analysis.md",
     controllerAnchors: [
@@ -209,15 +220,15 @@ const PARITY_CASES: ParityCase[] = [
       },
       {
         id: "ce-code-review.finding-validation",
-        file: "skills/ce-code-review/references/finish-review.md",
-        before: "deterministic validator batch",
-        after: "Run the validator batch foreground",
+        file: "skills/ce-code-review/references/finish-input.md",
+        before: "## The validator (dispatch context)",
+        after: "Launch the validator batch and collect it",
       },
     ],
     reference: "skills/ce-code-review/references/orca-review-dispatch.md",
     controllerAnchors: [
       "Keep scope resolution, intent discovery, persona selection, roster materialization",
-      "fixes, synthesis, and all writes in the CE controller.",
+      "the native report leaf owns adjudication, authorized fixes, and reporting.",
     ],
     nodes: [{
       id: "correctness",
@@ -253,11 +264,13 @@ const PARITY_CASES: ParityCase[] = [
   {
     workflowId: DOC_WORKFLOW_ID,
     controller: "ce-controller",
-    upstreamAnchor: "## Phase 2: Announce and Dispatch Personas",
+    upstreamAnchor: "# Dispatching the reviewers",
+    upstreamFile: "skills/ce-doc-review/references/dispatch.md",
     hooks: [{
       id: "ce-doc-review.persona-dispatch",
-      before: "Announce the team with a per-persona justification before any dispatch.",
-      after: NATIVE_DISPATCH,
+      file: "skills/ce-doc-review/references/dispatch.md",
+      before: "# Dispatching the reviewers",
+      after: "Dispatch generic subagents with **bounded parallelism** using",
     }],
     reference: "skills/ce-doc-review/references/orca-dispatch.md",
     controllerAnchors: [
@@ -672,8 +685,10 @@ describe("native and Orca document review parity", () => {
   test("keeps the upstream native dispatch paragraph byte-for-byte", async () => {
     const skill = await fs.readFile(SKILL_FILE, "utf8")
     expect(skill.split(NATIVE_DISPATCH)).toHaveLength(2)
-    expect(skill.indexOf("<!-- ce-orca-hook:start ce-doc-review.persona-dispatch -->"))
-      .toBeLessThan(skill.indexOf(NATIVE_DISPATCH))
+    const dispatch = await fs.readFile(path.join(REPO_ROOT, "skills/ce-doc-review/references/dispatch.md"), "utf8")
+    expect(skill).not.toContain("<!-- ce-orca-hook:")
+    expect(dispatch.indexOf("<!-- ce-orca-hook:start ce-doc-review.persona-dispatch -->"))
+      .toBeLessThan(dispatch.indexOf("Dispatch generic subagents"))
     expect(skill).toContain("## Phases 3-5: Synthesis, Presentation, and Next Action")
   })
 

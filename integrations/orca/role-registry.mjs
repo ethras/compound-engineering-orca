@@ -150,8 +150,8 @@ const WORKFLOW_DEFINITIONS = {
       "adversarial-peer": stage("skills/ce-code-review/references/select-and-route.md", "exclusive choice between a cross-model adversarial peer", {
         "adversarial-peer": workflowRole("skills/ce-code-review/references/select-and-route.md", "start the detached peer job", { activation: "conditional" }),
       }, { defaultOwner: "native" }),
-      "finding-validation": stage("skills/ce-code-review/references/finish-review.md", "### Stage 5b: Validation pass", {
-        "finding-validator": workflowRole("skills/ce-code-review/references/finish-review.md", "deterministic validator batch", { activation: "conditional", modelTier: "mid" }),
+      "finding-validation": stage("skills/ce-code-review/references/finish-input.md", "## The validator (dispatch context)", {
+        "finding-validator": workflowRole("skills/ce-code-review/references/finish-input.md", "validator-input.json", { activation: "conditional", modelTier: "mid" }),
       }),
     },
   },
@@ -210,9 +210,9 @@ const WORKFLOW_DEFINITIONS = {
   },
   lfg: {
     stages: {
-      planning: stage("skills/lfg/SKILL.md", "invoke the `ce-plan` skill", {}, { defaultOwner: "native", nativeTargetHandling: "child-workflow", resultMode: "controller" }),
+      planning: stage("skills/lfg/SKILL.md", "**Produce the work source**", {}, { defaultOwner: "native", nativeTargetHandling: "child-workflow", resultMode: "controller" }),
       implementation: stage("skills/lfg/SKILL.md", "invoke the `ce-work` skill", {}, { defaultOwner: "native", nativeTargetHandling: "child-workflow", mutation: "worktree-write", resultMode: "controller" }),
-      simplification: stage("skills/lfg/SKILL.md", "invoke the `ce-simplify-code` skill", {}, { defaultOwner: "native", nativeTargetHandling: "child-workflow", mutation: "worktree-write", resultMode: "controller" }),
+      simplification: stage("skills/lfg/SKILL.md", "Invoke the `ce-simplify-code` skill", {}, { defaultOwner: "native", nativeTargetHandling: "child-workflow", mutation: "worktree-write", resultMode: "controller" }),
       review: stage("skills/lfg/SKILL.md", "Invoke the `ce-code-review` skill", {}, { defaultOwner: "native", nativeTargetHandling: "child-workflow", resultMode: "controller" }),
       "shipping-tail": stage("skills/lfg/SKILL.md", "Shipping precondition", {}, { defaultOwner: "native", mutation: "shipping-tail", resultMode: "controller" }),
     },
