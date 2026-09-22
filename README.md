@@ -8,11 +8,11 @@
 
 [![Build Status](https://github.com/ethras/compound-engineering-orca/actions/workflows/ci.yml/badge.svg)](https://github.com/ethras/compound-engineering-orca/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-black.svg)](LICENSE)
-[![Skills](https://img.shields.io/badge/skills-35-black.svg)](docs/guides/README.md)
+[![Skills](https://img.shields.io/badge/skills-36-black.svg)](docs/guides/README.md)
 
 </div>
 
-Compound Engineering is a plugin of 35 skills for AI coding agents. It structures the work around a loop — brainstorm, plan, build, review, then **capture what you learned** — so the knowledge from each change is written down where the next change can read it.
+Compound Engineering is a plugin of 36 skills for AI coding agents. It structures the work around a loop — brainstorm, plan, build, review, then **capture what you learned** — so the knowledge from each change is written down where the next change can read it.
 
 This fork tracks upstream Compound Engineering and adds optional, bounded Orca orchestration. The upstream skill semantics remain authoritative; see the [Orca integration overlay](integrations/orca/README.md) for runtime details.
 
@@ -204,7 +204,7 @@ Starting from a bug instead of a feature? Use [`/ce-debug`](docs/guides/ce-debug
 
 ## Skills at a glance
 
-35 skills, grouped by what they are for. The full catalog, with a page per skill and how each one chains into the others, is in **[docs/guides](docs/guides/README.md)**.
+36 skills, grouped by what they are for. The full catalog, with a page per skill and how each one chains into the others, is in **[docs/guides](docs/guides/README.md)**.
 
 | Group | Skills | What it covers |
 |-------|--------|----------------|
@@ -215,7 +215,7 @@ Starting from a bug instead of a feature? Use [`/ce-debug`](docs/guides/ce-debug
 | [Autonomous](docs/guides/README.md#autonomous-pipeline) | `lfg` | The whole pipeline, hands-off |
 | [Testing & design](docs/guides/README.md#frontend-design) | `ce-test-browser` `ce-test-xcode` `ce-polish` `ce-dogfood` | Verifying and polishing what you built |
 | [Collaboration](docs/guides/README.md#collaboration) | `ce-proof` `ce-handoff` `ce-promote` | Sharing work and handing it off |
-| [Utilities](docs/guides/README.md#workflow-utilities) | `ce-setup` `ce-noslop` `ce-retune` `ce-riffrec-feedback-analysis` | Setup, writing, and maintenance |
+| [Utilities](docs/guides/README.md#workflow-utilities) | `ce-setup` `ce-noslop` `wtf` `ce-retune` `ce-riffrec-feedback-analysis` | Setup, writing, and maintenance |
 
 **Learn more**
 
@@ -347,15 +347,15 @@ Qwen Code installs Claude Code-compatible plugins directly from GitHub and conve
 
 ### OpenCode
 
-Add Compound Engineering to the `plugin` array in your global or project `opencode.json`:
+Add Compound Engineering to the `plugins` array in your global or project `opencode.json`:
 
 ```json
 {
-  "plugin": ["compound-engineering@git+https://github.com/EveryInc/compound-engineering-plugin.git"]
+  "plugins": ["compound-engineering@git+https://github.com/EveryInc/compound-engineering-plugin.git"]
 }
 ```
 
-Restart OpenCode after changing the config. The OpenCode plugin registers the Compound Engineering skills directory directly; no Bun installer or generated skill copy is required. See [`.opencode/INSTALL.md`](.opencode/INSTALL.md) for pinning examples.
+On OpenCode 1.x, the config key is `plugin` (singular). Restart OpenCode after changing the config. The plugin registers the Compound Engineering skills and `/commands` directly; no Bun installer or generated skill copy is required. See [`.opencode/INSTALL.md`](.opencode/INSTALL.md) for pinning examples.
 
 ### Pi
 

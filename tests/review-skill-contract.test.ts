@@ -1032,6 +1032,9 @@ describe("ce-code-review contract", () => {
     expect(skill).toMatch(/local-aligned.*local tree diff/i)
     expect(skill).not.toMatch(/append.*`DIFF:`.*unpushed/i)
     expect(skill).toMatch(/Do \*\*not\*\* call `gh pr diff` or append remote hunks/)
+    // A same-named origin branch can satisfy the fetch for a fork PR, so the ref is
+    // trusted only when it resolves to the PR's head commit.
+    expect(skill).toMatch(/`PR_HEAD_REF=[^`]+` [^.]*only when `git rev-parse [^`]+` equals the metadata `headRefOid`/)
     expect(stage2c).toMatch(
       /pr-remote.*branch-remote.*targeted probe.*`git show`.*reviewed head ref.*supplied diff hunks.*never inspect workspace paths/is,
     )
@@ -1879,8 +1882,8 @@ describe("cross-model peer skip legibility", () => {
 
   test("review-skill behavioral eval specs exercise the fixed-route U8 contract", async () => {
     const evalPaths = [
-      "skills/ce-code-review/references/cross-model-eval.md",
-      "skills/ce-doc-review/references/cross-model-eval.md",
+      "tests/skill-eval-cell/packs/ce-code-review-cross-model.md",
+      "tests/skill-eval-cell/packs/ce-doc-review-cross-model.md",
     ]
 
     for (const evalPath of evalPaths) {
@@ -1891,7 +1894,7 @@ describe("cross-model peer skip legibility", () => {
       expect(src).toMatch(/never changes? recipients? internally|no worker-internal recipient fallback/i)
     }
 
-    const docReviewEval = await readRepoFile("skills/ce-doc-review/references/cross-model-eval.md")
+    const docReviewEval = await readRepoFile("tests/skill-eval-cell/packs/ce-doc-review-cross-model.md")
     const wholeDocCase = docReviewEval.match(/10\. \*\*Whole-document sweep[\s\S]*?(?=\n11\. \*\*)/)?.[0]
     expect(wholeDocCase).toContain("`independence_verified: true`")
     expect(wholeDocCase).toMatch(/false or\s+absent independence[\s\S]*without promotion/)

@@ -1,8 +1,8 @@
 {
   "schema": "ce-orca.upstream-baseline/v1",
   "repository": "https://github.com/EveryInc/compound-engineering-plugin.git",
-  "version": "3.26.3",
-  "commit": "082c83e0537c803ac1d927daafc2e6eb6962dedf",
+  "version": "3.28.0",
+  "commit": "c152896f1cda13548fc1a05b2aff88caf8ae8dba",
   "skillInventory": [
     "ce-babysit-pr",
     "ce-bakeoff",
@@ -38,7 +38,8 @@
     "ce-test-xcode",
     "ce-work",
     "ce-worktree",
-    "lfg"
+    "lfg",
+    "wtf"
   ],
   "promptAssetSources": {
     "ce-code-review": "skills/ce-code-review/references/personas",
@@ -125,7 +126,7 @@
     {
       "id": "ce-plan.organizational-research",
       "file": "skills/ce-plan/references/research.md",
-      "contains": "**Slack context** (opt-in) — never auto-dispatch. Route by condition:"
+      "contains": "**Slack context** (opt-in) \u2014 never auto-dispatch. Route by condition:"
     },
     {
       "id": "ce-work.unit-dispatch",

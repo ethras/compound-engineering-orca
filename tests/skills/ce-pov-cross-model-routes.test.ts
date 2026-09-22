@@ -147,13 +147,18 @@ describe("ce-pov cross-model route safety", () => {
     }
     expect(emit("cursor")).not.toContain("--model")
     expect(emit("composer")).toContain("--model")
-    expect(emit("grok-cursor")).toContain("--model cursor-grok-4.6-high")
+    expect(emit("grok-cli")).toContain("--model grok-4.7")
+    expect(emit("grok-cli")).toContain("--effort xhigh")
+    expect(emit("grok-cursor")).toContain("--model grok-4.7-xhigh")
     expect(emit("opencode")).toContain("opencode run")
     expect(emit("opencode")).toContain('OPENCODE_CONFIG_CONTENT={"permission":{"edit":"deny","bash":"deny","webfetch":"deny","task":"deny"}}')
     expect(emit("opencode")).toContain("OPENCODE_DISABLE_PROJECT_CONFIG=1")
     expect(emit("opencode")).toContain("--dir <read-root>")
     expect(emit("opencode")).toContain("--format json")
     expect(emit("opencode")).toContain("--file <prompt-file>")
+    // OpenCode's --file is variadic: a bare argument after it becomes another attachment.
+    expect(emit("opencode").indexOf("Follow the attached brief.")).toBeGreaterThan(-1)
+    expect(emit("opencode").indexOf("Follow the attached brief.")).toBeLessThan(emit("opencode").indexOf("--file <prompt-file>"))
     expect(emit("opencode")).not.toContain("--auto")
     const source = readFileSync(SCRIPT, "utf8")
     // Zombies report as Z+ on macOS; exact "Z" alone leaves them "alive".
