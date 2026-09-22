@@ -1,6 +1,6 @@
 {
   "name": "compound-engineering-orca",
-  "version": "3.28.0",
+  "version": "3.28.2",
   "description": "Compound Engineering skills plugin with optional Orca orchestration",
   "type": "module",
   "private": true,

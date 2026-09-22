@@ -36,9 +36,9 @@ describe("CE-Orca role registry", () => {
     expect(registry.schema).toBe("ce-orca.role-registry/v1")
     expect(Object.keys(registry.workflows).sort()).toEqual(firstWaveWorkflowIds())
     expect(registry.identities).toEqual({
-      ceVersion: "3.28.0",
-      integrationVersion: "3.28.0-orca.7",
-      registryVersion: "ce-orca.registry/v1@3.28.0-orca.7",
+      ceVersion: "3.28.2",
+      integrationVersion: "3.28.2-orca.7",
+      registryVersion: "ce-orca.registry/v1@3.28.2-orca.7",
       protocolVersion: "orca.local-protocol/v1",
       requestVersion: "orca.execution-config/v1",
     })
