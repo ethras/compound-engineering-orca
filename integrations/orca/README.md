@@ -333,7 +333,7 @@ bun run orca:check-bundles
 
 `protocol.json` pins the local Orca protocol and request contracts accepted by this integration. An unsupported protocol or request version is a preflight failure; it is never a reason to substitute native execution after Orca has been selected.
 
-Fork releases use `<upstream-version>-orca.<integration-revision>`. The upstream version and commit live in `upstream.json`; the integration revision lives in `protocol.json`. Inspect the effective identity with:
+Fork releases use `<upstream-version>-orca.<integration-revision>`. The upstream version and commit live in `upstream.json`; the integration revision lives in `protocol.json`. When unreleased upstream changes are merged, `mergedCommit` records that tip for source parity while `commit` remains the released baseline. Inspect the effective identity with:
 
 ```bash
 bun run orca:version

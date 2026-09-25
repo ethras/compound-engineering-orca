@@ -77,6 +77,7 @@ test("local placement hooks preserve upstream bodies and ship their owned polici
   // remove upstream verification, role contracts, or downstream phases.
   const { execFileSync } = await import("node:child_process")
   const baseline = await loadUpstreamBaseline(REPO_ROOT)
+  const sourceCommit = baseline.mergedCommit ?? baseline.commit
   const stripHooks = (text: string) => text
     .replace(/<!-- ce-orca-hook:start [^>]+ -->[\s\S]*?<!-- ce-orca-hook:end [^>]+ -->\n/g, "")
     .replace(/\n{3,}/g, "\n\n")
@@ -86,7 +87,7 @@ test("local placement hooks preserve upstream bodies and ship their owned polici
   ]) {
     const relative = `skills/${skill}/${file}`
     const current = await fs.readFile(path.join(REPO_ROOT, relative), "utf8")
-    const upstream = execFileSync("git", ["show", `${baseline.commit}:${relative}`], {
+    const upstream = execFileSync("git", ["show", `${sourceCommit}:${relative}`], {
       cwd: REPO_ROOT,
       encoding: "utf8",
     })
@@ -103,7 +104,7 @@ test("local placement hooks preserve upstream bodies and ship their owned polici
     "skills/ce-doc-review/references/dispatch.md",
     "skills/lfg/references/task-visibility.md",
   ]) {
-    const upstream = execFileSync("git", ["show", baseline.commit + ":" + relative], { cwd: REPO_ROOT, encoding: "utf8" })
+    const upstream = execFileSync("git", ["show", sourceCommit + ":" + relative], { cwd: REPO_ROOT, encoding: "utf8" })
     expect(stripHooks(await fs.readFile(path.join(REPO_ROOT, relative), "utf8")), relative).toBe(stripHooks(upstream))
   }
 })

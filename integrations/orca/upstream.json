@@ -178,5 +178,6 @@
       "file": "skills/lfg/SKILL.md",
       "contains": "invoke the `ce-work` skill with `mode:return-to-caller"
     }
-  ]
+  ],
+  "mergedCommit": "868da03ee6b3b5a4e0cb47173da6d85d832a82fc"
 }
