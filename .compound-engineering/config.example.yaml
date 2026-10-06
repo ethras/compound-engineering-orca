@@ -128,6 +128,11 @@
 # xhigh; cursor/composer routes take none. A value the peer cannot honor skips
 # the pass with a stated reason -- never substituted.
 
+# ce-orca-hook:start review.codex-default-model
+# In the Orca fork, Codex review defaults to gpt-6.1-sol at extra-high reasoning.
+# Explicit model and effort selections take precedence.
+# ce-orca-hook:end review.codex-default-model
+
 # cross_model_review_mode: off   # auto | off (default: auto)
 # cross_model_peer: codex          # codex | claude | grok | cursor | composer | opencode
 # cross_model_model: fable         # model alias or full id for the resolved peer target (no default)

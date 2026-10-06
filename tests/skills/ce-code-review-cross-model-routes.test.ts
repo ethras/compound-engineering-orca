@@ -428,7 +428,7 @@ printf '%s' '{"structured_output":{"reviewer":"adversarial","findings":[],"resid
     expect(cmd).toContain("-s read-only")
     expect(cmd).toContain("--skip-git-repo-check")
     expect(cmd).toContain('model_reasoning_effort="xhigh"')
-    expect(cmd).toContain("gpt-6-luna")
+    expect(cmd).toContain("gpt-6.1-sol")
     expect(cmd).toContain("-C <repo-root>")
   })
 
@@ -1637,7 +1637,7 @@ describe("cross-model-adversarial-review normalization", () => {
       readFileSync(path.join(runDir, "adversarial-codex.json"), "utf8"),
     )
     expect(out.cross_model_route).toBe("codex")
-    expect(out.model_requested).toBe("gpt-6-luna")
+    expect(out.model_requested).toBe("gpt-6.1-sol")
     expect(out.model_actual).toBe("unverified")
     // Recover-from-stdout has no turn.completed; usage must be absent, not a
     // zero-byte file that json.load rejects (#1531).
@@ -1926,8 +1926,8 @@ function blockBetween(script: string, startMarker: string, endMarker = "# --- --
 
 describe("cross-model provider kernel parity (code-review vs doc-review)", () => {
   test("model IDs match across both skills' --emit-adapter output", () => {
-    expect(emitAdapter("codex")).toContain("gpt-6-luna")
-    expect(emitAdapter("codex", DOC_SCRIPT)).toContain("gpt-6-luna")
+    expect(emitAdapter("codex")).toContain("gpt-6.1-sol")
+    expect(emitAdapter("codex", DOC_SCRIPT)).toContain("gpt-6.1-sol")
     expect(emitAdapter("claude")).toContain("--model claude-opus-5-5")
     expect(emitAdapter("claude", DOC_SCRIPT)).toContain("--model claude-opus-5-5")
     expect(emitAdapter("grok-cli")).toContain("grok-4.7")

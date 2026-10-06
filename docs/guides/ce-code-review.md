@@ -32,6 +32,8 @@ If the repo declares [Compound Packs](./packs.md) in its `packs` config, the ins
 
 ---
 
+In the Orca fork, a cross-model Codex reviewer requests `gpt-6.1-sol` at extra-high reasoning by default. An explicit model or effort selection takes precedence; see [Configuration](./configuration.md).
+
 ## Example invocations
 
 ```text

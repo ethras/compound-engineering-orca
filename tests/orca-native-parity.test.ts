@@ -95,6 +95,31 @@ test("Codex model defaults use bounded hooks without replacing upstream route re
   }
 })
 
+test("review model hooks preserve upstream adapters and explicit override authority", async () => {
+  const { execFileSync } = await import("node:child_process")
+  const baseline = await loadUpstreamBaseline(REPO_ROOT)
+  const strip = (body: string) => body
+    .replace(/^# ce-orca-hook:start [^\n]+\n[\s\S]*?^# ce-orca-hook:end [^\n]+\n/gm, "")
+    .replace(/<!-- ce-orca-hook:start [^>]+ -->[\s\S]*?<!-- ce-orca-hook:end [^>]+ -->\n/g, "")
+    .replace(/\n{3,}/g, "\n\n")
+  for (const [skill, script] of [
+    ["ce-code-review", "cross-model-adversarial-review.sh"],
+    ["ce-doc-review", "cross-model-doc-review.sh"],
+  ]) {
+    for (const file of [`scripts/${script}`, "references/cross-model-review.md"]) {
+      const relative = `skills/${skill}/${file}`
+      const current = await fs.readFile(path.join(REPO_ROOT, relative), "utf8")
+      const upstream = execFileSync("git", ["show", `${baseline.mergedCommit}:${relative}`], {
+        cwd: REPO_ROOT,
+        encoding: "utf8",
+      })
+      expect(current, relative).toContain(`${skill}.codex-default-model`)
+      expect(current, relative).toContain("gpt-6.1-sol")
+      expect(strip(current), relative).toBe(strip(upstream))
+    }
+  }
+})
+
 test("local placement hooks preserve upstream bodies and ship their owned policies", async () => {
   // These hooks change execution placement, not required coverage. Compare the
   // entire body outside the bounded hooks so a routing edit cannot quietly

@@ -38,6 +38,8 @@ path.
 
 ## Runtime and configuration
 
+Orca workers and the Codex cross-model implementation, code-review, and document-review routes default to `gpt-6.1-sol`. Review routes retain extra-high reasoning. Explicit model and effort selectors keep their existing precedence.
+
 ### Codex home ownership under Orca
 
 Orca intentionally launches Codex with a managed runtime `CODEX_HOME`, but host

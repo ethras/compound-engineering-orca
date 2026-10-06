@@ -105,6 +105,8 @@ All settings are optional. Commented examples are documentation, not active valu
 | [`ce-promote`](./ce-promote.md) | `ce_promote_spiral_optout` | `true` suppresses the one-time Spiral setup offer; remove the key to enable it again. |
 | [`ce-sweep`](./ce-sweep.md) | `feedback_sources`, `sweep_state_path`, `sweep_ack_cap`, `sweep_lease_ttl_minutes`, `sweep_shared_branch` | Feedback connectors, durable state location, acknowledgment circuit breaker, lease expiry, and optional push-gated shared-branch coordination. The setup interview writes these values. |
 
+When `cross_model_model` is unset in the Orca fork, Codex code and document reviewers request `gpt-6.1-sol` at extra-high reasoning. An explicit conversation or checkout selector takes precedence.
+
 ## Implementation routing
 
 The work engine list is host-relative rather than tied to the checkout's usual harness:

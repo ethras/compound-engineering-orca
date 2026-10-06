@@ -89,6 +89,11 @@ M_GROK="grok-4.7"              # grok CLI             (--effort xhigh)
 M_GROK_CURSOR="grok-4.7-xhigh" # cursor-agent --list-models; 4.7 has no cursor- prefix, effort is in the id
 M_COMPOSER="composer-2.5-fast" # cursor-agent composer (no high tier; -fast is the ceiling)
 
+# ce-orca-hook:start ce-code-review.codex-default-model
+# Orca defaults to GPT-6.1 Sol; route-scoped explicit overrides still win.
+M_CODEX="gpt-6.1-sol"
+# ce-orca-hook:end ce-code-review.codex-default-model
+
 route_effort() {   # <route> -> requested effort: the override where the route takes one, else editorial
   if [ -n "${CROSS_MODEL_EFFORT_OVERRIDE:-}" ]; then
     case "$1" in

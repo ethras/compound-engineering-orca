@@ -27,6 +27,8 @@ The agent uses your plan and project context to choose technical fixes, even whe
 
 When only another AI model found a worthwhile problem, the review can have a local reviewer independently check the relevant document and source before applying an otherwise authorized fix. The reviewer sees the relevant source and agreed goal, without the first model’s claims, proposed fixes, or leading questions. Without independent support, the proposed fix still needs your approval.
 
+In the Orca fork, a cross-model Codex reviewer requests `gpt-6.1-sol` at extra-high reasoning by default. An explicit model or effort selection takes precedence; see [Configuration](./configuration.md).
+
 ## Example invocations
 
 A path, no path, or non-interactive. Markdown and HTML plans use the same review and mutation routes.

@@ -67,6 +67,10 @@ Preferred model mappings run first. Only after the preferred ID is observed unav
 
 ## Step 2 — Provider model + reasoning tier (defined in the script)
 
+<!-- ce-orca-hook:start ce-doc-review.codex-default-model -->
+This Orca build requests `gpt-6.1-sol` for Codex at extra-high reasoning when no model is explicitly selected. Announce the script’s effective mapping; model examples in the upstream prose do not override it.
+<!-- ce-orca-hook:end ce-doc-review.codex-default-model -->
+
 All activated lenses run on **one model per provider at high reasoning, except Codex and native Grok on extra-high**. The cursor-agent Grok route uses its model-implied extra-high tier; composer's `-fast` tier is its ceiling, an accepted exception. The concrete model IDs and per-route reasoning flags live in a **single mapping in the script** (`scripts/cross-model-doc-review.sh`, the `M_CODEX`/`M_CLAUDE`/`M_GROK`/`M_GROK_CURSOR`/`M_COMPOSER` constants and the `adapter_argv` builder). A checkout may pin the resolved target's model and effort through `cross_model_model` / `cross_model_effort` (Step 1); the script validates and never substitutes. This reference deliberately does **not** restate the IDs; one source of truth prevents the reference and script from drifting. The IDs are the current choice under the tier rule (a single maintenance point), not the contract.
 
 The **persona file** basename and the **reviewer name** are distinct: the script reads the brief from `references/personas/<persona-file>.md` but forces the fold-in `reviewer` field to `<reviewer-name>-<provider>` so agreement matches the in-process persona's short name. The script derives the persona file from the allowlisted reviewer name. It is **not** a caller argument, so no caller value reaches the brief-read path.
