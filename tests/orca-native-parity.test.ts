@@ -112,6 +112,7 @@ test("local placement hooks preserve upstream bodies and ship their owned polici
 function makeReadParityCase(input: {
   adapter: ReadAdapter
   upstreamAnchor: string
+  upstreamFile?: string
   hooks: HookSeam[]
   reference: string
   controllerAnchors: string[]
@@ -167,7 +168,7 @@ const PARITY_CASES: ParityCase[] = [
       id: "ce-work-execution-engine",
       file: "skills/ce-work/references/execution-engines.md",
       before: "`off` disables only the standing preference.",
-      after: "## Step 1: Probe host capability",
+      after: "## Run the chosen engine",
     }],
     reference: "skills/ce-work/references/orca-execution.md",
     controllerAnchors: [
@@ -290,14 +291,14 @@ const PARITY_CASES: ParityCase[] = [
   },
   makeReadParityCase({
     adapter: compoundWorkflow,
-    upstreamAnchor: "Launch research subagents.",
+    upstreamAnchor: "You classify the learning and draft its body in this context",
     upstreamFile: "skills/ce-compound/references/research.md",
     hooks: [
       {
         id: "ce-compound.research-dispatch",
         file: "skills/ce-compound/references/research.md",
-        before: "Launch research subagents.",
-        after: "**Run ID and run dir (before dispatching any subagent):**",
+        before: "You classify the learning and draft its body in this context",
+        after: "**Run ID and run dir (before dispatching the finder):**",
       },
       {
         id: "ce-compound.grounding-validation",
@@ -312,8 +313,6 @@ const PARITY_CASES: ParityCase[] = [
       "every `docs/`, `CONCEPTS.md`, or context-glossary write, and final output in the CE controller.",
     ],
     nodes: [
-      { id: "context", stage: "research", role: "context-analyzer", required: true, wave: 0 },
-      { id: "solution", stage: "research", role: "solution-extractor", required: true, wave: 0 },
       { id: "related", stage: "research", role: "related-docs-finder", required: true, wave: 0 },
     ],
   }),

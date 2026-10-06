@@ -299,7 +299,7 @@ describe('ce-work Orca workflow', () => {
       path.join(import.meta.dir, '..', 'skills', 'ce-work', 'references', 'execution-strategy.md'),
       'utf8',
     )
-    expect(strategy).toContain('prefer subagents for any structured multi-unit plan')
+    expect(strategy).toContain("run each dependency layer's independent units together as a parallel wave of fresh workers.")
 
     const engines = await readFile(
       path.join(import.meta.dir, '..', 'skills', 'ce-work', 'references', 'execution-engines.md'),
@@ -307,7 +307,7 @@ describe('ce-work Orca workflow', () => {
     )
     const nativeResolution = engines.indexOf('`off` disables only the standing preference.')
     const orcaHook = engines.indexOf('<!-- ce-orca-hook:start ce-work-execution-engine -->')
-    const capabilityProbe = engines.indexOf('## Step 1: Probe host capability')
+    const capabilityProbe = engines.indexOf('## Run the chosen engine')
     expect(nativeResolution).toBeGreaterThan(-1)
     expect(orcaHook).toBeGreaterThan(nativeResolution)
     expect(capabilityProbe).toBeGreaterThan(orcaHook)

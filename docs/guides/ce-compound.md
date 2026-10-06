@@ -14,7 +14,7 @@ Captures land in `docs/solutions/`, where `ce-plan`'s research and `ce-code-revi
 
 ## Orca execution placement
 
-In the Orca fork, Full mode can complete its three Phase 1 research roles in the main agent when the solved problem, verification evidence, source, and learning corpus fit its context. It still searches the live corpus and resolved Compound Packs and produces all three research artifacts. Substantial investigations and applicable execution assignments retain delegation. Session-history and independent grounding-validation requirements remain unchanged; local research is not Lightweight mode.
+In the Orca fork, Full mode can run the Related Docs Finder in the main agent when the solved problem, verification evidence, source, and learning corpus fit its context. Classification and drafting always stay in the controller. The finder still searches the live corpus and resolved Compound Packs and produces `related.json`. Substantial corpus investigations and applicable execution assignments retain finder delegation. Session-history and independent grounding-validation requirements remain unchanged; local research is not Lightweight mode.
 
 ## TL;DR
 
@@ -94,7 +94,7 @@ Most teams solve the same problem twice, sometimes with the same person, because
 
 ### Two modes, agent-selected
 
-Full mode runs three research subagents in parallel (Context Analyzer, Solution Extractor, Related Docs Finder), plus an automatic session-history probe across Claude Code, Codex, Cursor, Pi, and oh-my-pi (omp). It cross-references existing docs, detects duplicates, and runs specialized reviews.
+Full mode classifies the learning and drafts its body in the main session, which holds the conversation, while a Related Docs Finder subagent searches existing docs, plus an automatic session-history probe across Claude Code, Codex, Cursor, Pi, and oh-my-pi (omp). It cross-references existing docs, detects duplicates, and runs specialized reviews.
 
 Lightweight mode writes the same doc type in a single pass. No subagents, no overlap detection, no session-history research, no semantic grounding validation.
 
@@ -143,7 +143,7 @@ You've just spent 45 minutes debugging an N+1 query in the brief-generation flow
 
 The completion phrase marks the checkpoint. The agent applies the counterfactual, determines that a future engineer could plausibly repeat the investigation from the final implementation alone, and auto-invokes `ce-compound`. With plenty of context left, it picks Full mode and notes "Ran Full mode." at the top of its output. No prompt.
 
-Three subagents dispatch in parallel. Context Analyzer classifies the work as `performance_issue` (bug track) and proposes the filename and category. Solution Extractor structures the fix with before/after code. Related Docs Finder reports moderate overlap with an older doc on a different N+1 case. Alongside them, the session-history probe scans recent sessions; none clear the relevance bar, so it records "no relevant prior sessions."
+The Related Docs Finder dispatches in the background. While it searches, the agent classifies the work as `performance_issue` (bug track), picks the filename and category, and drafts the fix with before/after code and the dead ends from the session. The finder reports moderate overlap with an older doc on a different N+1 case. Alongside them, the session-history probe scans recent sessions; none clear the relevance bar, so it records "no relevant prior sessions."
 
 The orchestrator assembles the doc, validates frontmatter, and writes `docs/solutions/performance-issues/n-plus-one-brief-generation.md`. Grounding validation runs next: the mechanical script confirms every cited path and SHA resolves, and the validator subagent quotes the source line behind the doc's claim about the ORM's default batching behavior. The discoverability check finds `AGENTS.md` does not mention `docs/solutions/`, proposes a one-line addition, and applies it after you confirm.
 

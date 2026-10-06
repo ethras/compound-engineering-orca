@@ -10,6 +10,8 @@ After code review, the host resolves verified fixes within the requested work an
 
 Project simplification thresholds override the default. Deployment guidance belongs in the shipping handoff and must distinguish expected behavior changes from regressions.
 
+Incremental commits follow the same message precedence as `ce-commit`: project conventions, then the recent log pattern, then conventional commits. A user override wins. This also applies in return-to-caller mode.
+
 It is the fourth step in the compound-engineering ideation chain:
 
 ```text
@@ -109,7 +111,7 @@ Before each task, it checks whether the unit's work already exists and matches t
 
 ### Engine, workspace, and scheduling are separate decisions
 
-Ordinary synchronous native work stays in the active checkout. Each implementation unit gets a fresh, single-use native worker context using whatever isolation the current harness provides. A detached external worker always gets a private linked worktree. The host alone applies, verifies, and commits that result in the canonical checkout.
+Independent units in the same dependency layer run as a parallel wave of fresh, single-use native workers, using whatever isolation the current harness provides. That spends more tokens than working inline, in exchange for finishing sooner. Units that must run in sequence gain no time from a worker, so they run inline in the active checkout unless the context is crowded enough that a fresh window would help. A detached external worker always gets a private linked worktree. The host alone applies, verifies, and commits that result in the canonical checkout.
 
 The scheduler may author a bounded wave concurrently only after checking dependencies, actual and expected paths, shared interfaces, generated or config surfaces, migrations, and shared runtime resources. Results then fold in one at a time against the advancing canonical tree. A clean patch is not proof of semantic compatibility; overlap or uncertainty returns the affected work to host resolution, re-dispatch, or serial execution.
 
@@ -117,11 +119,13 @@ When the plan defines U-IDs, they propagate as task prefixes, into commit messag
 
 ### Test evidence, review, and operational validation
 
-A task is not done when the code compiles. Before changing behavior, `ce-work` discovers the existing test files and chooses the right proof: use an existing failing test, update or strengthen the existing test that owns the contract, add a focused failing test, capture characterization coverage, or record a deliberate exception with replacement verification. Before marking a feature-bearing task complete, it checks that test scenarios cover the categories that apply (happy path, edges, error paths, integration) and traces two levels out for callbacks, middleware, and observers.
+A task is not done when the code compiles. Before changing behavior, `ce-work` discovers the existing test files and chooses the right proof: use an existing failing test, update or strengthen the existing test that owns the contract, add a focused failing test, capture characterization coverage, or record a deliberate exception with replacement verification. Tests prove the behavior the unit builds: vague scenarios get made concrete, but a category the plan left out is not a gap to fill. Before marking a task complete, it traces two levels out for callbacks, middleware, and observers, and keeps the paths that already worked through them working.
+
+### Building what was asked
+
+The plan, or the request when there is no plan, defines what gets built. A mechanism nobody asked for, such as a guard, fallback, option, or abstraction, is added only when an existing contract requires it, when leaving it out lets harm land before anyone catches it, or when adding it later would be expensive (stored data, a shared interface, money, security). Anything else is reported as considered and not built, and the plan's non-goals stay unbuilt unless implementation turns up new evidence. `ce-work` never narrows requested behavior to fit a safeguard; when a needed safeguard conflicts with it, a trade-off the plan already decided is built as decided, and an undecided one goes back to the requester. When it replaces an interface whose callers are all in the repository, it updates the callers and removes the old version. When two fixes for the same failing check have not worked, it stops patching and checks the assumption both relied on. It corrects a wrong plan assumption within scope, and stops only when correcting it needs a decision, authority, or input it does not have.
 
 Before shipping on its own, `ce-work` must have a completed `ce-code-review` result or report exactly why it skipped review: `Code review: skipped (mechanical diff)` or `Code review: skipped (ce-code-review unavailable)`. Mechanical changes are formatting, dependency updates, lint fixes, or generated files only. Review does not edit files. `ce-work` checks the findings, chooses technical fixes from project evidence, and applies justified fixes within scope. It stops when essential evidence, a user decision, or permission is needed to complete the requested work. Other remaining concerns are recorded without asking what to do next. When `ce-work` is returning work to another agent, that agent owns the review.
-
-Every PR description includes a `Post-Deploy Monitoring & Validation` section. If there is truly no production impact, the section still exists with that as the recorded decision.
 
 ### Smart triage on bare prompts
 
@@ -253,7 +257,7 @@ work_engine_preferences:
   - harness: cursor
     model: composer
   - harness: codex
-    model: "gpt-6-sol"
+    model: "gpt-6.1-sol"
   - harness: claude
 ```
 
@@ -324,6 +328,15 @@ After review, `ce-work` drops incorrect or low-value suggestions and applies jus
 
 **Does `ce-work` support non-software plans?**
 For a plan marked `execution: knowledge-work` (produced by `ce-plan`'s approach-altitude flow), yes. The carve-out reads the sources, synthesizes, and produces the deliverable, skipping the commit/test/PR lifecycle. Other non-software work without that marker still ends at `ce-plan`, and a human executes it.
+
+**Can I run `ce-work` under `/goal`?**
+Yes, if you want the harness to keep re-prompting until the run finishes. `ce-plan` no longer offers `/goal` as a separate way to execute a plan, because that path skipped `ce-work`'s review receipt and its protection for uncommitted files. Type the goal yourself and make `ce-work`'s finished state the condition:
+
+```text
+/goal The ce-work skill has implemented docs/plans/<plan>.md and finished its shipping handoff (a PR or a local commit) with a code-review receipt or an authorized review-skip phrase, or reported a blocker
+```
+
+The `/goal` evaluator reads only the transcript, so name a state the transcript shows: when it finishes, `ce-work` prints where the work landed (a PR URL, or the local commit when it ships without a PR) and its review receipt or skip phrase.
 
 **What happens if I pass a requirements-only brainstorm file?**
 The run stops and tells you the Product Contract needs `ce-plan` enrichment first. It offers the exact `ce-plan <plan-path>` handoff. Blank invoke does the same if the newest matching artifact is still requirements-only.

@@ -28,9 +28,9 @@ Create a private packet outside the checkout:
   "workflowId": "ce-compound",
   "nodes": [
     {
-      "id": "context",
+      "id": "related",
       "stage": "research",
-      "role": "context-analyzer",
+      "role": "related-docs-finder",
       "prompt": "<full native task prompt, asking for content rather than only a scratch path>",
       "required": true,
       "wave": 0
@@ -39,10 +39,10 @@ Create a private packet outside the checkout:
 }
 ```
 
-Use only installed stage/role IDs and unique safe IDs. The three core research
-roles (`context-analyzer`, `solution-extractor`, `related-docs-finder`) are
-required when Full/headless research runs; all other installed Orca workers are
-optional. Same-wave nodes run concurrently; later waves wait. Dispatch Phase 1
+Use only installed stage/role IDs and unique safe IDs. The `related-docs-finder`
+is the only delegated research role and is required when corpus research runs
+through Orca. Classification and drafting stay in the controller. All other
+installed Orca workers are optional. Same-wave nodes run concurrently; later waves wait. Dispatch Phase 1
 and Phase 2.45 as separate packets so the controller can perform its writes and
 gates between them. Never send Phase 3 specialized reviewers through Orca.
 
@@ -93,9 +93,9 @@ persisting the content to the controller-owned scratch path where the native
 assembly expects one. References such as `runs/<run-id>/...` are opaque
 transport identifiers; never resolve or open them relative to the target
 checkout or current working directory. The helper retrieves only published
-artifacts through the protocol's allowlisted reader. A core research failure
-fails the Orca run; completed core artifacts remain usable, but the controller
-must not write a solution document from an incomplete core set. Optional
+artifacts through the protocol's allowlisted reader. A required finder failure
+fails the Orca run; the controller must not write a solution document without
+the finder result. Optional
 failures are visible degradation and follow the native fallback.
 
 Stop on an invalid envelope, unexpected workflow or role set, or malformed

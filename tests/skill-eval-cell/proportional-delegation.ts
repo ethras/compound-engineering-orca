@@ -26,7 +26,7 @@ export const proportionalDelegationScenarios: Scenario[] = [
       files_read_post: ["references/orca-delegation.md"],
       workspace_read: [".ce-orca.json"],
       must_include_field: "PLACEMENT",
-      must_include: ["delegated", "orca", "codex", "gpt-5.6-sol", "medium"],
+      must_include: ["delegated", "orca", "codex", "gpt-6.1-sol", "medium"],
       actions: "none",
     },
   },

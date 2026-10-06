@@ -6,26 +6,26 @@
     "concurrency": 1,
     "effort": "medium",
     "isolation": "shared",
-    "model": "gpt-5.6-sol",
+    "model": "gpt-6.1-sol",
     "reasoning": "medium"
   },
   "modelTiers": {
     "cheap": {
       "backend": "codex",
       "budget": 600,
-      "model": "gpt-5.6-sol",
+      "model": "gpt-6.1-sol",
       "reasoning": "medium"
     },
     "mid": {
       "backend": "codex",
       "budget": 900,
-      "model": "gpt-5.6-sol",
+      "model": "gpt-6.1-sol",
       "reasoning": "medium"
     },
     "parent": {
       "backend": "codex",
       "budget": 900,
-      "model": "gpt-5.6-sol",
+      "model": "gpt-6.1-sol",
       "reasoning": "medium"
     }
   },

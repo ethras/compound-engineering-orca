@@ -53,7 +53,7 @@ function resolved({ selected = "orca", confirmationRequired = false, workflowId 
     executionConfig: {
       version: "orca.execution-config/v1",
       workflowId,
-      defaults: { backend: "codex", model: "gpt-5.6-sol", reasoning: "medium", effort: "medium", concurrency: 1, isolation: "shared" },
+      defaults: { backend: "codex", model: "gpt-6.1-sol", reasoning: "medium", effort: "medium", concurrency: 1, isolation: "shared" },
       stages: {},
       ownership: {},
       provenance: { ceVersion: "3.19.0", integrationVersion: "3.19.0-orca.1", registryVersion: "ce-orca.registry/v1@3.19.0-orca.1", profile: "", profileDigest: "" },
@@ -290,7 +290,7 @@ describe("CE-Orca runtime routing", () => {
       })
 
       expect(result.action).toBe("orca")
-      expect(observed).toEqual({
+      expect(observed as { args: string[]; timeout: number } | null).toEqual({
         args: expect.arrayContaining(["--wait", String(expectedWaitSeconds)]),
         timeout: (budget + 60) * 1_000,
       })

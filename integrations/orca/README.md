@@ -7,7 +7,8 @@ This directory is the fork-owned boundary between upstream Compound Engineering 
 The fork's bounded placement hooks let `ce-simplify-code` and `ce-compound`
 complete their core analysis in the main agent when its context can cover the
 work. Simplification still applies all three persona rubrics. Full compounding
-still produces all three research outputs, searches the live learning corpus,
+keeps classification and drafting in the controller, completes the Related Docs
+Finder contract against the live learning corpus,
 and runs its later session-history and validation gates. Local research does
 not switch to Lightweight or count as independent grounding validation.
 
@@ -142,7 +143,7 @@ still overrides the recorded selector.
 
 Built-in role targets preserve the relative tier intent declared by upstream CE
 without silently downgrading the model: `parent`, `mid`, and `cheap` all use
-`gpt-5.6-sol` with medium reasoning. Their supervision windows are 900 seconds
+`gpt-6.1-sol` with medium reasoning. Their supervision windows are 900 seconds
 for `parent` and `mid`, and 600 seconds for `cheap`; `budget` is a wall-clock
 supervision timeout, not a token budget. A higher-precedence project, profile,
 stage, or role target still wins. Changing a backend or model without naming a
@@ -181,7 +182,7 @@ Natural language and explicit JSON use the same resolver. These invocations are
 representative controller inputs:
 
 ```text
-/lfg Use Claude Opus with high reasoning for planning. Use 3 Codex gpt-5.6-sol implementation workers with xhigh reasoning. Do not ask for confirmation.
+/lfg Use Claude Opus with high reasoning for planning. Use 3 Codex gpt-6.1-sol implementation workers with xhigh reasoning. Do not ask for confirmation.
 
 /ce-doc-review Use Claude Opus high for security-lens-reviewer; use the defaults for the remaining selected reviewers.
 ```
@@ -202,7 +203,7 @@ The equivalent explicit LFG patch is:
     },
     "implementation": {
       "backend": "codex",
-      "model": "gpt-5.6-sol",
+      "model": "gpt-6.1-sol",
       "reasoning": "xhigh",
       "concurrency": 3
     }

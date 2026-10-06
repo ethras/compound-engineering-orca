@@ -97,7 +97,7 @@
           "jsonpath": "$.version"
         }
       ],
-      "release-as": "3.28.2-orca.7"
+      "release-as": "3.30.3-orca.7"
     },
     ".claude-plugin": {
       "release-type": "simple",

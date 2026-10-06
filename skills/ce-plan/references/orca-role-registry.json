@@ -1,19 +1,16 @@
 {
   "identities": {
-    "ceVersion": "3.28.2",
-    "integrationVersion": "3.28.2-orca.7",
+    "ceVersion": "3.30.3",
+    "integrationVersion": "3.30.3-orca.7",
     "protocolVersion": "orca.local-protocol/v1",
-    "registryVersion": "ce-orca.registry/v1@3.28.2-orca.7",
+    "registryVersion": "ce-orca.registry/v1@3.30.3-orca.7",
     "requestVersion": "orca.execution-config/v1"
   },
   "schema": "ce-orca.role-registry/v1",
-  "version": "ce-orca.registry/v1@3.28.2-orca.7",
+  "version": "ce-orca.registry/v1@3.30.3-orca.7",
   "workflows": {
     "ce-plan": {
       "controller": "ce-controller",
-      "excludedPromptAssets": {
-        "data-migration-reviewer": "The upstream asset is dormant in ce-plan and is not dispatched by the installed workflow."
-      },
       "mode": "mixed",
       "skill": "ce-plan",
       "stages": {
@@ -81,15 +78,6 @@
               "resultMode": "artifact",
               "sourceKind": "prompt-asset",
               "sourcePath": "references/agents/data-integrity-guardian.md"
-            },
-            "deployment-verification-agent": {
-              "activation": "conditional",
-              "modelTier": "parent",
-              "mutation": "read-only",
-              "required": false,
-              "resultMode": "artifact",
-              "sourceKind": "prompt-asset",
-              "sourcePath": "references/agents/deployment-verification-agent.md"
             },
             "framework-docs-researcher": {
               "activation": "conditional",

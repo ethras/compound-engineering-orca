@@ -10,8 +10,6 @@ export const WORKFLOW_ID = "ce-compound"
 
 export const ROLE_POLICY = Object.freeze({
   research: Object.freeze({
-    "context-analyzer": Object.freeze({ required: true, repeatable: false }),
-    "solution-extractor": Object.freeze({ required: true, repeatable: false }),
     "related-docs-finder": Object.freeze({ required: true, repeatable: false }),
   }),
   "session-history": Object.freeze({
@@ -78,7 +76,7 @@ export function validatePacket(packet) {
   const researchRoles = packet.nodes.filter(({ stage }) => stage === "research").map(({ role }) => role).sort()
   const requiredResearch = Object.keys(ROLE_POLICY.research).sort()
   if (researchRoles.length > 0 && JSON.stringify(researchRoles) !== JSON.stringify(requiredResearch)) {
-    throw new Error("research requires exactly the three installed core research roles")
+    throw new Error("research requires exactly the installed corpus research role")
   }
   return packet
 }

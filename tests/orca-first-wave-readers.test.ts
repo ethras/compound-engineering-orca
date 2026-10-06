@@ -360,11 +360,18 @@ describe("CE-Orca first-wave read adapters", () => {
       role: "code-reuse-reviewer",
     }]))).toThrow("exactly the three installed simplification roles")
 
-    expect(() => compound.validatePacket(packetFor(compound, [{
-      id: "context",
+    const finder = packetFor(compound, [{
+      id: "related",
       stage: "research",
-      role: "context-analyzer",
-    }]))).toThrow("exactly the three installed core research roles")
+      role: "related-docs-finder",
+    }])
+    expect(compound.validatePacket(finder)).toBe(finder)
+    // Upstream keeps conversation-dependent classification and drafting local.
+    // A stale pre-sync packet must not delegate either retired research role.
+    for (const role of ["context-analyzer", "solution-extractor"]) {
+      const stale = { ...finder, nodes: [{ ...finder.nodes[0], role }] }
+      expect(() => compound.validatePacket(stale)).toThrow("role is not installed in stage research")
+    }
   })
 
   test("marks optional debug failure degraded and forbids nested delegation", async () => {
@@ -612,8 +619,6 @@ export async function integrateChange(change) {
         role: "hypothesis-probe",
       }]),
       readCase("ce-compound", compound, [
-        { id: "context", stage: "research", role: "context-analyzer" },
-        { id: "solution", stage: "research", role: "solution-extractor" },
         { id: "related", stage: "research", role: "related-docs-finder" },
       ]),
       {
@@ -723,7 +728,7 @@ export async function integrateChange(change) {
       ["ce-code-review/references", "ce-code-review.persona-dispatch", "### Stage 4: Spawn sub-agents", "dispatch-reviewers.md"],
       ["ce-simplify-code", "ce-simplify-code.reviewer-analysis", "Dispatch three generic subagents"],
       ["ce-debug/references", "ce-debug.hypothesis-investigation", "### Phase 1: Investigate", "investigate.md"],
-      ["ce-compound/references", "ce-compound.research-dispatch", "Launch research subagents.", "research.md"],
+      ["ce-compound/references", "ce-compound.research-dispatch", "You classify the learning and draft its body in this context", "research.md"],
     ]
 
     for (const [skillName, hook, nativeText, fileName = "SKILL.md"] of checks) {

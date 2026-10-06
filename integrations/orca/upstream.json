@@ -1,8 +1,8 @@
 {
   "schema": "ce-orca.upstream-baseline/v1",
   "repository": "https://github.com/EveryInc/compound-engineering-plugin.git",
-  "version": "3.28.2",
-  "commit": "020c5e10d49aed19ee9354917780e94e665f5977",
+  "version": "3.30.3",
+  "commit": "752b0bc275aec95a4d0417655266632415cdc56f",
   "skillInventory": [
     "ce-babysit-pr",
     "ce-bakeoff",
@@ -93,8 +93,6 @@
       "architecture-strategist.md",
       "best-practices-researcher.md",
       "data-integrity-guardian.md",
-      "data-migration-reviewer.md",
-      "deployment-verification-agent.md",
       "framework-docs-researcher.md",
       "git-history-analyzer.md",
       "learnings-researcher.md",
@@ -126,7 +124,7 @@
     {
       "id": "ce-plan.organizational-research",
       "file": "skills/ce-plan/references/research.md",
-      "contains": "**Slack context** (opt-in) — never auto-dispatch. Route by condition:"
+      "contains": "**Slack context** (opt-in) \u2014 never auto-dispatch. Route by condition:"
     },
     {
       "id": "ce-work.unit-dispatch",
@@ -166,7 +164,7 @@
     {
       "id": "ce-compound.research-dispatch",
       "file": "skills/ce-compound/references/research.md",
-      "contains": "Launch research subagents."
+      "contains": "You classify the learning and draft its body in this context"
     },
     {
       "id": "ce-compound.specialized-review",
@@ -179,5 +177,5 @@
       "contains": "invoke the `ce-work` skill with `mode:return-to-caller"
     }
   ],
-  "mergedCommit": "868da03ee6b3b5a4e0cb47173da6d85d832a82fc"
+  "mergedCommit": "033fa483ef81070149a9f3174c301de988c7d94f"
 }

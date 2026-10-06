@@ -20,7 +20,7 @@ afterEach(async () => {
   await Promise.all(temporary.splice(0).map((directory) => rm(directory, { recursive: true, force: true })))
 })
 
-const stage = (id: string, extras: Record<string, unknown> = {}) => ({
+const stage = (id: string, extras: Record<string, unknown> = {}): { id: string; status: string; runtime: string; owner: string; artifactRef: string; standaloneShippingSkipped?: boolean } => ({
   id,
   status: 'complete',
   runtime: 'orca',
@@ -63,7 +63,7 @@ const resolvedLfg = () => ({
       planning: { backend: 'claude', model: 'opus', reasoning: 'high' },
       implementation: {
         backend: 'codex',
-        model: 'gpt-5.6-sol',
+        model: 'gpt-6.1-sol',
         reasoning: 'xhigh',
         concurrency: 3,
       },
@@ -95,7 +95,7 @@ const resolvedLfg = () => ({
       },
       implementation: {
         backend: 'codex',
-        model: 'gpt-5.6-sol',
+        model: 'gpt-6.1-sol',
         reasoning: 'xhigh',
         effort: 'medium',
         budget: 8,
@@ -459,7 +459,7 @@ describe('LFG Orca ownership gate', () => {
       stages: {
         implementation: {
           backend: 'codex',
-          model: 'gpt-5.6-sol',
+          model: 'gpt-6.1-sol',
           reasoning: 'xhigh',
           concurrency: 3,
         },
@@ -546,7 +546,7 @@ describe('LFG Orca ownership gate', () => {
   })
 
   test('propagates only configured LFG layers and never pins materialized built-ins', () => {
-    const resolved = resolvedLfg()
+    const resolved: Omit<ReturnType<typeof resolvedLfg>, 'runScopedOverride'> & { runScopedOverride: Record<string, unknown> } = resolvedLfg()
     resolved.runScopedOverride = {
       schema: 'ce-orca.execution-request/v1',
       workflowId: 'lfg',

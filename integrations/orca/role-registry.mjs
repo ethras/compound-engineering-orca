@@ -83,9 +83,6 @@ const WORKFLOW_DEFINITIONS = {
     },
   },
   "ce-plan": {
-    excludedPromptAssets: {
-      "data-migration-reviewer": "The upstream asset is dormant in ce-plan and is not dispatched by the installed workflow.",
-    },
     stages: {
       "local-research": stage("skills/ce-plan/references/research.md", "All specialist research and deepening prompts used in this phase are skill-local prompt assets", {
         "repo-research-analyst": promptRole("skills/ce-plan/references/agents/repo-research-analyst.md", { activation: "always", required: true, resultMode: "artifact" }),
@@ -117,7 +114,6 @@ const WORKFLOW_DEFINITIONS = {
         "performance-oracle": promptRole("skills/ce-plan/references/agents/performance-oracle.md", { resultMode: "artifact" }),
         "security-sentinel": promptRole("skills/ce-plan/references/agents/security-sentinel.md", { resultMode: "artifact" }),
         "data-integrity-guardian": promptRole("skills/ce-plan/references/agents/data-integrity-guardian.md", { resultMode: "artifact" }),
-        "deployment-verification-agent": promptRole("skills/ce-plan/references/agents/deployment-verification-agent.md", { resultMode: "artifact" }),
       }, { defaultOwner: "native" }),
       authoring: stage("skills/ce-plan/references/final-review.md", "### Phase 5: Final Review, Write File, and Handoff", {
         "plan-author": workflowRole("skills/ce-plan/SKILL.md", "Research, decide, and write the plan", { activation: "always", required: true, resultMode: "controller" }),
@@ -173,9 +169,7 @@ const WORKFLOW_DEFINITIONS = {
   },
   "ce-compound": {
     stages: {
-      research: stage("skills/ce-compound/references/research.md", "Launch research subagents.", {
-        "context-analyzer": workflowRole("skills/ce-compound/references/research.md", "Context Analyzer", { activation: "always", required: true, resultMode: "artifact" }),
-        "solution-extractor": workflowRole("skills/ce-compound/references/research.md", "Solution Extractor", { activation: "always", required: true, resultMode: "artifact" }),
+      research: stage("skills/ce-compound/references/research.md", "You classify the learning and draft its body in this context", {
         "related-docs-finder": workflowRole("skills/ce-compound/references/research.md", "Related Docs Finder", { activation: "always", required: true, resultMode: "artifact" }),
       }),
       "session-history": stage("skills/ce-compound/references/session-history.md", "Session History", {
@@ -203,8 +197,8 @@ const WORKFLOW_DEFINITIONS = {
       "design-validation": stage("skills/ce-work/references/implementation-loop.md", "figma-design-sync", {
         "figma-design-sync": promptRole("skills/ce-work/references/agents/figma-design-sync.md", { activation: "conditional", resultMode: "artifact" }),
       }, { defaultOwner: "native" }),
-      "review-fixes": stage("skills/ce-work/references/shipping-workflow.md", "dispatch fix subagents", {
-        "review-fix-worker": workflowRole("skills/ce-work/references/shipping-workflow.md", "dispatch fix subagents", { activation: "repeatable", mutation: "worktree-write", resultMode: "artifact" }),
+      "review-fixes": stage("skills/ce-work/references/review-findings-followup.md", "Dispatch file-grouped subagent batches", {
+        "review-fix-worker": workflowRole("skills/ce-work/references/review-findings-followup.md", "Dispatch file-grouped subagent batches", { activation: "repeatable", mutation: "worktree-write", resultMode: "artifact" }),
       }, { defaultOwner: "native", mutation: "worktree-write", resultMode: "artifact" }),
     },
   },

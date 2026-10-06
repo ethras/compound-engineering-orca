@@ -82,7 +82,7 @@ const healthyProbe = {
     transport: { confidentialPacket: { supported: true, maxBytes: 8_388_608, delivery: "in-memory-consume-v1", sourceConsumption: "explicit-one-shot-v1" } },
     targets: {
       claude: { available: true, models: ["opus", "sonnet"], reasoning: ["low", "medium", "high"], reasoningByModel: { opus: ["medium", "high"], sonnet: ["low", "medium", "high"] }, mutation: { read: { supported: true, policy: "orca.read-policy/v1", issues: [] }, writer: { supported: true, policy: "orca.writer-policy/v1", issues: [] } } },
-      codex: { available: true, models: ["gpt-5.4", "gpt-5.4-mini", "gpt-5.6-sol"], reasoning: ["low", "medium", "high", "xhigh"], reasoningByModel: { "gpt-5.4": ["low", "medium", "high"], "gpt-5.4-mini": ["low", "medium", "high"], "gpt-5.6-sol": ["medium", "high", "xhigh"] }, mutation: { read: { supported: true, policy: "orca.read-policy/v1", issues: [] }, writer: { supported: true, policy: "orca.writer-policy/v1", issues: [] } } },
+      codex: { available: true, models: ["gpt-5.4", "gpt-5.4-mini", "gpt-6.1-sol"], reasoning: ["low", "medium", "high", "xhigh"], reasoningByModel: { "gpt-5.4": ["low", "medium", "high"], "gpt-5.4-mini": ["low", "medium", "high"], "gpt-6.1-sol": ["medium", "high", "xhigh"] }, mutation: { read: { supported: true, policy: "orca.read-policy/v1", issues: [] }, writer: { supported: true, policy: "orca.writer-policy/v1", issues: [] } } },
       cursor: { available: true, models: ["composer-2.5"], reasoning: ["none"], reasoningByModel: { "composer-2.5": ["none"] }, mutation: { read: { supported: true, policy: "orca.read-policy/v1", issues: [] }, writer: { supported: false, policy: "orca.writer-policy/v1", issues: ["not attested"] } } },
     },
   },
@@ -95,7 +95,7 @@ describe("CE-Orca canonical configuration resolution", () => {
     const prose = "Refactor the domain model so the model object keeps its invariants."
     expect(controllerExecutionPatch(prose)).toEqual({})
     const resolved = resolveExecutionRequest({ workflowId: "ce-doc-review", registry, builtins, prompt: controllerExecutionPatch(prose), probe: healthyProbe })
-    expect(resolved.executionConfig.defaults).toMatchObject({ backend: "codex", model: "gpt-5.6-sol", reasoning: "medium" })
+    expect(resolved.executionConfig.defaults).toMatchObject({ backend: "codex", model: "gpt-6.1-sol", reasoning: "medium" })
     expect(canonicalJson(resolved)).not.toContain(prose)
   })
 
@@ -244,19 +244,19 @@ describe("CE-Orca canonical configuration resolution", () => {
     const documentRoles = documentReview.executionConfig.stages["persona-review"].roles
     expect(documentRoles["coherence-reviewer"]).toMatchObject({
       backend: "codex",
-      model: "gpt-5.6-sol",
+      model: "gpt-6.1-sol",
       reasoning: "medium",
       budget: 600,
     })
     expect(documentRoles["design-lens-reviewer"]).toMatchObject({
       backend: "codex",
-      model: "gpt-5.6-sol",
+      model: "gpt-6.1-sol",
       reasoning: "medium",
       budget: 900,
     })
     expect(documentRoles["feasibility-reviewer"]).toMatchObject({
       backend: "codex",
-      model: "gpt-5.6-sol",
+      model: "gpt-6.1-sol",
       reasoning: "medium",
       budget: 900,
     })
@@ -268,7 +268,7 @@ describe("CE-Orca canonical configuration resolution", () => {
       probe: healthyProbe,
     })
     for (const target of Object.values<any>(simplification.executionConfig.stages["reviewer-analysis"].roles)) {
-      expect(target).toMatchObject({ backend: "codex", model: "gpt-5.6-sol", reasoning: "medium", budget: 900 })
+      expect(target).toMatchObject({ backend: "codex", model: "gpt-6.1-sol", reasoning: "medium", budget: 900 })
     }
 
     const overridden = resolveExecutionRequest({
@@ -300,7 +300,7 @@ describe("CE-Orca canonical configuration resolution", () => {
     expect(roleOverride.executionConfig.stages["persona-review"].roles["coherence-reviewer"])
       .toMatchObject({ backend: "claude", model: "opus", reasoning: "medium" })
     expect(roleOverride.executionConfig.stages["persona-review"].roles["design-lens-reviewer"])
-      .toMatchObject({ backend: "codex", model: "gpt-5.6-sol", reasoning: "medium", budget: 900 })
+      .toMatchObject({ backend: "codex", model: "gpt-6.1-sol", reasoning: "medium", budget: 900 })
   })
 
   test("fails closed for target overrides that a native owner cannot enforce", async () => {
@@ -333,12 +333,12 @@ describe("CE-Orca canonical configuration resolution", () => {
       workflowId: "lfg",
       stages: {
         planning: { backend: "claude", model: "opus", reasoning: "high" },
-        implementation: { backend: "codex", model: "gpt-5.6-sol", reasoning: "xhigh", concurrency: 3 },
+        implementation: { backend: "codex", model: "gpt-6.1-sol", reasoning: "xhigh", concurrency: 3 },
       },
     })
     const resolved = resolveExecutionRequest({ workflowId: "lfg", registry, builtins, prompt, probe: healthyProbe })
     expect(resolved.executionConfig.stages.planning).toMatchObject({ backend: "claude", model: "opus", reasoning: "high", effort: "medium" })
-    expect(resolved.executionConfig.stages.implementation).toMatchObject({ backend: "codex", model: "gpt-5.6-sol", reasoning: "xhigh", effort: "medium", concurrency: 3 })
+    expect(resolved.executionConfig.stages.implementation).toMatchObject({ backend: "codex", model: "gpt-6.1-sol", reasoning: "xhigh", effort: "medium", concurrency: 3 })
     expect(resolved.display.targetApplication.stages).toMatchObject({
       planning: { appliedBy: "child-workflow" },
       implementation: { appliedBy: "child-workflow" },
@@ -348,7 +348,7 @@ describe("CE-Orca canonical configuration resolution", () => {
       schema: "ce-orca.execution-request/v1",
       workflowId: "lfg",
       stages: {
-        implementation: { backend: "codex", concurrency: 3, model: "gpt-5.6-sol", reasoning: "xhigh" },
+        implementation: { backend: "codex", concurrency: 3, model: "gpt-6.1-sol", reasoning: "xhigh" },
         planning: { backend: "claude", model: "opus", reasoning: "high" },
       },
     })
@@ -362,7 +362,7 @@ describe("CE-Orca canonical configuration resolution", () => {
         stages: {
           implementation: {
             backend: "codex",
-            model: "gpt-5.6-sol",
+            model: "gpt-6.1-sol",
             reasoning: "xhigh",
             concurrency: 3,
           },
@@ -403,8 +403,8 @@ describe("CE-Orca canonical configuration resolution", () => {
       registry,
       builtins,
       probe: healthyProbe,
-      prompt: { defaults: { backend: "codex", model: "gpt-5.6-sol", reasoning: "low" } },
-    })).toThrow(/unsupported for codex\/gpt-5.6-sol.*high, medium, xhigh/)
+      prompt: { defaults: { backend: "codex", model: "gpt-6.1-sol", reasoning: "low" } },
+    })).toThrow(/unsupported for codex\/gpt-6.1-sol.*high, medium, xhigh/)
   })
 
   test("rejects ambiguous controller output rather than guessing and never activates roles", async () => {
@@ -562,7 +562,7 @@ describe("CE-Orca canonical configuration resolution", () => {
     const store = JSON.parse(await fs.readFile(filePath, "utf8"))
     expect(selectProfile(store, "review", "ce-doc-review")).toEqual({ defaults: { backend: "claude", model: "opus", reasoning: "high" } })
     const fresh = resolveExecutionRequest({ workflowId: "ce-doc-review", registry, builtins, probe: healthyProbe })
-    expect(fresh.executionConfig.defaults).toMatchObject({ model: "gpt-5.6-sol", reasoning: "medium" })
+    expect(fresh.executionConfig.defaults).toMatchObject({ model: "gpt-6.1-sol", reasoning: "medium" })
   })
 
   test("serializes concurrent profile updates without losing successful writes", async () => {
@@ -968,7 +968,7 @@ describe("CE-Orca canonical configuration resolution", () => {
     const { registry, builtins } = await data("ce-doc-review")
     expect(() => resolveExecutionRequest({ workflowId: "ce-doc-review", registry, builtins, probe: healthyProbe, project: { apiKey: "top-secret" } as any })).toThrow(/unsupported fields: apiKey/)
     const resolved = resolveExecutionRequest({ workflowId: "ce-doc-review", registry, builtins, probe: healthyProbe })
-      expect(resolved.identities).toMatchObject({ ceVersion: "3.28.2", integrationVersion: "3.28.2-orca.7", registryVersion: expect.any(String), protocolVersion: "orca.local-protocol/v1", requestVersion: "orca.execution-config/v1" })
+      expect(resolved.identities).toMatchObject({ ceVersion: "3.30.3", integrationVersion: "3.30.3-orca.7", registryVersion: expect.any(String), protocolVersion: "orca.local-protocol/v1", requestVersion: "orca.execution-config/v1" })
     expect(canonicalJson(resolved)).not.toMatch(/api[_-]?key|token|secret|credential/i)
   })
 })

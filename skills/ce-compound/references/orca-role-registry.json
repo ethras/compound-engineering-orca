@@ -1,13 +1,13 @@
 {
   "identities": {
-    "ceVersion": "3.28.2",
-    "integrationVersion": "3.28.2-orca.7",
+    "ceVersion": "3.30.3",
+    "integrationVersion": "3.30.3-orca.7",
     "protocolVersion": "orca.local-protocol/v1",
-    "registryVersion": "ce-orca.registry/v1@3.28.2-orca.7",
+    "registryVersion": "ce-orca.registry/v1@3.30.3-orca.7",
     "requestVersion": "orca.execution-config/v1"
   },
   "schema": "ce-orca.role-registry/v1",
-  "version": "ce-orca.registry/v1@3.28.2-orca.7",
+  "version": "ce-orca.registry/v1@3.30.3-orca.7",
   "workflows": {
     "ce-compound": {
       "controller": "ce-controller",
@@ -36,34 +36,14 @@
         },
         "research": {
           "activation": "always",
-          "anchor": "Launch research subagents.",
+          "anchor": "You classify the learning and draft its body in this context",
           "defaultOwner": "orca",
           "mutation": "read-only",
           "resultMode": "structured",
           "roles": {
-            "context-analyzer": {
-              "activation": "always",
-              "anchor": "Context Analyzer",
-              "modelTier": "parent",
-              "mutation": "read-only",
-              "required": true,
-              "resultMode": "artifact",
-              "sourceKind": "workflow-role",
-              "sourcePath": "references/research.md"
-            },
             "related-docs-finder": {
               "activation": "always",
               "anchor": "Related Docs Finder",
-              "modelTier": "parent",
-              "mutation": "read-only",
-              "required": true,
-              "resultMode": "artifact",
-              "sourceKind": "workflow-role",
-              "sourcePath": "references/research.md"
-            },
-            "solution-extractor": {
-              "activation": "always",
-              "anchor": "Solution Extractor",
               "modelTier": "parent",
               "mutation": "read-only",
               "required": true,
