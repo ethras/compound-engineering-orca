@@ -492,7 +492,7 @@ describe("ce-work unit workspace controller: init, identity, and dispatch author
     ).word).toBe("AUTHORING")
     expect(ctl(runs, "terminalize", "--run-id", "run-effort", "--unit-id", "U2").word).not.toBe("BLOCKED")
     const accepted = ctl(runs, "status", "--run-id", "run-effort", "--unit-id", "U2").body.unit.attempts[0]
-    expect(accepted.terminal_receipt).toMatchObject({ effort_requested: "xhigh", model_requested: "auto" })
+    expect(accepted.terminal_receipt).toMatchObject({ effort_requested: "xhigh", model_requested: "gpt-6.1-sol" })
     expect(accepted.terminal_receipt).not.toHaveProperty("effort_actual")
   })
 
@@ -518,7 +518,7 @@ describe("ce-work unit workspace controller: init, identity, and dispatch author
       target: "codex",
       harness: "codex",
       intermediaries: [],
-      model_requested: "auto",
+      model_requested: "gpt-6.1-sol",
       restriction_posture: "adapter-enforced",
       restrictions: [],
       activity_posture: "hard-only",

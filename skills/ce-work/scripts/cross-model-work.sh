@@ -63,6 +63,12 @@ route_model() {
     printf '%s' "$override"
     return
   fi
+  # ce-orca-hook:start ce-work.codex-default-model
+  if [ "$route" = codex ]; then
+    printf '%s' 'gpt-6.1-sol'
+    return
+  fi
+  # ce-orca-hook:end ce-work.codex-default-model
   case "$route" in
     codex|claude|grok-cli|cursor|agy) printf 'auto' ;;
     grok-cursor) printf '%s' "$M_GROK_CURSOR" ;;

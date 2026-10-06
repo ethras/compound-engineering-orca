@@ -393,7 +393,7 @@ export function fakeDoneJob(
     target: "codex",
     harness: "codex",
     intermediaries: [],
-    model_requested: "auto",
+    model_requested: "gpt-6.1-sol",
     model_actual: "unverified",
     model_receipt_status: "unverified",
     activity_posture: "incremental",

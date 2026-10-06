@@ -150,6 +150,10 @@ stage, or role target still wins. Changing a backend or model without naming a
 reasoning level keeps the effective higher-precedence target family instead of
 accidentally inheriting a provider-incompatible tier level.
 
+The cross-model `ce-work` Codex route also defaults to `gpt-6.1-sol`.
+The controller records that model in its authorization and the adapter passes it
+to the CLI explicitly. An explicitly selected model still takes precedence.
+
 Cursor does not expose a separate reasoning control. A target that selects the
 `cursor` backend without a `reasoning` field is therefore canonicalized to the
 explicit, capability-attested sentinel `reasoning: "none"`; it never inherits a

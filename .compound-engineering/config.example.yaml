@@ -146,6 +146,11 @@
 # or commands here. A candidate equivalent to the current host/default is skipped;
 # a different explicit model in the same harness remains eligible.
 
+# ce-orca-hook:start ce-work.codex-default-model
+# In the Orca fork, a selected cross-model Codex route with no model selector
+# uses gpt-6.1-sol. Explicit selectors retain their precedence.
+# ce-orca-hook:end ce-work.codex-default-model
+
 # work_engine_mode: prefer        # off | prefer | require (default: off)
 # work_engine_preferences:
 #   - harness: cursor

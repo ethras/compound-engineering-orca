@@ -633,6 +633,11 @@ ROUTE_CONTRACTS = {
 }
 
 
+# ce-orca-hook:start ce-work.codex-default-model
+ROUTE_CONTRACTS["codex"]["default_model"] = "gpt-6.1-sol"
+# ce-orca-hook:end ce-work.codex-default-model
+
+
 def route_model_allowed(route: str, model: str) -> bool:
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:/-]*", model):
         return False

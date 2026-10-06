@@ -33,6 +33,10 @@ work_engine_effort:
 - optional `model`: a model id or family understood by that harness; omission means its configured default
 - optional `work_engine_effort`: a map from harness to the reasoning effort its external worker runs at, written in that harness's own levels; a harness left out keeps its default
 
+<!-- ce-orca-hook:start ce-work.codex-default-model -->
+In the Orca fork, a selected cross-model Codex route with no model selector uses `gpt-6.1-sol`. The controller records that model in the authorization and the adapter passes it explicitly. An explicit model selector keeps its existing precedence.
+<!-- ce-orca-hook:end ce-work.codex-default-model -->
+
 Do not put CLI commands or flags in configuration. The list expresses implementation intent; the skill's adapter recipes and local inspection determine how to invoke it. Composer is therefore `{ harness: cursor, model: composer }`, while `{ harness: cursor }` means Cursor's configured default.
 
 Normalize a qualified candidate to the controller's fixed route: Codex -> `codex`, Claude -> `claude`, native Grok -> `grok-cli`, Cursor with no model -> `cursor`, a Composer-family Cursor model -> `composer`, a Grok-family Cursor model -> `grok-cursor`, another explicit Cursor model -> `cursor` with that controller-authorized model selector, and OpenCode -> `opencode`. A model selector is data, never shell syntax; if it cannot be represented by the fixed adapter's safe model token, the candidate is unavailable.

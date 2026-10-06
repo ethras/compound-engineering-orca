@@ -109,7 +109,7 @@ function fakeDoneJob(runs: string, runId: string, unitId: string, packetContent:
   writeFileSync(resultPath, `${JSON.stringify({
     schema_version: 1, terminal_status: "completed", summary: "done", changed_files: [], evidence: ["fake"], scope_expansion: null,
     requested_route: "codex", actual_route: "codex", target: "codex", harness: "codex", intermediaries: [],
-    model_requested: "auto", model_actual: "unverified", model_receipt_status: "unverified", activity_posture: "incremental",
+    model_requested: "gpt-6.1-sol", model_actual: "unverified", model_receipt_status: "unverified", activity_posture: "incremental",
     restriction_posture: "adapter-enforced", failure_reason: null, raw_log: logPath, packet_digest: digest,
   })}\n`, { mode: 0o600 })
   return jobId
@@ -446,7 +446,7 @@ printf '%s\n' '${JSON.stringify({
       target: "codex",
       harness: "codex",
       intermediaries: [],
-      model_requested: "auto",
+      model_requested: "gpt-6.1-sol",
       model_actual: "unverified",
       model_receipt_status: "unverified",
       activity_posture: "hard-only",

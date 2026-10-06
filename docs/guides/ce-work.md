@@ -263,7 +263,7 @@ work_engine_preferences:
 
 The [central configuration reference](./configuration.md#implementation-routing) explains how this checkout-local default interacts with current-task, session, and project instructions.
 
-Each candidate has a `harness` (`codex`, `claude`, `grok`, `cursor`, or `opencode`) and an optional `model`. Omitting `model` means that harness's configured default. Composer is a model family reached through Cursor, so it is written as `harness: cursor` plus `model: composer`. Keep CLI flags and commands out of config.
+Each candidate has a `harness` (`codex`, `claude`, `grok`, `cursor`, or `opencode`) and an optional `model`. Omitting `model` means that harness's configured default; in the Orca fork, a selected cross-model Codex route uses `gpt-6.1-sol` instead. Explicit model selections take precedence. Composer is a model family reached through Cursor, so it is written as `harness: cursor` plus `model: composer`. Keep CLI flags and commands out of config.
 
 To choose the reasoning effort the external worker runs at, add a `work_engine_effort` map from harness to one of that harness's own levels:
 

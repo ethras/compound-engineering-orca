@@ -32,7 +32,7 @@ const SCHEMA = path.join(process.cwd(), "skills/ce-work/references/implementatio
 type PreparedUnit = { authorization_path: string; workspace: string; packet_path: string; result_dir: string }
 const ROUTES = ["codex", "claude", "grok-cli", "cursor", "composer", "grok-cursor", "opencode"] as const
 const ROUTE_CONTRACTS = {
-  codex: { target: "codex", harness: "codex", intermediaries: [], model: "auto", restriction: "adapter-enforced" },
+  codex: { target: "codex", harness: "codex", intermediaries: [], model: "gpt-6.1-sol", restriction: "adapter-enforced" },
   claude: { target: "claude", harness: "claude", intermediaries: [], model: "auto", restriction: "cooperative" },
   "grok-cli": { target: "grok", harness: "grok", intermediaries: [], model: "auto", restriction: "cooperative" },
   cursor: { target: "cursor", harness: "cursor-agent", intermediaries: [], model: "auto", restriction: "adapter-enforced" },
@@ -251,6 +251,7 @@ describe("ce-work fixed write routes", () => {
     expect(codex).toContain("-s workspace-write")
     expect(codex).toContain("-C <workspace>")
     expect(codex).toContain("-c model_reasoning_effort=high")
+    expect(codex).toContain("-m gpt-6.1-sol")
 
     const claude = emit("claude", cleanEnv()).stdout
     expect(claude).toContain("--safe-mode")

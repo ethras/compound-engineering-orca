@@ -119,7 +119,7 @@ work_engine_preferences:
   - harness: claude
 ```
 
-Supported harnesses are `codex`, `claude`, `grok`, `cursor`, and `opencode`. Omitting `model` uses that harness's configured default. Composer is a model family reached through Cursor, so request it with `harness: cursor` and `model: composer`.
+Supported harnesses are `codex`, `claude`, `grok`, `cursor`, and `opencode`. Omitting `model` uses that harness's configured default; in the Orca fork, a selected cross-model Codex route uses `gpt-6.1-sol` instead. Composer is a model family reached through Cursor, so request it with `harness: cursor` and `model: composer`.
 
 `ce-work` walks the list in order and skips an entry equivalent to the current host/default model. A different explicit model in the same harness remains eligible. With either `prefer` or `require`, an unavailable list falls back to native implementation on the current harness and session model with one disclosure. `require` keeps the requested external identity fixed while viable; it never authorizes an unrequested external recipient or turns route unavailability into a blocker.
 
