@@ -16,14 +16,18 @@ export const ROLE_POLICY = Object.freeze({
     "code-reuse-reviewer": Object.freeze({ required: true, repeatable: false }),
     "code-quality-reviewer": Object.freeze({ required: true, repeatable: false }),
     "efficiency-reviewer": Object.freeze({ required: true, repeatable: false }),
+    "test-value-reviewer": Object.freeze({ required: true, repeatable: false }),
+    "comment-reviewer": Object.freeze({ required: true, repeatable: false }),
   }),
 })
 
-const REQUIRED_ROLES = Object.freeze(Object.keys(ROLE_POLICY["reviewer-analysis"]).sort())
+const CORE_ROLES = ["code-reuse-reviewer", "code-quality-reviewer", "efficiency-reviewer"]
 const REVIEW_PROMPTS = Object.freeze([
   Object.freeze({ id: "reuse", role: "code-reuse-reviewer", file: "reuse.txt" }),
   Object.freeze({ id: "quality", role: "code-quality-reviewer", file: "quality.txt" }),
   Object.freeze({ id: "efficiency", role: "efficiency-reviewer", file: "efficiency.txt" }),
+  Object.freeze({ id: "tests", role: "test-value-reviewer", file: "tests.txt" }),
+  Object.freeze({ id: "comments", role: "comment-reviewer", file: "comments.txt" }),
 ])
 
 const PACKET_KEYS = new Set(["schema", "workflowId", "nodes"])
@@ -60,8 +64,9 @@ export function validatePacket(packet) {
   const seenRoles = new Set()
   packet.nodes.forEach((node, index) => validateNode(node, index, seenIds, seenRoles))
   const suppliedRoles = packet.nodes.map(({ role }) => role).sort()
-  if (JSON.stringify(suppliedRoles) !== JSON.stringify(REQUIRED_ROLES)) {
-    throw new Error("reviewer-analysis requires exactly the three installed simplification roles")
+  const focused = suppliedRoles.length === 1 && ["test-value-reviewer", "comment-reviewer"].includes(suppliedRoles[0])
+  if (!focused && !CORE_ROLES.every((role) => suppliedRoles.includes(role))) {
+    throw new Error("reviewer-analysis requires the complete core roster or one focused tests/comments reviewer")
   }
   return packet
 }
@@ -71,11 +76,17 @@ export async function buildReviewPacketFromDirectory(promptsDirectory) {
   const nodes = []
   let bytes = 0
   for (const { id, role, file } of REVIEW_PROMPTS) {
-    const promptBytes = await readStableRegularBytes(
-      path.join(promptsDirectory, file),
-      MAX_CONFIDENTIAL_PACKET_BYTES - bytes,
-      file,
-    )
+    let promptBytes
+    try {
+      promptBytes = await readStableRegularBytes(
+        path.join(promptsDirectory, file),
+        MAX_CONFIDENTIAL_PACKET_BYTES - bytes,
+        file,
+      )
+    } catch (error) {
+      if (error?.code === "ENOENT") continue
+      throw error
+    }
     bytes += promptBytes.length
     const prompt = new TextDecoder("utf-8", { fatal: true }).decode(promptBytes)
     if (!nonEmpty(prompt)) throw new Error(`${file} must contain a non-empty reviewer prompt`)

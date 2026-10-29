@@ -318,6 +318,22 @@ describe("ce-code-review contract", () => {
     expect(content).toContain("**Deprecated alias**")
   })
 
+  test("mode:agent JSON records the peer outcome in finish-input's vocabulary", async () => {
+    const modes = await readRepoFile("skills/ce-code-review/references/modes-and-output.md")
+    const finishInput = await readRepoFile("skills/ce-code-review/references/finish-input.md")
+    const review = await readRepoFile("skills/ce-code-review/references/cross-model-review.md")
+    const json = modes.split("## JSON output format (`mode:agent` only)")[1] ?? ""
+    const outcomes = (text: string) =>
+      (text.match(/"peer": \{[^}]*?"outcome": "([^"]+)"/)?.[1] ?? "")
+        .split(" | ")
+        .filter((value) => value !== "null")
+
+    expect(outcomes(json).length).toBeGreaterThan(0)
+    expect(outcomes(json)).toEqual(outcomes(finishInput))
+    expect(json).toContain("copy `outcome` and `coverage` verbatim from the `peer` record in `finish-input.json`")
+    expect(review).not.toContain("stay silent in `mode:agent`")
+  })
+
   test("documents policy-driven routing and actionable handoff", async () => {
     const content = await readCodeReviewRuntimeContract()
 
@@ -701,6 +717,12 @@ describe("ce-code-review contract", () => {
     expect(handoff).toMatch(/step 5 decides which stay as unresolved gates/)
     expect(handoff).toMatch(/still count toward the Stage 6 verdict/)
     expect(handoff).not.toMatch(/drop and validation-degraded rules/)
+    // #1777: a host refuses a subagent Write whose basename matches the report pattern, so the
+    // report leaf cannot persist report.md; the dispatch context, which already holds and emits
+    // the return, owns that write.
+    expect(handoff).toMatch(/write the report leaf's return to `<run-dir>\/report\.md` first/)
+    expect(handoff).not.toMatch(/Write `report\.md` or `review\.json`/)
+    expect(finish).toMatch(/the dispatch context persists it to `report\.md`/)
   })
 
   test("Stage 5 synthesis uses anchor gate and one-anchor promotion", async () => {
@@ -1237,6 +1259,18 @@ describe("ce-code-review contract", () => {
     expect(content).not.toContain("git diff -U10 HEAD")
     expect(content).not.toContain("git diff --cached")
 
+    // #1836: deleted-file bodies stay out of the shared diff on every scope path,
+    // and every reviewer gets the deletion manifest instead.
+    expect(content).not.toMatch(/git diff -U10 (?!--irreversible-delete)/)
+    expect(content).not.toMatch(/gh pr diff [^`]*\| awk/)
+    expect(content).toMatch(/awk '[^`]*deleted file mode/)
+    expect(content).toContain('<deleted-files base="<ref>">')
+    expect(content).toMatch(/`deleted_band: large` rules out lite/)
+    const peerScript = await readRepoFile(
+      "skills/ce-code-review/scripts/cross-model-adversarial-review.sh",
+    )
+    expect(peerScript).toMatch(/diff --no-ext-diff --no-color --irreversible-delete "\$BASE"/)
+
     // PR mode uses remote diff API, not checkout
     expect(content).toContain("gh pr diff")
     expect(content).toMatch(/Do not fall back to checkout/i)
@@ -1538,6 +1572,23 @@ describe("ce-code-review contract", () => {
     expect(jsonContract).toContain('"triage_groups": []')
     expect(jsonContract).toMatch(/Each object in `triage_groups` carries/)
     expect(template).toMatch(/`triage_groups`.*batch related fixes by theme/)
+  })
+})
+
+describe("review reviewer assets are delivered by path", () => {
+  test("ce-code-review passes asset paths and the resolved root", async () => {
+    const dispatch = await readRepoFile("skills/ce-code-review/references/dispatch-reviewers.md")
+    expect(dispatch).toMatch(/pass their absolute paths, resolved from this skill's directory/)
+    expect(dispatch).toMatch(/Tell it to read all four before reviewing/)
+    expect(dispatch).toMatch(/inline them only when the host's subagents cannot read files/)
+    expect(dispatch).toMatch(/`<root>` in those files means the resolved root/)
+  })
+
+  test("ce-doc-review passes asset paths", async () => {
+    const dispatch = await readRepoFile("skills/ce-doc-review/references/dispatch.md")
+    expect(dispatch).toMatch(/pass their absolute paths, resolved from this skill's directory/)
+    expect(dispatch).toMatch(/Tell it to read all three before reviewing/)
+    expect(dispatch).toMatch(/inline them only when the host's subagents cannot read files/)
   })
 })
 
@@ -1843,7 +1894,7 @@ describe("cross-model peer skip legibility", () => {
 
   function extractHostAttestation(src: string): string {
     const m = src.match(
-      /if \[ "\$\{CLAUDECODE:-\}" = "1" \]; then XHOST_HARNESS=claude; XHOST_FAMILY=claude;\n(?:elif .+\n)*else XHOST_HARNESS=unknown; XHOST_FAMILY=unknown; fi/,
+      /XHOST_SEEN=;\n(?:.+\n)*?else XHOST_HARNESS=unknown; XHOST_FAMILY=unknown; fi/,
     )
     expect(m).toBeTruthy()
     return m![0]
@@ -1868,7 +1919,6 @@ describe("cross-model peer skip legibility", () => {
     )
     for (const snippet of snippets) {
       expect(snippet).toBe(snippets[0])
-      expect(snippet).toContain('XHOST_HARNESS=grok; XHOST_FAMILY=grok')
       expect(snippet).toContain("GROK_AGENT")
       expect(snippet).toContain("GROK_SESSION_ID")
     }
@@ -1876,10 +1926,23 @@ describe("cross-model peer skip legibility", () => {
     expect(attestHost(snippet, {})).toBe("unknown unknown")
     expect(attestHost(snippet, { GROK_AGENT: "1" })).toBe("grok grok")
     expect(attestHost(snippet, { GROK_SESSION_ID: "sess" })).toBe("grok grok")
-    expect(attestHost(snippet, { CLAUDECODE: "1", GROK_AGENT: "1" })).toBe("claude claude")
-    expect(attestHost(snippet, { CODEX_SESSION_ID: "sess", GROK_AGENT: "1" })).toBe("codex codex")
+    expect(attestHost(snippet, { CLAUDECODE: "1" })).toBe("claude claude")
+    expect(attestHost(snippet, { CODEX_THREAD_ID: "t" })).toBe("codex codex")
+    expect(attestHost(snippet, { CLAUDECODE: "1", CURSOR_AGENT: "1" })).toBe("claude claude")
     expect(attestHost(snippet, { CURSOR_AGENT: "1" })).toBe("cursor unknown")
+    expect(attestHost(snippet, { OMPCODE: "1", CLAUDECODE: "1" })).toBe("omp unknown")
+    expect(attestHost(snippet, { OMPCODE: "1", CLAUDECODE: "1", CODEX_THREAD_ID: "t" })).toBe("omp unknown")
+    expect(attestHost(snippet, { CLAUDECODE: "1", CODEX_THREAD_ID: "t" })).toBe("unknown unknown")
+    expect(attestHost(snippet, { CLAUDECODE: "1", GROK_AGENT: "1" })).toBe("unknown unknown")
+    expect(attestHost(snippet, { CODEX_SESSION_ID: "sess", GROK_AGENT: "1" })).toBe("unknown unknown")
   })
+
+  for (const { worker } of routeTokenPairs) {
+    test(`${worker} accepts the harness token the attestation snippet emits for an owning harness`, async () => {
+      const src = await readRepoFile(worker)
+      expect(src).toContain("codex|claude|grok|cursor|opencode|antigravity|omp|unknown)")
+    })
+  }
 
   // The provider runs under `set -m` in its OWN process group so the worker can
   // group-reap it without killing itself. On a clean worker exit the runner's
@@ -1962,6 +2025,17 @@ describe("ce-code-review dispatch templates", () => {
     for (const name of ["file_list", "diff"]) {
       expect(counts.get(name)).toBe(1)
     }
+  })
+
+  // Told only to "Read that file", reviewers and validators pulled a large staged
+  // diff in whole-file reads and re-read it; reviewers also read the parent transcript.
+  test("staged-diff readers locate file sections instead of loading the whole diff", async () => {
+    for (const file of ["subagent-template.md", "validator-batch-template.md"]) {
+      const content = await readRepoFile(`skills/ce-code-review/references/${file}`)
+      expect(content).toContain("`diff --git`")
+    }
+    const reviewer = await readRepoFile("skills/ce-code-review/references/subagent-template.md")
+    expect(reviewer).toContain("transcript")
   })
 
   test("compact-return contract uses exact schema keys in both output tiers", async () => {

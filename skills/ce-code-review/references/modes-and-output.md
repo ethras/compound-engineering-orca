@@ -45,6 +45,8 @@ Emit a one-line failure reason. In `mode:agent`, return JSON: `{"status":"failed
 
 Default and `mode:agent` are **report-only**. `mode:agent` changes only the serialization from markdown to JSON for programmatic callers; it does not change reviewer selection, merge logic, or scope rules. `apply:local` is separate mutation authority, not an output mode. The default markdown is the human view; keep it ASCII-safe (pipe tables, `->` not middot `·`, no box-drawing) so it degrades gracefully across terminals.
 
+Whatever this skill returns, including a failed, degraded, or skipped result, is the last thing it writes. It ends this skill, not the turn. When a caller invoked this skill, control returns to the caller in this same session, and the caller's own handling of the result decides whether its run continues or stops; otherwise end the turn.
+
 ## Quick Review Short-Circuit
 
 If the invocation arguments indicate the user wants a quick, fast, or light code review — and **`mode:agent` is not active** — do not dispatch the multi-agent flow.
@@ -63,15 +65,17 @@ Sequence:
 
 Decide after Stage 1 (its 1b facts and 1c mapping), before reading any later reference. This skill owns the decision; a caller may pass `depth:full` but never a depth of its own. Three paths exist: **lite** (this context alone), **focused** (this context plus one independent adversarial read), and **full** (the multi-agent spine from Stage 2).
 
-Floors that run the full spine from Stage 2, whatever the diff looks like: `depth:full`; the helper's `hard_block_full` (the helper reports facts. It never awards lite. `hard_block_full` is a floor, and it covers a named hard-block class, any file the helper could not count, and a `size_band` of `large`, which means the executable non-test changed lines reached the full floor); a Stage 1c criteria search that failed or whose scope is uncertain; and apply authority (`apply:local` or an explicit apply request), which needs Stage 5c's verified-apply mechanics. Line counts below the floor, prose and test volume, `unclassified_lines`, and `signals` are prompts to consider, not floors.
+Floors that run the full spine from Stage 2, whatever the diff looks like: `depth:full`; the helper's `hard_block_full` (the helper reports facts. It never awards lite. `hard_block_full` is a floor, and it covers a named hard-block class, any file the helper could not count, and a `size_band` of `large`, which means the executable non-test changed lines reached the full floor; whole-file deletions are not counted there); a Stage 1c criteria search that failed or whose scope is uncertain; and apply authority (`apply:local` or an explicit apply request), which needs Stage 5c's verified-apply mechanics. Line counts below the floor, prose and test volume, `unclassified_lines`, and `signals` are prompts to consider, not floors.
 
 With no floor set, read the Stage 1 diff and decide whether a wrong version of this change would fail loudly where it is made, or silently somewhere else. It fails silently when it would break a silent-pass guard, an auth / money / data boundary, or a public contract, or would let a system degrade under load, failure, or contention with no error at the change site (retry, timeout, ordering, locking, background work). Executable code the helper could not name, visible in `unclassified_lines` under its extension, is executable code for this question; a markdown or data file listed there is what it is. Loud and local → lite. Silent, or unsure → focused, unless the silent failure sits on an auth, money, or public-contract boundary, where the specialist lenses only the full spine carries are the point: then continue from Stage 2.
 
 A helper-named silent-pass class (`silent_pass_classes`, today the CI workflow paths) is a floor on the lens, not on depth: the change can never take lite, because the guard needs the adversarial read the focused path carries, and consequence still decides focused versus full as above. On the focused path that guard gets correctness and the one independent adversarial read and no standards, testing, or security persona; a workflow change that handles credentials, tokens, or permissions is an auth boundary and goes to full by the sentence above.
 
-A floor cannot be talked down, and a path may only move toward full: lite never becomes the answer once the diff reads silent or the helper named a silent-pass class, and focused never replaces a floor.
+Whole-file deletions get the same treatment from their own band. A deletion is wrong when something in the surviving tree still uses the deleted file, for example through a string reference, a route resolved from the file name, or a registration the file made when it was imported. That breaks silently, away from the change site. So `deleted_band: large` rules out lite, the same way a silent-pass class does, and consequence still decides focused versus full. Deletions never force full on their own.
 
-When the gate selects lite or focused, read `references/depth-paths.md` at that point and run the selected path from this context; the full spine continues from Stage 2 and never opens that file. Either way, close the scope stage with the decision: the stage-log call from `references/scope.md` with `--end scope --start review` (lite, focused) or `--end scope --start select` (full), carrying `--fact` entries for `exec_nontest_lines`, `changed_lines`, `size_band`, `unclassified_lines`, and `depth`.
+A floor cannot be talked down, and a path may only move toward full: lite never becomes the answer once the diff reads silent, the helper named a silent-pass class, or `deleted_band` is `large`, and focused never replaces a floor.
+
+When the gate selects lite or focused, read `references/depth-paths.md` at that point and run the selected path from this context; the full spine continues from Stage 2 and never opens that file. Either way, close the scope stage with the decision: the stage-log call from `references/scope.md` with `--end scope --start review` (lite, focused) or `--end scope --start select` (full), carrying `--fact` entries for `exec_nontest_lines`, `changed_lines`, `size_band`, `deleted_band`, `unclassified_lines`, and `depth`.
 
 ## Run artifacts
 
@@ -128,6 +132,14 @@ Minimum shape:
   "run_id": "<run-id>"
 }
 ```
+
+`peer` tells a caller whether a different-provider peer actually reviewed the change. It is not part of the minimum shape: add it only when this run selected the adversarial lens (the full roster selected it, or the focused path ran), and never on lite. Its shape:
+
+```json
+"peer": {"outcome": "folded | in-process-fallback | not-run | no-usable-output | failed", "coverage": "<the Coverage sentence for this outcome>"}
+```
+
+On the full path, copy `outcome` and `coverage` verbatim from the `peer` record in `finish-input.json`; the focused path fills them from its own fold-in, using the same outcome names and Coverage sentences. `folded` is the only outcome in which a peer artifact was folded into this review. Every other outcome means no peer artifact was folded, and `coverage` says why and what covered the lens instead. An outcome other than `folded` never changes `status`.
 
 Lite fills `findings`, `actionable_findings`, `testing_gaps`, `residual_risks`, and `requirements_completeness` (`null` only when no plan was found) from its own review. The arrays owned by reviewers it did not run (`learnings`, `agent_native_gaps`, `deployment_notes`, `pre_existing_findings`, `triage_groups`) are `[]`, and Coverage names them as not assessed. `reviewers` is `["correctness"]` and `coverage.depth` is `"lite"`. Focused fills the same fields from its merged findings, lists its two reviewers, and sets `coverage.depth` to `"focused"`; the full path's finish leaf fills every field and sets `coverage.depth` to `"full"`.
 

@@ -100,7 +100,7 @@ A semantic cost class for a dispatched sub-agent — extraction (cheapest capabl
 When a platform cannot select models per agent, every role runs on the inherited model and cost control falls back to structure: read budgets and output caps.
 
 ### Evidence dossier
-A bulk evidence artifact — verbatim quotes with source pointers, gathered by a cheap scout agent — written to scratch storage instead of returned inline, so the orchestrator carries only a short gist and downstream agents read the full dossier themselves.
+A bulk evidence artifact — verbatim quotes with source pointers, gathered by a cheap retrieval agent such as a grounding scout or research distiller — written to scratch storage instead of returned inline, so the orchestrator carries only a short gist and downstream agents read the full dossier themselves.
 
 ### Outcome spine
 The part of a Skill that must hold without any reference loaded: the result it produces and who consumes it next, the done condition, the safe failure direction, and the facts the agent cannot derive from the repository in front of it. Everything else in the skill is protocol or judgment attached to that spine, and a block that cannot name its spine is restated before it is edited.
@@ -165,7 +165,7 @@ A checkout whose git-ignored inventory already contains what the project's verif
 Ignored state in a warm checkout is large, symlink-heavy, and owned by tooling the controller never ran, so any host-side guarantee about it can only be detection and disclosure, never byte-exact custody.
 
 ### Model identity receipt
-The serving backend's own report of which model actually handled a delegated run, recorded alongside the requested model so the two can disagree visibly. A run's model identity is verified only by such a receipt — never by the request parameters or the model's own text — and outputs without one are labeled as requested-but-unverified; logic that weights cross-model agreement follows the receipt, not the request.
+The serving side's own report — the backend's, or the adapter's that fronts it — of which model actually handled a delegated run, recorded alongside the requested model so the two can disagree visibly. A run's model identity is verified only by such a receipt — never by the request parameters or the model's own text — and outputs without one are labeled as requested-but-unverified; logic that weights cross-model agreement follows the receipt, not the request.
 
 ### Handoff seam
 The point in a calling Skill where completed work triggers a follow-on Skill in the same run — distinct from a Session handoff, which carries continuity to a fresh session. A seam that states only intent ("auto-invoke X") invites the caller's agent to reproduce the callee's mechanics from memory; a hardened seam pins the invocation mechanism (the platform's skill-invocation primitive, so the callee's instructions actually load) and, when the callee runs a stateful protocol, explicitly forbids starting that protocol's mechanics directly. The callee itself must stay model-invokable: an opt-out flag such as `disable-model-invocation` blocks a sibling's invocation on every host, so restraint belongs in the callee's description condition. The callee loads into the caller's context rather than behind a subagent boundary, so anything it "returns" is text the caller writes next; a caller-only channel (a change summary, a receipt) must say when it is produced and where it may not land.

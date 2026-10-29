@@ -3,10 +3,13 @@ import path from "node:path"
 import { ACPX_PIN } from "../../helpers/acpx-pin"
 
 const STUB_NPX = path.join(process.cwd(), "tests/fixtures/acp-stub-npx.sh")
-const AGENT_BINARIES = ["codex", "claude", "grok", "cursor-agent", "opencode"]
+// The Antigravity route needs its ACP runtime and the helper beside it.
+const AGENT_BINARIES = ["codex", "claude", "grok", "cursor-agent", "opencode", "agy_acp_server.par", "localharness_external"]
 
 export const COMPLETED_RESULT =
   '{"terminal_status":"completed","summary":"implemented","changed_files":["result.txt"],"evidence":["focused test passed"],"scope_expansion":null}'
+
+const rpc = (body: Record<string, unknown>) => JSON.stringify({ jsonrpc: "2.0", ...body })
 
 // Shaped like the captured acpx@0.19.4 streams in tests/fixtures/acpx-streams/:
 // acpx echoes the outbound prompt into the stream before the agent replies, and
@@ -24,7 +27,6 @@ export type StreamSpec = {
 
 /** Writes a canned acpx stream at `<base>.stdout` (plus exit/stderr/sleep) and returns `base`. */
 export function acpStream(base: string, spec: StreamSpec = {}): string {
-  const rpc = (body: Record<string, unknown>) => JSON.stringify({ jsonrpc: "2.0", ...body })
   const sessionId = "stub-session-1"
   const lines = [
     rpc({ id: 0, method: "initialize", params: { protocolVersion: 1, clientInfo: { name: "acpx", version: ACPX_PIN } } }),
@@ -51,6 +53,30 @@ export function acpStream(base: string, spec: StreamSpec = {}): string {
   return base
 }
 
+/** What acpx@0.19.4 prints when --model names a model the session did not advertise: no prompt is sent. */
+export function unadvertisedStream(base: string, model: string, available: string): string {
+  writeFileSync(`${base}.stdout`, [
+    rpc({ id: 0, method: "initialize", params: { protocolVersion: 1 } }),
+    rpc({ id: 0, result: { protocolVersion: 1, authMethods: [] } }),
+    rpc({ id: 1, method: "session/new", params: { cwd: "/tmp/cwd", mcpServers: [] } }),
+    rpc({ id: 1, result: { sessionId: "stub-session-1" } }),
+    rpc({ id: null, error: { code: -32603, message: `Cannot apply --model "${model}": the ACP agent did not advertise that model. Available models: ${available}.`, data: { acpxCode: "RUNTIME" } } }),
+  ].join("\n") + "\n")
+  writeFileSync(`${base}.exit`, "1\n")
+  return base
+}
+
+/** Antigravity answers initialize, then holds session/new open while it waits for a browser sign-in. */
+export function signInWaitStream(base: string): string {
+  writeFileSync(`${base}.stdout`, [
+    rpc({ id: 0, method: "initialize", params: { protocolVersion: 1 } }),
+    rpc({ id: 0, result: { protocolVersion: 1, authMethods: [{ id: "oauth-personal" }] } }),
+    rpc({ id: 1, method: "session/new", params: { cwd: "/tmp/cwd", mcpServers: [] } }),
+  ].join("\n") + "\n")
+  writeFileSync(`${base}.sleep`, "30\n")
+  return base
+}
+
 /**
  * Fills `bin` with stand-in agent CLIs and an `npx` that replays `stream`.
  *
@@ -58,8 +84,10 @@ export function acpStream(base: string, spec: StreamSpec = {}): string {
  * environment. The `npx` wrapper bakes them in, records what the acpx child sees
  * in `capture` (cwd, environment, argv, launch variables, prompt), runs `hook`
  * from the `--cwd` workspace the way the agent would, then replays the stream.
+ * `numbered` counts launches in `<capture>/calls` and replays `<stream>.<N>.*`,
+ * suffixing the prompt log the same way.
  */
-export function acpNpxBin(bin: string, capture: string, stream: string, hook = ""): string {
+export function acpNpxBin(bin: string, capture: string, stream: string, hook = "", numbered = false): string {
   for (const binary of AGENT_BINARIES) {
     writeFileSync(path.join(bin, binary), "#!/bin/sh\nexit 0\n")
     chmodSync(path.join(bin, binary), 0o755)
@@ -76,7 +104,7 @@ for arg in "$@"; do [ "$prev" = --cwd ] && agent_cwd="$arg"; prev="$arg"; done
 ( cd "$agent_cwd" || exit 1
 ${hook}
 ) || exit 1
-ACP_STUB_NPX_STREAM='${stream}' ACP_STUB_NPX_ARGV_LOG='${capture}/argv' ACP_STUB_NPX_ENV_LOG='${capture}/launch-env' ACP_STUB_NPX_PROMPT_LOG='${capture}/prompt' exec '${STUB_NPX}' "$@"
+ACP_STUB_NPX_STREAM='${stream}' ${numbered ? `ACP_STUB_NPX_CALLS='${capture}/calls' ` : ""}ACP_STUB_NPX_ARGV_LOG='${capture}/argv' ACP_STUB_NPX_ENV_LOG='${capture}/launch-env' ACP_STUB_NPX_PROMPT_LOG='${capture}/prompt' exec '${STUB_NPX}' "$@"
 `)
   chmodSync(path.join(bin, "npx"), 0o755)
   return bin

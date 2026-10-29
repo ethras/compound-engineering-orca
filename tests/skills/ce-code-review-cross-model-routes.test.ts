@@ -1,5 +1,6 @@
 import { afterAll, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { spawnSync } from "node:child_process"
+import { createHash } from "node:crypto"
 import {
   chmodSync,
   existsSync,
@@ -14,8 +15,8 @@ import {
 } from "node:fs"
 import { devNull, tmpdir } from "node:os"
 import path from "node:path"
-import { ACPX_PIN } from "../helpers/acpx-pin"
-import { alive } from "../helpers/process"
+import { ACPX_PIN, ACPX_RANGE } from "../helpers/acpx-pin"
+import { survivors } from "../helpers/process"
 
 // These tests spawn bash/python/git subprocesses; on a loaded CI runner they cross the 5s default
 // (2026-08-21, PR #1508: three different tests timed out across two reruns with no related change).
@@ -157,6 +158,7 @@ function sandbox(providers: string[], stream = acpStream({ text: review() }), ex
       ...process.env,
       PATH: bin,
       HOME: home,
+      GEMINI_HOME: "",
       // Mask any real Codex.app bundle so discovery sees only what the test stages.
       CROSS_MODEL_CODEX_APP_DIRS: temp("xmodel-cr-nobundle-"),
       ACP_STUB_NPX_STREAM: stream,
@@ -275,7 +277,7 @@ function run(args: string[], runDir: string, env: NodeJS.ProcessEnv = process.en
   }
 }
 function peerOutputs(files: string[]): string[] {
-  return files.filter((file) => /^adversarial-(codex|claude|grok|cursor|composer|opencode)\.json$/.test(file))
+  return files.filter((file) => /^adversarial-(codex|claude|grok|cursor|composer|opencode|antigravity)\.json$/.test(file))
 }
 function published(runDir: string, name: string) {
   return JSON.parse(readFileSync(path.join(runDir, name), "utf8"))
@@ -324,7 +326,7 @@ describe("cross-model-adversarial-review route safety", () => {
     ["opencode", "--non-interactive-permissions deny --agent", ["opencode acp exec --config-option mode=plan"]],
   ])("--emit-adapter %s approves only reads, from the repository root", (route, agent, options) => {
     const command = emitAdapter(route)
-    expect(command).toContain(`npx -y acpx@${ACPX_PIN} --cwd <repo-root> --format json --mcp-config <mcp-config> --timeout 1200 --approve-reads --non-interactive-permissions deny`)
+    expect(command).toContain(`npx -y --package ${ACPX_RANGE} -- acpx --cwd <repo-root> --format json --mcp-config <mcp-config> --timeout 1200 --approve-reads --non-interactive-permissions deny`)
     expect(command).toContain("env npm_config_prefer_offline=true npm_config_fetch_retries=0")
     expect(command).toContain(agent)
     for (const option of options) expect(command).toContain(option)
@@ -428,7 +430,7 @@ describe("cross-model-adversarial-review route safety", () => {
     expect(r.files).toContain("adversarial-cursor.json")
   })
 
-  test("schema-valid output from a peer still running at the hard cap is never published", () => {
+  test("schema-valid output from a peer still running at the hard cap is never published", async () => {
     const sb = sandbox(["cursor-agent"], acpStream({ text: review(), stopReason: null, sleep: 30 }))
     const runDir = makeRunDir()
     const started = Date.now()
@@ -439,7 +441,7 @@ describe("cross-model-adversarial-review route safety", () => {
     expect(r.stderr).toContain("peer run ended with incomplete")
     const pids = readFileSync(sb.logs.pids, "utf8").trim().split("\n").map(Number)
     expect(pids).toHaveLength(2)
-    for (const pid of pids) expect(alive(pid)).toBe(false)
+    expect(await survivors(pids)).toEqual([])
   })
 
   test("a peer whose stream goes silent is reaped by the idle cap before the hard cap", () => {
@@ -479,6 +481,33 @@ describe("cross-model-adversarial-review diff delivery", () => {
     expect(text).not.toContain("too large to inline safely")
     // Codex no longer fetches the diff itself.
     expect(text).not.toContain("Run: git diff")
+  })
+
+  // codex-acp's only refusal option is `cancel`, which ends the turn, so one
+  // escalation request leaves the review with no artifact (#1896).
+  test.each([...ROUTES] as string[])("only the codex prompt rules out escalation requests (%s)", (route) => {
+    const sb = sandbox([ROUTE_BIN[route]])
+    const runDir = makeRunDir()
+    const target = route.startsWith("grok") ? "grok" : route
+    const r = run(["claude" === target ? "codex" : "claude", target, "HEAD", runDir], runDir, {
+      ...sb.env,
+      CROSS_MODEL_FIXED_ROUTE: route,
+      ...(route === "grok-cursor" ? { CROSS_MODEL_PEERS: "grok,cursor" } : {}),
+    })
+    expect(peerOutputs(r.files)).toHaveLength(1)
+    const rule = "never request escalated or out-of-sandbox permissions"
+    if (route === "codex") expect(prompt(sb)).toContain(rule)
+    else expect(prompt(sb)).not.toContain(rule)
+  })
+
+  test("the codex large-diff prompt also rules out escalation requests", () => {
+    const sb = sandbox(["codex"])
+    const runDir = makeRunDir("- Review the changed fixture.\n")
+    const r = run(["claude", "codex", "HEAD~1", runDir], runDir, { ...sb.env, CROSS_MODEL_INLINE_MAX_TOKENS: "1" })
+    expect(r.files).toContain("adversarial-codex.json")
+    const text = prompt(sb)
+    expect(text).toContain("too large to inline safely")
+    expect(text).toContain("never request escalated or out-of-sandbox permissions")
   })
 
   test("a large diff sends the orchestrator map and the staged diff's path to a route that can read it", () => {
@@ -617,6 +646,13 @@ describe("cross-model-adversarial-review provider selection", () => {
     expect(envLog(sb)).toContain(`CODEX_PATH=${path.join(sb.bin, "codex")}\n`)
   })
 
+  test("the codex route disables the user's Codex plugins so the peer cannot pick up ce-code-review (issue #1788)", () => {
+    const sb = sandbox(["codex"])
+    const runDir = makeRunDir()
+    run(["claude", "codex", "HEAD", runDir], runDir, { ...sb.env, CODEX_CONFIG: '{"features":{"plugins":true}}' })
+    expect(envLog(sb)).toContain('CODEX_CONFIG={"features":{"plugins":false}}\n')
+  })
+
   test("a front-loaded preference overrides the default order", () => {
     expect(resolvePeers("claude", "grok,codex,claude,composer", ["codex", "claude", "grok", "cursor-agent"])).toBe("grok")
   })
@@ -749,6 +785,16 @@ describe("cross-model-adversarial-review skip paths — non-blocking, no file", 
     expect(r.stderr).toContain("host serving family unattested")
     expect(calls(sb)).toBe(0)
   })
+
+  test("harness omp with an unattested family skips instead of being rejected", () => {
+    const sb = sandbox(["claude"])
+    const runDir = makeRunDir()
+    const r = run(["unknown", "claude", "HEAD", runDir], runDir, { ...sb.env, CROSS_MODEL_HOST_HARNESS: "omp" })
+    expect(r.files).not.toContain("adversarial-claude.json")
+    expect(r.stderr).toContain("host serving family unattested")
+    expect(r.stderr).not.toContain("invalid")
+    expect(calls(sb)).toBe(0)
+  })
 })
 
 describe("cross-model-adversarial-review outcome classification", () => {
@@ -773,12 +819,31 @@ describe("cross-model-adversarial-review outcome classification", () => {
     expect(r.stderr).not.toContain("pre-egress")
   })
 
+  // codex-acp streams a provider 400 as reply text and still ends the turn with end_turn.
+  test("a model the provider rejects in reply text is named in skip evidence with the advertised models", () => {
+    const sb = sandbox(["codex"], path.join(STREAMS, "model-rejected-end-turn"))
+    const runDir = makeRunDir()
+    const r = run(["claude", "codex", "HEAD", runDir], runDir, sb.env)
+    expect(r.files).not.toContain("adversarial-codex.json")
+    expect(r.stderr).toContain("The 'gpt-6-luna' model is not supported when using Codex with a ChatGPT account.")
+    expect(r.stderr).toContain("peer skip evidence (advertised models): gpt-6.1-sol, gpt-6-sol, gpt-6-luna, gpt-5.6-sol")
+  })
+
   test("a cancelled turn that exits 0 is not published even with findings in its reply", () => {
     const sb = sandbox(["codex"], acpStream({ text: review(), stopReason: "cancelled", exit: 0 }))
     const runDir = makeRunDir()
     const r = run(["claude", "codex", "HEAD", runDir], runDir, sb.env)
     expect(r.files).not.toContain("adversarial-codex.json")
     expect(r.stderr).toContain("peer skip evidence: stopReason=cancelled")
+  })
+
+  test("a cancelled turn after a refused permission names that refusal", () => {
+    const sb = sandbox(["codex"], acpStream({ text: review(), stopReason: "cancelled", exit: 5 }))
+    const runDir = makeRunDir()
+    const r = run(["claude", "codex", "HEAD", runDir], runDir, sb.env)
+    expect(r.files).not.toContain("adversarial-codex.json")
+    expect(r.stderr).toContain("peer skip evidence: permission request cancelled the turn")
+    expect(r.stderr).not.toContain("peer skip evidence: stopReason=cancelled")
   })
 
   test("a turn that ran out of turns is not published", () => {
@@ -884,6 +949,73 @@ describe("cross-model-adversarial-review acpx transport preflight", () => {
     expect(calls(sb)).toBe(1)
     expect(peerOutputs(r.files)).toEqual([])
     expect(r.stderr).not.toContain("peer skip evidence")
+  })
+
+  test("the first line of a Node startup error is the pre-egress reason", () => {
+    const base = path.join(temp("xmodel-cr-node-"), "s")
+    const line = "Error [ERR_MODULE_NOT_FOUND]: Cannot find module '@openclaw/fs-safe/dist/advanced.js'"
+    writeFileSync(`${base}.stderr`, `node:internal/modules/esm/resolve:275\n${line}\n    at Function._resolveFilename (node:internal/modules/cjs/loader:1207:15)\n`)
+    writeFileSync(`${base}.exit`, "1\n")
+    const sb = sandbox(["codex"], base)
+    const runDir = makeRunDir()
+    const r = run(["claude", "codex", "HEAD", runDir], runDir, sb.env)
+    expect(r.stderr).toContain(`transport unavailable (pre-egress, route): ${line}`)
+    expect(r.stderr).not.toContain("acpx exited 1 before sending the prompt")
+    expect(peerOutputs(r.files)).toEqual([])
+  })
+
+  test.each(["stderr", "stdout"])("an npm date cutoff in %s is reported after one policy-respecting refresh", (channel) => {
+    const base = path.join(temp("xmodel-cr-age-"), "s")
+    const error = readFileSync(path.join(STREAMS, "npm-release-age.stderr"), "utf8")
+    writeFileSync(`${base}.${channel}`, channel === "stdout"
+      ? JSON.stringify({ jsonrpc: "2.0", id: 0, error: { code: -32000, message: error.replace("acpx@0.21.0", "@openai/codex@^0.156.1") } })
+      : error)
+    writeFileSync(`${base}.exit`, "1\n")
+    const sb = sandbox(["codex"], base)
+    const runDir = makeRunDir()
+    const r = run(["claude", "codex", "HEAD", runDir], runDir, sb.env)
+    expect(calls(sb)).toBe(2)
+    expect(r.stderr).toContain(`transport unavailable (pre-egress, ${channel === "stderr" ? "shared" : "route"}): npm could not resolve ${ACPX_RANGE}`)
+    expect(r.stderr).toContain("check min-release-age/before policy or wait for the cooldown")
+    expect(r.stderr).not.toContain("stale cached")
+    expect(r.stderr).toContain("npm policy unchanged")
+    expect(peerOutputs(r.files)).toEqual([])
+  })
+
+  test.each(["stale-npm-metadata", "npm-release-age"])("an npm resolution failure (%s) retries the same route once with fresh metadata", (stream) => {
+    const base = path.join(temp("xmodel-cr-stale-"), "s")
+    for (const ext of ["stderr", "exit"]) writeFileSync(`${base}.1.${ext}`, readFileSync(path.join(STREAMS, `${stream}.${ext}`)))
+    acpStream({ text: review() }, `${base}.2`)
+    const sb = sandbox(["codex"], base)
+    const runDir = makeRunDir()
+    const r = run(["claude", "codex", "HEAD", runDir], runDir, sb.env)
+    expect(calls(sb)).toBe(2)
+    expect(r.files).toContain("adversarial-codex.json")
+    expect(argv(sb)).toContain(ACPX_RANGE)
+    expect(envLog(sb)).toContain("npm_config_prefer_offline=false\nnpm_config_fetch_retries=0\nnpm_config_prefer_online=true\n")
+    expect(r.stderr).not.toContain("transport unavailable")
+  })
+
+  test("stale-metadata text after the prompt was sent is not retried", () => {
+    const sb = sandbox(["codex"], acpStream({ error: "No matching version found", stderr: readFileSync(path.join(STREAMS, "stale-npm-metadata.stderr"), "utf8"), exit: 1 }))
+    const runDir = makeRunDir()
+    const r = run(["claude", "codex", "HEAD", runDir], runDir, sb.env)
+    expect(calls(sb)).toBe(1)
+    expect(envLog(sb)).toContain("npm_config_prefer_offline=true\n")
+    expect(r.files).not.toContain("adversarial-codex.json")
+  })
+
+  test("a refresh launch that also hits stale metadata reports the npm error without a third launch", () => {
+    const base = path.join(temp("xmodel-cr-stale-"), "s")
+    for (const call of [1, 2]) {
+      for (const ext of ["stderr", "exit"]) writeFileSync(`${base}.${call}.${ext}`, readFileSync(path.join(STREAMS, `stale-npm-metadata.${ext}`)))
+    }
+    const sb = sandbox(["codex"], base)
+    const runDir = makeRunDir()
+    const r = run(["claude", "codex", "HEAD", runDir], runDir, sb.env)
+    expect(calls(sb)).toBe(2)
+    expect(r.stderr).toContain("transport unavailable (pre-egress, shared): npm error code ETARGET")
+    expect(peerOutputs(r.files)).toEqual([])
   })
 
   test("a codex agent override in the repository's .acpxrc.json fails only that route; a replacement route still runs", () => {
@@ -994,6 +1126,14 @@ describe("cross-model-adversarial-review normalization", () => {
     expect(r.stderr.includes("model mismatch")).toBe(mismatch)
   })
 
+  test("an OpenCode effort override sets its ACP effort option", () => {
+    expect(emitAdapter("opencode", SCRIPT, { CROSS_MODEL_EFFORT_OVERRIDE: "xhigh" })).toContain("--config-option mode=plan --config-option effort=xhigh --file")
+  })
+
+  test("without an effort override OpenCode keeps its own default", () => {
+    expect(emitAdapter("opencode")).not.toContain("effort=")
+  })
+
   test("a valid effort override reaches the adapter; an unsupported level is rejected before launch", () => {
     let sb = sandbox(["claude"])
     let runDir = makeRunDir()
@@ -1003,7 +1143,7 @@ describe("cross-model-adversarial-review normalization", () => {
     expect(argv(sb)).toContain("effort=max")
     expect(r.stderr).toContain("(effort max)")
 
-    for (const [route, effort] of [["claude", "minimal"], ["grok-cli", "max"], ["opencode", "high"], ["composer", "high"]]) {
+    for (const [route, effort] of [["claude", "minimal"], ["grok-cli", "max"], ["opencode", "minimal"], ["composer", "high"]]) {
       sb = sandbox([ROUTE_BIN[route]])
       runDir = makeRunDir()
       const target = route.startsWith("grok") ? "grok" : route
@@ -1156,6 +1296,171 @@ function blockBetween(script: string, startMarker: string, endMarker: string): s
 // override validation, run loop, and overload handling stay byte-identical.
 // What differs is posture: doc-review denies every permission from an empty
 // workspace, while code-review approves reads from the repository root.
+// The Antigravity ACP runtime and its helper, staged as stubs on the sandbox PATH.
+const ANTIGRAVITY_BINS = ["agy_acp_server.par", "localharness_external"]
+// What acpx@0.19.4 prints when --model names a model the session did not
+// advertise: the session opens, then the run ends before any prompt is sent.
+function unadvertisedStream(model: string, available: string, base = path.join(temp("xmodel-cr-stream-"), "s")) {
+  const rpc = (body: Record<string, unknown>) => JSON.stringify({ jsonrpc: "2.0", ...body })
+  writeFileSync(`${base}.stdout`, [
+    rpc({ id: 0, method: "initialize", params: { protocolVersion: 1 } }),
+    rpc({ id: 0, result: { protocolVersion: 1, authMethods: [] } }),
+    rpc({ id: 1, method: "session/new", params: { cwd: "/tmp/cwd", mcpServers: [] } }),
+    rpc({ id: 1, result: { sessionId: "stub-session-1" } }),
+    rpc({ id: null, error: { code: -32603, message: `Cannot apply --model "${model}": the ACP agent did not advertise that model. Available models: ${available}.`, data: { acpxCode: "RUNTIME" } } }),
+  ].join("\n") + "\n")
+  writeFileSync(`${base}.exit`, "1\n")
+  return base
+}
+// The runtime answers initialize, then holds session/new open while it waits
+// for a browser sign-in.
+function signInWaitStream(base = path.join(temp("xmodel-cr-stream-"), "s")) {
+  const rpc = (body: Record<string, unknown>) => JSON.stringify({ jsonrpc: "2.0", ...body })
+  writeFileSync(`${base}.stdout`, [
+    rpc({ id: 0, method: "initialize", params: { protocolVersion: 1 } }),
+    rpc({ id: 0, result: { protocolVersion: 1, authMethods: [{ id: "oauth-personal" }] } }),
+    rpc({ id: 1, method: "session/new", params: { cwd: "/tmp/cwd", mcpServers: [] } }),
+  ].join("\n") + "\n")
+  writeFileSync(`${base}.sleep`, "30\n")
+  return base
+}
+
+describe("cross-model-adversarial-review antigravity route", () => {
+  test("--emit-adapter antigravity requests Argon read-only, strips Google credentials, and isolates GEMINI_HOME", () => {
+    const command = emitAdapter("antigravity")
+    expect(command).toContain(`npx -y --package ${ACPX_RANGE} -- acpx --cwd`)
+    expect(command).toStartWith("env -u GEMINI_API_KEY -u GOOGLE_API_KEY -u GOOGLE_APPLICATION_CREDENTIALS -u GOOGLE_CLOUD_PROJECT -u GOOGLE_CLOUD_LOCATION -u GOOGLE_GENAI_USE_VERTEXAI -u AGY_LLM_GATEWAY_URL npm_config_prefer_offline=true")
+    expect(command).toContain("GEMINI_HOME=<gemini-home>")
+    expect(command).toContain("--approve-reads --non-interactive-permissions deny --model gemini-4-argon antigravity exec --config-option mode=default --config-option thinking_level=high")
+    const tokens = command.split(/\s+/)
+    for (const bad of NEVER_FLAGS) expect(tokens).not.toContain(bad)
+  })
+
+  test("Argon unoffered falls back once to Flash before any prompt; the receipt names Flash as requested", () => {
+    const base = path.join(temp("xmodel-cr-stream-"), "s")
+    unadvertisedStream("gemini-4-argon", "gemini-3.8-flash", `${base}.1`)
+    acpStream({ text: review() }, `${base}.2`)
+    const sb = sandbox(ANTIGRAVITY_BINS, base)
+    const runDir = makeRunDir()
+    const r = run(["claude", "antigravity", "HEAD", runDir], runDir, sb.env)
+    expect(calls(sb)).toBe(2)
+    expect(r.stderr).toContain("Antigravity does not offer gemini-4-argon on this account; falling back to gemini-3.8-flash")
+    expect(argv(sb)).toContain("gemini-3.8-flash")
+    const out = published(runDir, "adversarial-antigravity.json")
+    expect(out.model_requested).toBe("gemini-3.8-flash")
+    expect(out.model_actual).toBe("unverified")
+    expect(out.serving_family).toBe("gemini")
+    expect(out.receipt_supported).toBe(false)
+    expect(out.independence_verified).toBe(true)
+  })
+
+  test("the Flash fallback never starts once the Argon refusal used up the shared deadline", () => {
+    const base = path.join(temp("xmodel-cr-stream-"), "s")
+    unadvertisedStream("gemini-4-argon", "gemini-3.8-flash", `${base}.1`)
+    writeFileSync(`${base}.1.sleep`, "3\n")
+    acpStream({ text: review() }, `${base}.2`)
+    const sb = sandbox(ANTIGRAVITY_BINS, base)
+    const runDir = makeRunDir()
+    const r = run(["claude", "antigravity", "HEAD", runDir], runDir, { ...sb.env, CROSS_MODEL_HARD_SECS: "2" })
+    expect(calls(sb)).toBe(1)
+    expect(r.stderr).not.toContain("falling back")
+    expect(peerOutputs(r.files)).toEqual([])
+  })
+
+  test("a pinned Argon on an account without it skips naming the offered models and never runs Flash", () => {
+    const sb = sandbox(ANTIGRAVITY_BINS, unadvertisedStream("gemini-4-argon", "gemini-3.8-flash"))
+    const runDir = makeRunDir()
+    const r = run(["claude", "antigravity", "HEAD", runDir], runDir, {
+      ...sb.env,
+      CROSS_MODEL_MODEL_OVERRIDE_TARGET: "antigravity",
+      CROSS_MODEL_MODEL_OVERRIDE: "gemini-4-argon",
+    })
+    expect(calls(sb)).toBe(1)
+    expect(r.stderr).toMatch(/transport unavailable \(pre-egress, route\): Cannot apply --model "gemini-4-argon".*Available models: gemini-3\.8-flash/)
+    expect(r.stderr).not.toContain("falling back")
+    expect(peerOutputs(r.files)).toEqual([])
+  })
+
+  test("a non-Gemini model pin or an effort Antigravity lacks skips before launch", () => {
+    for (const env of [
+      { CROSS_MODEL_MODEL_OVERRIDE_TARGET: "antigravity", CROSS_MODEL_MODEL_OVERRIDE: "claude-sonnet-4-6" },
+      { CROSS_MODEL_EFFORT_OVERRIDE: "xhigh" },
+    ]) {
+      const sb = sandbox(ANTIGRAVITY_BINS)
+      const runDir = makeRunDir()
+      const r = run(["claude", "antigravity", "HEAD", runDir], runDir, { ...sb.env, ...env })
+      expect(r.stderr).toContain("not compatible with route 'antigravity'; skipping")
+      expect(calls(sb)).toBe(0)
+    }
+    expect(emitAdapter("antigravity", SCRIPT, { CROSS_MODEL_EFFORT_OVERRIDE: "medium" })).toContain("thinking_level=medium")
+  })
+
+  test("a runtime waiting for sign-in is reaped before any prompt with a sign-in remedy", () => {
+    const sb = sandbox(ANTIGRAVITY_BINS, signInWaitStream())
+    const runDir = makeRunDir()
+    const r = run(["claude", "antigravity", "HEAD", runDir], runDir, { ...sb.env, CROSS_MODEL_SESSION_START_SECS: "1" })
+    expect(r.stderr).toContain("transport unavailable (pre-egress, route): Antigravity is waiting for a Google sign-in")
+    expect(r.stderr).toContain(`{"auth":{"type":"oauth-personal"}} in ~/.gemini/antigravity-acp/settings.json, run npx -y --package '${ACPX_RANGE}' -- acpx antigravity exec ok`)
+    expect(r.stderr).toContain("antigravity exec ok in a terminal")
+    expect(calls(sb)).toBe(1)
+    expect(peerOutputs(r.files)).toEqual([])
+  })
+
+  test("the peer gets a private oauth-personal GEMINI_HOME and the helper beside the runtime, never ambient Google keys", () => {
+    const sb = sandbox(ANTIGRAVITY_BINS)
+    const runDir = makeRunDir()
+    run(["claude", "antigravity", "HEAD", runDir], runDir, { ...sb.env, GEMINI_API_KEY: "ambient-key", GOOGLE_CLOUD_PROJECT: "ambient-project" })
+    const env = envLog(sb)
+    expect(env).toContain("GEMINI_API_KEY=<unset>")
+    expect(env).toContain("GOOGLE_CLOUD_PROJECT=<unset>")
+    expect(env).toContain(`ANTIGRAVITY_HARNESS_PATH=${path.join(sb.bin, "localharness_external")}`)
+    expect(env).toMatch(/GEMINI_HOME=\S*xmodel-cr-scratch-\S*\/gemini-home/)
+    expect(env).toContain('{"auth":{"type":"oauth-personal"}}')
+    expect(env).not.toContain("--- GEMINI_HOME token")
+  })
+
+  test.each([
+    ["the default home", false],
+    ["the user's own GEMINI_HOME", true],
+  ])("the private GEMINI_HOME gets a 0600 copy of the runtime sign-in token from %s", (_name, customHome) => {
+    const sb = sandbox(ANTIGRAVITY_BINS)
+    const userHome = customHome ? temp("xmodel-cr-user-gemini-") : path.join(sb.home, ".gemini")
+    mkdirSync(path.join(userHome, "antigravity-acp"), { recursive: true })
+    const token = path.join(userHome, "antigravity-acp", "acp_token.json")
+    writeFileSync(token, '{"refresh_token":"stub"}\n')
+    const runDir = makeRunDir()
+    run(["claude", "antigravity", "HEAD", runDir], runDir, { ...sb.env, ...(customHome ? { GEMINI_HOME: userHome } : {}) })
+    const env = envLog(sb)
+    expect(env).toMatch(/GEMINI_HOME=\S*xmodel-cr-scratch-\S*\/gemini-home/)
+    const digest = createHash("sha256").update('{"refresh_token":"stub"}\n').digest("hex")
+    expect(env).toContain(`--- GEMINI_HOME token 0600 sha256:${digest} ---`)
+    expect(readFileSync(token, "utf8")).toBe('{"refresh_token":"stub"}\n')
+  })
+
+  test("a runtime without its helper is a route pre-egress skip", () => {
+    const sb = sandbox(["agy_acp_server.par"])
+    const runDir = makeRunDir()
+    const r = run(["claude", "antigravity", "HEAD", runDir], runDir, sb.env)
+    expect(r.stderr).toContain("transport unavailable (pre-egress, route): Antigravity's localharness_external helper is not beside agy_acp_server.par")
+    expect(calls(sb)).toBe(0)
+  })
+
+  test("the default order reaches Antigravity last and never picks Composer", () => {
+    const order = "codex,claude,grok,antigravity"
+    expect(resolvePeers("claude", order, ANTIGRAVITY_BINS)).toBe("antigravity")
+    expect(resolvePeers("claude", order, [...ANTIGRAVITY_BINS, "codex"])).toBe("codex")
+    // cursor-agent still reaches Grok through Cursor, ahead of Antigravity.
+    expect(resolvePeers("claude", order, [...ANTIGRAVITY_BINS, "cursor-agent"])).toBe("grok")
+  })
+
+  test("a Gemini-served or Antigravity-hosted session never selects Antigravity", () => {
+    const order = "codex,claude,grok,antigravity"
+    expect(resolvePeers("gemini", order, ANTIGRAVITY_BINS)).toBe("")
+    expect(resolvePeers("claude", order, ANTIGRAVITY_BINS, { CROSS_MODEL_HOST_HARNESS: "antigravity" })).toBe("")
+    expect(resolvePeers("gemini", order, [...ANTIGRAVITY_BINS, "codex"])).toBe("codex")
+  })
+})
+
 describe("cross-model provider kernel parity (code-review vs doc-review)", () => {
   test.each([
     ["route mapping", "route_effort() {", "# --- acpx transport"],

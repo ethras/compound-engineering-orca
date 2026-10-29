@@ -29,8 +29,14 @@ function gitPathExists(ref: string, gitPath: string): boolean {
   return spawnSync("git", ["cat-file", "-e", `${ref}:${gitPath}`], { cwd: REPO_ROOT }).status === 0
 }
 
+const skillAtRef = new Map<string, boolean>()
 function gitShowExists(ref: string, skill: string): boolean {
-  return gitPathExists(ref, `skills/${skill}/SKILL.md`)
+  const key = `${ref}:${skill}`
+  const cached = skillAtRef.get(key)
+  if (cached !== undefined) return cached
+  const exists = gitPathExists(ref, `skills/${skill}/SKILL.md`)
+  skillAtRef.set(key, exists)
+  return exists
 }
 
 describe("skill-eval-cell catalog", () => {
@@ -80,8 +86,8 @@ describe("skill-eval-cell catalog", () => {
       if (!scenario.post_only && !gitShowExists(preRef, scenario.skill)) {
         missing.push(`${scenario.skill} missing at ${preRef}`)
       }
-      if (!gitShowExists(POST_SWEEP_REF, scenario.skill)) {
-        missing.push(`${scenario.skill} missing at ${POST_SWEEP_REF}`)
+      for (const skill of [scenario.skill, ...(scenario.with_skill ?? [])]) {
+        if (!gitShowExists(POST_SWEEP_REF, skill)) missing.push(`${skill} missing at ${POST_SWEEP_REF}`)
       }
     }
     expect(missing).toEqual([])
@@ -232,6 +238,7 @@ describe("skill-eval-cell catalog", () => {
         "ce-simplify-code/local-coverage:references/orca-delegation.md",
         "ce-simplify-code/broad-coverage-route:references/orca-delegation.md",
         "ce-simplify-code/requested-reviewers-route:references/orca-delegation.md",
+        "ce-resolve-pr-feedback/out-of-scope-finding-declined:references/evaluation-rubric.md",
         "ce-resolve-pr-feedback/saved-batch-route:references/resume.md",
         "ce-plan/handoff-offers-ce-work-only:references/plan-handoff.md",
         "ce-retune/selected-streak-claim:references/noise-floor.md",
@@ -253,6 +260,12 @@ describe("skill-eval-cell catalog", () => {
         "ce-work/requirements-only-stops:references/input-triage.md",
         "ce-work/return-to-caller-no-pr:references/input-triage.md",
         "ce-work/return-to-caller-no-pr:references/return-to-caller.md",
+        "ce-code-review/antigravity-last-automatic-target:references/cross-model-review.md",
+        "ce-code-review/composer-not-auto-selected:references/cross-model-review.md",
+        "ce-code-review/gemini-request-binds-antigravity:references/cross-model-review.md",
+        "ce-doc-review/antigravity-last-automatic-target:references/cross-model-review.md",
+        "ce-pov/oracle-default-order-reaches-antigravity:references/cross-model-panel.md",
+        "ce-work/antigravity-default-candidates:references/cross-model-execution.md",
         "lfg/plan-first:references/plan-brief.md",
       ].sort(),
     )
@@ -317,6 +330,7 @@ describe("skill-eval-cell catalog", () => {
       "ce-code-review/depth-gate-standards-violation",
       "ce-code-review/depth-gate-unlisted-language",
       "ce-code-review/depth-gate-yaml-lite",
+      "ce-code-review/prune-deletions-do-not-force-full",
       "ce-code-review/validator-veto-routes-protected-rejections",
       "ce-commit-push-pr/babysit-off-preserves-human-decision",
       "ce-commit-push-pr/project-publishing-gate",
@@ -324,8 +338,16 @@ describe("skill-eval-cell catalog", () => {
       "ce-compound-refresh/guidance-survives-implementation-conflict",
       "ce-compound-refresh/plain-refresh-keeps-redundant-accurate-doc",
       "ce-compound-refresh/worth-lens-intent-confirms-before-loading",
+      "ce-debug/bakeoff-caller-opt-in",
+      "ce-debug/bakeoff-consequential-repair",
+      "ce-debug/bakeoff-selected-unsupported-guarantee",
+      "ce-debug/bakeoff-unresolved-no-default",
       "ce-debug/pipeline-divergent-defer",
       "ce-doc-review/approval-versus-judgment-summary",
+      "ce-doc-review/peer-outcome-disabled-by-config",
+      "ce-doc-review/peer-outcome-folded",
+      "ce-doc-review/peer-outcome-started-failed",
+      "ce-doc-review/peer-outcome-started-no-artifact",
       "ce-noslop/dense-paragraph-keeps-every-claim",
       "ce-noslop/detect-names-patterns-without-rewrite",
       "ce-noslop/facts-survive-the-edit",
@@ -334,6 +356,27 @@ describe("skill-eval-cell catalog", () => {
       "ce-noslop/protected-spans-stay-byte-identical",
       "ce-noslop/two-devices-stay-unchanged",
       "ce-noslop/workflow-jargon-keeps-technical-detail",
+      "ce-optimize/approval-material-in-message-not-question",
+      "ce-optimize/attended-judge-proceeds-uncalibrated",
+      "ce-optimize/event-wake-without-deadline",
+      "ce-optimize/expired-wait-resume",
+      "ce-optimize/holdout-waits-for-selection-decision",
+      "ce-optimize/judge-check-accepted-agent-does-the-work",
+      "ce-optimize/judge-check-offered-once-automated-by-default",
+      "ce-optimize/judge-spec-without-holdout",
+      "ce-optimize/keep-earns-its-gain",
+      "ce-optimize/live-run-records-approval-and-report",
+      "ce-optimize/objective-target-asks-no-exemplars",
+      "ce-optimize/receipts-park-before-evaluation",
+      "ce-optimize/remote-holdout-before-keep",
+      "ce-optimize/remote-without-detached-worker",
+      "ce-optimize/resume-added-holdout",
+      "ce-optimize/resume-changed-cap",
+      "ce-optimize/resume-changed-metric",
+      "ce-optimize/resume-recorded-approval",
+      "ce-optimize/runner-up-earns-gain",
+      "ce-optimize/tick-boundary-without-wake",
+      "ce-optimize/unattended-judge-needs-calibration",
       "ce-plan/auto-bakeoff-chat-brief-continues",
       "ce-plan/auto-bakeoff-concrete-alternatives-continue",
       "ce-plan/auto-bakeoff-eligible",
@@ -353,6 +396,7 @@ describe("skill-eval-cell catalog", () => {
       "ce-resolve-pr-feedback/pipeline-returns-complete-human-decision",
       "ce-setup/instruction-file-covered-offers-nothing",
       "ce-setup/instruction-file-gap-offers-store-and-directive",
+      "lfg/defect-route-ships-session-edits",
     ])
   })
 

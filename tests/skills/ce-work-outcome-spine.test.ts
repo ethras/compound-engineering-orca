@@ -352,6 +352,8 @@ describe("ce-work cross-model engine contract", () => {
 
     expect(worker).toContain("caller, unit packet, and controller own dispatch")
     expect(worker).toContain("Implement exactly the supplied implementation unit")
+    expect(worker).toMatch(/Inspect another checkout only to read.*prototype.*explicitly cited in the unit packet/)
+    expect(worker).toContain("Never mutate another checkout")
     expect(worker).toContain("Before returning `completed`")
     expect(worker).toContain("complete Git delta")
     expect(worker).toContain("disposable artifacts created by your own checks")
@@ -377,7 +379,7 @@ describe("ce-work cross-model engine contract", () => {
     expect(protocol).toContain("claude")
     expect(protocol).toContain("grok")
     expect(protocol).toContain("Fixed controller route tokens")
-    expect(protocol).toContain("`codex`, `claude`, `grok-cli`, `cursor`, `composer`, `grok-cursor`, or `opencode`")
+    expect(protocol).toContain("`codex`, `claude`, `grok-cli`, `cursor`, `composer`, `grok-cursor`, `opencode`, or `antigravity`")
   })
 
   test("defines prefer, require, fixed-recipient sanction, and restriction failure", async () => {
@@ -523,7 +525,7 @@ describe("ce-work cross-model engine contract", () => {
     expect(serial).not.toContain("CE_WORK_MODEL_OVERRIDE_TARGET")
     expect(serial).toContain("one bounded unit packet")
     expect(serial).toContain("exact plural keys `route`, `intermediaries`, and `restrictions`")
-    expect(serial).toContain("direct `codex`, `claude`, `grok-cli`, and `cursor` routes use `intermediaries: []`")
+    expect(serial).toContain("direct `codex`, `claude`, `grok-cli`, `cursor`, `opencode`, and `antigravity` routes use `intermediaries: []`")
     expect(serial).toContain("Write the packet source directly to OS temp outside the canonical checkout")
     expect(serial).toContain("never draft it inside the repository and move or copy it later")
     expect(serial).toContain("quoting `$(...)` as a direct argument does not expand it")

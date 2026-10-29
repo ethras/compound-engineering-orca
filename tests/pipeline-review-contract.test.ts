@@ -462,7 +462,7 @@ describe("cross-model execution receipt seam parity (ce-work <-> lfg)", () => {
       "3. **Read `references/review-followup.md` now**",
     )
 
-    expect(gate).toContain("Only a valid `status: complete` may advance")
+    expect(gate).toContain("Only a valid `status: complete` from `ce-work` may advance")
     expect(gate).toContain("every other status")
     expect(gate).toContain("malformed return")
     expect(gate).toContain("stops the pipeline")
@@ -631,8 +631,12 @@ describe("ce-debug regression test selection", () => {
     }
 
     expect(debug).toMatch(/Only when that gate qualifies the fix, offer capture/i)
-    expect(debug).toMatch(/commit and push only the artifacts it actually wrote or updated/i)
-    expect(debug).toMatch(/If it writes nothing, end without a documentation commit/i)
+    expect(debug).toMatch(/only the artifacts it actually wrote or updated/i)
+    expect(debug).toMatch(/If it writes nothing, no documentation joins the commit/i)
+    // Capture is settled before the fix commits, so an accepted learning ships with the
+    // fix. The older after-PR offer never fired in real sessions and cost a second push.
+    expect(debug).toMatch(/Settle learning capture before anything commits/i)
+    expect(debug).not.toMatch(/After a PR is open/i)
 
     const debugContract = [debug, handoff, guide].join("\n")
     expect(debugContract).not.toMatch(/one-sentence insight|fits in one sentence/i)
@@ -850,6 +854,33 @@ describe("ce-doc-review contract", () => {
 
     // Terminal signal preserved for programmatic callers
     expect(synthesis).toContain("Review complete")
+  })
+
+  test("non-interactive result records a cleanly skipped cross-model peer", async () => {
+    const synthesis = await readRepoFile(
+      "skills/ce-doc-review/references/synthesis-and-presentation.md",
+    )
+    const review = await readRepoFile(
+      "skills/ce-doc-review/references/cross-model-review.md",
+    )
+    const nonInteractive = sliceSection(
+      synthesis,
+      "**Non-interactive mode:**",
+      "**Interactive mode:**",
+    )
+
+    const template = sliceSection(nonInteractive, "```", "Review complete\n```")
+
+    expect(nonInteractive).toContain("peer.outcome: folded")
+    expect(nonInteractive).toContain("peer.outcome: in-process-fallback")
+    expect(template).toContain("peer.outcome: <folded | in-process-fallback>")
+    expect(template).toContain("cross-model <lens> peer: <what happened to the peer's result>")
+    expect(template).toContain("<lens>: in-process fallback (cross-model peer not run: <reason>)")
+    expect(template).toContain("whole-doc: not run (cross-model peer not run: <reason>)")
+
+    expect(review).not.toContain("stay silent in non-interactive mode")
+    expect(review).not.toContain("emit no user-facing prose")
+    expect(review).toContain("references/synthesis-and-presentation.md")
   })
 
   test("completed doc review returns control without authorizing another workflow", async () => {
@@ -1278,6 +1309,43 @@ describe("explicit Compound Engineering branding provenance", () => {
     expect(debug).toContain("invoke the `ce-commit-push-pr` skill with `branding:on`.")
     expect(debug).not.toContain("`/ce-commit-push-pr branding:on`")
     expect(debugHandoff).not.toContain("`/ce-commit-push-pr branding:on`")
+  })
+})
+
+describe("ce-simplify-code pipeline callers", () => {
+  // Without the token, a caller's run could be judged user-started and stop at a
+  // report instead of applying fixes. A proof-test path passed bare would read as a
+  // user-named scope and narrow the run to the one test it must not touch.
+  const callsites: Array<[string, string]> = [
+    ["skills/ce-work/references/implementation-loop.md", "invoke it with `mode:pipeline` at phase boundaries"],
+    ["skills/ce-work/references/shipping-workflow.md", "**`ce-simplify-code`** with `mode:pipeline`"],
+    ["skills/lfg/SKILL.md", "Invoke the `ce-simplify-code` skill with `mode:pipeline`"],
+    ["skills/lfg/references/debug-return.md", "pass `mode:pipeline`"],
+    ["skills/ce-debug/references/post-fix-handoff.md", "Invoke `ce-simplify-code` with `mode:pipeline`"],
+  ]
+
+  test("every caller passes mode:pipeline and labels the proof test", async () => {
+    for (const [file, invocation] of callsites) {
+      const content = await readRepoFile(file)
+      expect(content, file).toContain(invocation)
+    }
+    const proofCarriers = [
+      "skills/ce-work/references/implementation-loop.md",
+      "skills/ce-work/references/shipping-workflow.md",
+      "skills/lfg/references/review-followup.md",
+      "skills/lfg/references/debug-return.md",
+      "skills/ce-debug/references/post-fix-handoff.md",
+    ]
+    for (const file of proofCarriers) {
+      expect(await readRepoFile(file), file).toContain("`proof-test:<path>`")
+    }
+  })
+
+  test("the callee documents both tokens and treats the proof test as context", async () => {
+    const skill = await readRepoFile("skills/ce-simplify-code/SKILL.md")
+    expect(skill).toContain("mode:pipeline")
+    expect(skill).toContain("proof-test:<path>")
+    expect(skill).toContain("The proof-test path is context for Step 3, never scope")
   })
 })
 

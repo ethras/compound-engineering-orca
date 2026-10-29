@@ -136,6 +136,10 @@ describe("ce-debug return-to-caller seam (ce-debug <-> lfg)", () => {
       expect(debugReturn, `ce-debug must return ${field}`).toMatch(new RegExp('"' + field + '":'))
       expect(debugReturnGate, `lfg must require ${field}`).toMatch(new RegExp("`" + field + "(?:`|:)"))
     }
+    // Edits the calling session made before invoking ce-debug ship with the fix; both
+    // ends must name the field so lfg's offered-scope check can see them.
+    expect(debugReturn).toContain('"caller_edits":')
+    expect(debugReturnGate).toContain("`pre_fix_scope.caller_edits`")
   })
 
   test("the debug gate requires the same evidence facts the ce-work gate requires", () => {
@@ -223,12 +227,19 @@ describe("inline child returns do not end the caller's turn", () => {
     "skills/ce-plan/references/plan-handoff.md": readRepoFile("skills/ce-plan/references/plan-handoff.md"),
     "skills/ce-pov/references/invocation.md": readRepoFile("skills/ce-pov/references/invocation.md"),
     "skills/ce-doc-review/references/synthesis-and-presentation.md": readRepoFile("skills/ce-doc-review/references/synthesis-and-presentation.md"),
+    "skills/ce-simplify-code/SKILL.md": readRepoFile("skills/ce-simplify-code/SKILL.md"),
+    "skills/ce-code-review/references/modes-and-output.md": readRepoFile("skills/ce-code-review/references/modes-and-output.md"),
+    "skills/ce-code-review/references/depth-paths.md": readRepoFile("skills/ce-code-review/references/depth-paths.md"),
+    "skills/ce-code-review/references/finish-input.md": readRepoFile("skills/ce-code-review/references/finish-input.md"),
+    "skills/ce-test-browser/references/pipeline-orchestration.md": readRepoFile("skills/ce-test-browser/references/pipeline-orchestration.md"),
+    "skills/ce-commit-push-pr/references/apply-and-handoff.md": readRepoFile("skills/ce-commit-push-pr/references/apply-and-handoff.md"),
+    "skills/ce-babysit-pr/references/pipeline.md": readRepoFile("skills/ce-babysit-pr/references/pipeline.md"),
   }
 
   test("callee return contracts say the return ends the skill, not the turn", () => {
     for (const [file, body] of Object.entries(calleeReturns)) {
       expect(body, `${file} must not present the return as the final output`).not.toMatch(/as the final output/)
-      expect(body, `${file} must state the return ends the skill, not the turn`).toMatch(/ends this skill, not the turn/)
+      expect(body, `${file} must state the return ends the skill, not the turn`).toMatch(/ends (?:this|the) skill, not the turn/)
     }
   })
 

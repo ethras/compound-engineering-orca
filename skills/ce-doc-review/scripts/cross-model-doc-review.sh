@@ -25,12 +25,12 @@
 #                   the peer-key of the host's OWN serving family, attested by
 #                   the calling skill (it knows its harness). A peer-key, never
 #                   a provider name: openai->codex, anthropic->claude,
-#                   xai->grok, cursor/composer->composer.
+#                   xai->grok, cursor/composer->composer, google->gemini.
 #                   Excluded from selection when attested. `unknown` is allowed,
 #                   but any returned review remains non-independent and cannot
 #                   promote agreement.
 #   <candidates>    comma-separated ordered provider keys to consider, e.g.
-#                   "codex,claude,grok,composer". The skill front-loads any
+#                   "codex,claude,grok,antigravity". The skill front-loads any
 #                   resolved preference (conversation > CE config cascade >
 #                   project-instructions-in-context); the script excludes the
 #                   host, applies the CROSS_MODEL_PEERS allowlist, and walks this
@@ -52,7 +52,8 @@
 # Test/introspection mode (no model call, no side effects):
 #   cross-model-doc-review.sh --emit-adapter <route>
 #     prints the exact argv the given route would run (route in:
-#     codex | claude | grok-cli | grok-cursor | cursor | composer | opencode).
+#     codex | claude | grok-cli | grok-cursor | cursor | composer | opencode |
+#     antigravity).
 #     Both this mode and the live run build their argv from adapter_argv(), so
 #     the route-safety test asserts on the same command string the peer runs.
 #
@@ -78,6 +79,8 @@ trap '' HUP
 # Filled while a peer process group is live; TERM/INT handler (installed after
 # reap() is defined) reaps it so an orchestrator kill cannot leave orphans.
 ACTIVE_PEER_PID=""
+PEER_ROUTE=""
+SESSION_STALLED=false
 PY_BIN=""
 
 log()  { printf '[cross-model-doc] %s\n' "$*" >&2; }
@@ -103,6 +106,11 @@ M_GROK="grok-4.7"              # grok CLI  (reasoning_effort=xhigh)
 # so grok-cursor runs at high/fast and composer at its fast tier.
 M_GROK_CURSOR="grok-4.7[context=256k,reasoning_effort=high,fast=true]"
 M_COMPOSER="composer-2.5[fast=true]"
+# Antigravity offers only the models the account is entitled to. Argon is
+# preferred; an account without it falls back once to Flash before any prompt.
+M_ANTIGRAVITY="gemini-4-argon"            # antigravity (thinking_level=high)
+M_ANTIGRAVITY_FALLBACK="gemini-3.8-flash"
+ANTIGRAVITY_MODEL=""   # set by the fallback; empty requests M_ANTIGRAVITY
 
 # ce-orca-hook:start ce-doc-review.codex-default-model
 # Orca defaults to GPT-6.1 Sol; route-scoped explicit overrides still win.
@@ -112,12 +120,12 @@ M_CODEX="gpt-6.1-sol"
 route_effort() {   # <route> -> requested effort: the override where the route takes one, else editorial
   if [ -n "${CROSS_MODEL_EFFORT_OVERRIDE:-}" ]; then
     case "$1" in
-      codex|claude|grok-cli) printf '%s' "$CROSS_MODEL_EFFORT_OVERRIDE"; return 0 ;;
+      codex|claude|grok-cli|antigravity|opencode) printf '%s' "$CROSS_MODEL_EFFORT_OVERRIDE"; return 0 ;;
     esac
   fi
   case "$1" in
     codex|grok-cli) printf 'xhigh' ;;
-    claude) printf 'high' ;;
+    claude|antigravity) printf 'high' ;;
     grok-cursor) printf 'model-implied-high' ;;
     composer) printf 'fast' ;;
     cursor|opencode) printf 'unverified' ;;
@@ -141,12 +149,13 @@ route_model() {   # <route> -> the M_* constant that route requests
     cursor)      printf 'auto' ;;
     composer)    printf '%s' "$M_COMPOSER" ;;
     opencode)    printf 'auto' ;;
+    antigravity) printf '%s' "${ANTIGRAVITY_MODEL:-$M_ANTIGRAVITY}" ;;
   esac
 }
 
 route_target() {
   case "$1" in
-    codex|claude|cursor|composer) printf '%s' "$1" ;;
+    codex|claude|cursor|composer|antigravity) printf '%s' "$1" ;;
     grok-cli|grok-cursor) printf 'grok' ;;
     opencode) printf 'opencode' ;;
   esac
@@ -159,12 +168,14 @@ route_harness() {
     grok-cli) printf 'grok' ;;
     grok-cursor|cursor|composer) printf 'cursor-agent' ;;
     opencode) printf 'opencode' ;;
+    antigravity) printf 'antigravity' ;;
   esac
 }
 
 target_serving_family() {
   case "$1" in
     codex|claude|grok|composer) printf '%s' "$1" ;;
+    antigravity) printf 'gemini' ;;
     cursor) printf 'unknown' ;;
     opencode) printf 'unknown' ;;
   esac
@@ -177,6 +188,7 @@ route_available() {
     grok-cli) command -v grok >/dev/null 2>&1 ;;
     grok-cursor|cursor|composer) command -v cursor-agent >/dev/null 2>&1 ;;
     opencode) command -v opencode >/dev/null 2>&1 ;;
+    antigravity) command -v agy_acp_server.par >/dev/null 2>&1 ;;
     *) return 1 ;;
   esac
 }
@@ -185,9 +197,16 @@ route_available() {
 # Every route reaches its agent through acpx, which speaks the Agent Client
 # Protocol and prints the JSON-RPC stream, so one parser covers every CLI.
 # The calling worker supplies route_available, route_model, and log.
-ACPX_VERSION="0.19.4"
+ACPX_VERSION="0.21.0"
+# 0.18.0 fixes approve-reads allowing ambiguous destructive permission requests.
+ACPX_MIN_VERSION="0.18.0"
 ACPX_UNAVAILABLE=""   # pre-egress reason; ACPX_SCOPE says whether every route shares it
 ACPX_SCOPE=""
+ACPX_NPM_REFRESH=false
+
+acpx_package_spec() {
+  printf 'acpx@>=%s <=%s' "$ACPX_MIN_VERSION" "$ACPX_VERSION"
+}
 
 acpx_agent() {   # <route> -> acpx built-in agent name
   case "$1" in
@@ -196,8 +215,34 @@ acpx_agent() {   # <route> -> acpx built-in agent name
     grok-cli) printf 'grok-build' ;;
     grok-cursor|cursor|composer) printf 'cursor' ;;
     opencode) printf 'opencode' ;;
+    antigravity) printf 'antigravity' ;;
     *) return 1 ;;
   esac
+}
+
+# acpx launches Google's Antigravity ACP runtime by name. It is a separate
+# download from the agy CLI and needs its localharness_external helper from the
+# same release, beside it or named by ANTIGRAVITY_HARNESS_PATH.
+acpx_antigravity_helper() {
+  local runtime
+  if [ -n "${ANTIGRAVITY_HARNESS_PATH:-}" ]; then printf '%s' "$ANTIGRAVITY_HARNESS_PATH"; return 0; fi
+  runtime="$(command -v agy_acp_server.par 2>/dev/null)" || return 1
+  printf '%s/localharness_external' "$(dirname "$runtime")"
+}
+
+# The runtime reads skills and settings from GEMINI_HOME, so every run gets a
+# private one, deleted with the caller's scratch. A file-backed login (no macOS
+# keychain) is read only from there, so it is copied in; refreshes are not
+# written back, so concurrent peers cannot clobber the user's token.
+acpx_antigravity_home() {   # <private-dir> -> GEMINI_HOME path
+  local home="$1/gemini-home"
+  local token="${GEMINI_HOME:-${HOME:-}/.gemini}/antigravity-acp/acp_token.json"
+  (umask 077; mkdir -p "$home/antigravity-acp") || return 1
+  printf '{"auth":{"type":"oauth-personal"}}\n' > "$home/antigravity-acp/settings.json" || return 1
+  if [ -f "$token" ]; then
+    (umask 077; cp "$token" "$home/antigravity-acp/acp_token.json") || return 1
+  fi
+  printf '%s' "$home"
 }
 
 acpx_unavailable() {   # <shared|route> <reason>
@@ -233,6 +278,13 @@ acpx_preflight() {   # <route> <cwd>; nothing is sent to a provider here
     return 1
   fi
   command -v npx >/dev/null 2>&1 || { acpx_unavailable shared "npx not found; acpx runs through npx"; return 1; }
+  if [ "$1" = antigravity ]; then
+    case "$(uname -s 2>/dev/null)" in
+      MINGW*|MSYS*|CYGWIN*) acpx_unavailable route "the Antigravity route is not yet supported on native Windows"; return 1 ;;
+    esac
+    route_available "$1" || { acpx_unavailable route "Antigravity's ACP runtime (agy_acp_server.par) is not on PATH; it is a separate download from the agy CLI (run ce-setup for the link)"; return 1; }
+    [ -x "$(acpx_antigravity_helper)" ] || { acpx_unavailable route "Antigravity's localharness_external helper is not beside agy_acp_server.par or at ANTIGRAVITY_HARNESS_PATH; install both from the same release (run ce-setup for the link)"; return 1; }
+  fi
   route_available "$1" || { acpx_unavailable route "the agent CLI for route '$1' is not installed"; return 1; }
   if [ "$1" = opencode ]; then
     case "$(uname -s 2>/dev/null)" in
@@ -251,17 +303,44 @@ acpx_claude_wrapper() {   # <private-dir> -> wrapper path
   printf '%s' "$wrapper"
 }
 
-# Prints the NUL-delimited argv prefix through `npx acpx@<pin>` and its global
-# flags; the worker appends permission flags, `--model`, the agent, and exec options.
+acpx_npm_failure_reason() {
+  if grep -qE 'No matching version found for .* with a date before ' "$1" 2>/dev/null; then
+    printf '%s' "npm could not resolve $(acpx_package_spec) or a dependency before its date cutoff; check min-release-age/before policy or wait for the cooldown"
+  else
+    grep -m1 '^npm error' "$1" 2>/dev/null
+  fi
+}
+
+# ETARGET is ambiguous: refresh metadata once while preserving npm's date policy.
+# npm ignores prefer_online while prefer_offline is set, so refresh disables it.
+acpx_npm_resolution_retryable() {   # <stderr-log> <stream-log>
+  [ "$ACPX_NPM_REFRESH" = true ] && return 1
+  grep -qE 'ETARGET|notarget|No matching version found' "$1" "$2" 2>/dev/null
+}
+
 # The codex and claude adapters are pointed at the installed CLIs so the pin
-# governs the transport, not which models the agent can serve.
-acpx_base_argv() {   # <route> <cwd> <mcp-config> <timeout-secs> <claude-wrapper>
-  printf '%s\0' env npm_config_prefer_offline=true npm_config_fetch_retries=0
+# bounds the transport version, not which models the agent can serve.
+acpx_base_argv() {   # <route> <cwd> <mcp-config> <timeout-secs> <claude-wrapper> <gemini-home>
+  printf '%s\0' env
+  # An ambient Google API key or cloud project would bill it instead of the
+  # Antigravity subscription. env takes -u only before its first assignment.
   case "$1" in
-    codex) printf '%s\0' "CODEX_PATH=$(command -v codex)" ;;
-    claude) printf '%s\0' "CLAUDE_CODE_EXECUTABLE=$5" ;;
+    antigravity) printf '%s\0' -u GEMINI_API_KEY -u GOOGLE_API_KEY -u GOOGLE_APPLICATION_CREDENTIALS \
+      -u GOOGLE_CLOUD_PROJECT -u GOOGLE_CLOUD_LOCATION -u GOOGLE_GENAI_USE_VERTEXAI -u AGY_LLM_GATEWAY_URL ;;
   esac
-  printf '%s\0' npx -y "acpx@$ACPX_VERSION" --cwd "$2" --format json --mcp-config "$3" --timeout "$4"
+  if [ "$ACPX_NPM_REFRESH" = true ]; then
+    printf '%s\0' npm_config_prefer_offline=false npm_config_fetch_retries=0 npm_config_prefer_online=true
+  else
+    printf '%s\0' npm_config_prefer_offline=true npm_config_fetch_retries=0
+  fi
+  case "$1" in
+    # codex-acp ignores app-server CLI flags.
+    codex) printf '%s\0' "CODEX_PATH=$(command -v codex)" 'CODEX_CONFIG={"features":{"plugins":false}}' ;;
+    claude) printf '%s\0' "CLAUDE_CODE_EXECUTABLE=$5" ;;
+    antigravity) printf '%s\0' "GEMINI_HOME=$6" "ANTIGRAVITY_HARNESS_PATH=$(acpx_antigravity_helper)" ;;
+  esac
+  # Explicit --package avoids npx reusing a global binary that violates npm age policy.
+  printf '%s\0' npx -y --package "$(acpx_package_spec)" -- acpx --cwd "$2" --format json --mcp-config "$3" --timeout "$4"
 }
 
 acpx_agent_argv() {   # <route>
@@ -279,6 +358,21 @@ acpx_outcome() {   # <stream-log> -> end_turn | <other stopReason> | error | inc
   [ -n "$id" ] || { printf 'not-sent'; return 0; }
   outcome="$(jq -rR --argjson id "$id" 'fromjson? | select(.method == null and .id == $id) | if .error then "error" else (.result.stopReason // "error") end' "$1" 2>/dev/null | tail -1)"
   printf '%s' "${outcome:-incomplete}"
+}
+
+# Antigravity holds session/new open while it waits for a browser sign-in it
+# will never get, so a run without a usable login would otherwise sit out the
+# whole idle cap. Nothing has been sent while the session is pending.
+ACPX_SESSION_START_SECS="${CROSS_MODEL_SESSION_START_SECS:-60}"
+acpx_session_state() {   # <stream-log> -> starting | pending | open
+  local id
+  jq -eR 'fromjson? | select(.result.protocolVersion? != null)' "$1" >/dev/null 2>&1 || { printf 'starting'; return 0; }
+  id="$(jq -R 'fromjson? | select(.method == "session/new") | .id' "$1" 2>/dev/null | tail -1)"
+  if [ -n "$id" ] && jq -eR --argjson id "$id" 'fromjson? | select(.method == null and .id == $id)' "$1" >/dev/null 2>&1; then
+    printf 'open'
+  else
+    printf 'pending'
+  fi
 }
 
 acpx_text() {   # <stream-log> <outfile>: the agent's reply text
@@ -301,6 +395,36 @@ acpx_failure_evidence() {   # <stream-log>
   evidence="${evidence% }"
   [ "${#evidence}" -gt 300 ] && evidence="${evidence:0:147} ... ${evidence: -147}"
   printf '%s' "$evidence"
+}
+
+# codex-acp streams a provider rejection (such as a model the account may not
+# use) as reply text and still ends the turn with end_turn, so only the reply
+# carries it. Bounded inside jq so a long reply never enters a bash string.
+acpx_reply_evidence() {   # <stream-log>
+  jq -nrR '[inputs | fromjson? | select(.method == "session/update" and .params.update.sessionUpdate == "agent_message_chunk") | .params.update.content.text // empty]
+    | join("") | gsub("\\s+"; " ") | ltrimstr(" ") | rtrimstr(" ")
+    | if length > 300 then .[0:147] + " ... " + .[-147:] else . end' "$1" 2>/dev/null
+}
+
+acpx_advertised_models() {   # <stream-log>
+  jq -nrR '[inputs | fromjson? | .result.models.availableModels[]?.modelId | sub("\\[.*$"; "")]
+    | reduce .[] as $m ([]; if any(.[]; . == $m) then . else . + [$m] end)
+    | join(", ") | if length > 300 then .[0:296] + " ..." else . end' "$1" 2>/dev/null
+}
+
+# Exit 5 is acpx's permission refusal. Paired with stopReason cancelled, the
+# refusal ended the turn. Exit 5 with end_turn means the turn finished. A
+# cancelled turn with any other exit is an interrupt.
+acpx_permission_cancel_reason() {   # <stream-log> <exit-code>
+  [ "$(acpx_outcome "$1")" = cancelled ] && [ "$2" = 5 ] || return 0
+  printf '%s' "permission request cancelled the turn"
+}
+
+acpx_node_startup_line() {   # <stderr-log>
+  local line=""
+  line="$(grep -m1 -E '^Error ' "$1" 2>/dev/null)"
+  [ -n "$line" ] || line="$(grep -m1 -E '^node:' "$1" 2>/dev/null)"
+  printf '%s' "$line"
 }
 # --- end acpx transport -----------------------------------------------------
 
@@ -354,7 +478,7 @@ adapter_argv() {
     opencode) printf '%s\0' env OPENCODE_DISABLE_PROJECT_CONFIG=1 \
       'OPENCODE_CONFIG_CONTENT={"permission":{"edit":"deny","webfetch":"deny","websearch":"deny","task":"deny"}}' ;;
   esac
-  acpx_base_argv "$route" "$PEER_WORKDIR" "$MCP_CONFIG" "$HARD_SECS" "$CLAUDE_WRAPPER"
+  acpx_base_argv "$route" "$PEER_WORKDIR" "$MCP_CONFIG" "$HARD_SECS" "$CLAUDE_WRAPPER" "$GEMINI_HOME_DIR"
   printf '%s\0' --deny-all
   case "$route" in
     claude) printf '%s\0' --max-turns 15 ;;
@@ -368,7 +492,9 @@ adapter_argv() {
     claude)   printf '%s\0' --config-option mode=default --config-option "effort=$(route_effort claude)" ;;
     grok-cli) printf '%s\0' --config-option "reasoning_effort=$(route_effort grok-cli)" ;;
     grok-cursor|cursor|composer) printf '%s\0' --config-option mode=ask ;;
-    opencode) printf '%s\0' --config-option mode=plan ;;
+    opencode) printf '%s\0' --config-option mode=plan
+      [ -z "${CROSS_MODEL_EFFORT_OVERRIDE:-}" ] || printf '%s\0' --config-option "effort=$(route_effort opencode)" ;;
+    antigravity) printf '%s\0' --config-option mode=default --config-option "thinking_level=$(route_effort antigravity)" ;;
   esac
   printf '%s\0' --file "$PROMPT_FILE"
 }
@@ -387,7 +513,7 @@ validate_model_override() {
   [ "$override_target" = "$target" ] || return 0
   [ "$target" != "cursor" ] || return 1
   case "$route:$override" in
-    codex:gpt-*|codex:o[0-9]*|codex:*[./]gpt-*|codex:*[./]o[0-9]*|claude:fable|claude:opus|claude:sonnet|claude:haiku|claude:claude-*|grok-cli:grok-*|grok-cursor:grok-*|grok-cursor:cursor-grok-*|composer:composer-*|opencode:*/*) ;;
+    codex:gpt-*|codex:o[0-9]*|codex:*[./]gpt-*|codex:*[./]o[0-9]*|claude:fable|claude:opus|claude:sonnet|claude:haiku|claude:claude-*|grok-cli:grok-*|grok-cursor:grok-*|grok-cursor:cursor-grok-*|composer:composer-*|opencode:*/*|antigravity:gemini-*) ;;
     *) return 1 ;;
   esac
 }
@@ -395,12 +521,14 @@ validate_model_override() {
 # Accept an effort override only where the route's ACP adapter exposes an
 # effort option and the value is one it advertises (claude effort:
 # low|medium|high|xhigh|max; codex reasoning_effort: low|medium|high|xhigh|max|ultra;
-# grok reasoning_effort: low|medium|high|xhigh). Checked 2026-10-06 against the
+# grok reasoning_effort: low|medium|high|xhigh; antigravity thinking_level:
+# low|medium|high, checked 2026-10-14; opencode 2.x effort: none|low|medium|
+# high|xhigh|max, checked 2026-10-23). Checked 2026-10-06 against the
 # session options each adapter reports through acpx 0.19.4. Codex levels vary
-# per model, so a listed level can still be refused before the prompt is sent.
-# Cursor routes fix effort in the model preset and OpenCode exposes no effort
-# option over ACP, so any override there is invalid for the route rather than
-# silently dropped. Empty means "no override".
+# and OpenCode levels vary per model, and OpenCode 1.x has no effort option,
+# so a listed level can still be refused before the prompt is sent.
+# Cursor routes fix effort in the model preset, so any override there is
+# invalid for the route rather than silently dropped. Empty means "no override".
 validate_effort_override() {
   local route="$1" effort="${CROSS_MODEL_EFFORT_OVERRIDE:-}"
   [ -n "$effort" ] || return 0
@@ -408,6 +536,8 @@ validate_effort_override() {
     claude:low|claude:medium|claude:high|claude:xhigh|claude:max) ;;
     codex:low|codex:medium|codex:high|codex:xhigh|codex:max|codex:ultra) ;;
     grok-cli:low|grok-cli:medium|grok-cli:high|grok-cli:xhigh) ;;
+    antigravity:low|antigravity:medium|antigravity:high) ;;
+    opencode:none|opencode:low|opencode:medium|opencode:high|opencode:xhigh|opencode:max) ;;
     *) return 1 ;;
   esac
 }
@@ -415,14 +545,14 @@ validate_effort_override() {
 # --- --emit-adapter <route>: print the argv, no model call, no side effects --
 if [ "${1:-}" = "--emit-adapter" ]; then
   PEER_WORKDIR="<peer-workdir>"
-  PROMPT_FILE="<prompt-file>"; MCP_CONFIG="<mcp-config>"; CLAUDE_WRAPPER="<claude-safe-mode-wrapper>"
+  PROMPT_FILE="<prompt-file>"; MCP_CONFIG="<mcp-config>"; CLAUDE_WRAPPER="<claude-safe-mode-wrapper>"; GEMINI_HOME_DIR="<gemini-home>"
   HARD_SECS="${CROSS_MODEL_HARD_SECS:-1200}"
   route="${2:-}"
   validate_model_override "$route" 2>/dev/null || { echo "model override '${CROSS_MODEL_MODEL_OVERRIDE:-}' not compatible with route '$route'" >&2; exit 2; }
   validate_effort_override "$route" 2>/dev/null || { echo "effort override '${CROSS_MODEL_EFFORT_OVERRIDE:-}' not compatible with route '$route'" >&2; exit 2; }
   # adapter_argv emits NUL-delimited argv (can't be captured in a shell var), so
   # validate the route first, then render for humans with NUL -> space.
-  adapter_argv "$route" >/dev/null 2>&1 || { echo "unknown route '$route' (want codex|claude|grok-cli|grok-cursor|cursor|composer|opencode)" >&2; exit 2; }
+  adapter_argv "$route" >/dev/null 2>&1 || { echo "unknown route '$route' (want codex|claude|grok-cli|grok-cursor|cursor|composer|opencode|antigravity)" >&2; exit 2; }
   adapter_argv "$route" | tr '\0' ' '; echo
   exit 0
 fi
@@ -453,12 +583,12 @@ command -v jq >/dev/null 2>&1 || skip "jq not installed; skipping"
 # Validate the host identity tuple. An unknown serving family is allowed, but
 # normalization marks every result non-independent.
 case "$HOST_PROVIDER" in
-  codex|claude|grok|composer|unknown) ;;
-  *) skip "host serving family '${HOST_PROVIDER:-<empty>}' invalid (want codex|claude|grok|composer|unknown); skipping cross-model pass" ;;
+  codex|claude|grok|composer|gemini|unknown) ;;
+  *) skip "host serving family '${HOST_PROVIDER:-<empty>}' invalid (want codex|claude|grok|composer|gemini|unknown); skipping cross-model pass" ;;
 esac
 case "$HOST_HARNESS" in
-  codex|claude|grok|cursor|opencode|unknown) ;;
-  *) skip "host harness '$HOST_HARNESS' invalid (want codex|claude|grok|cursor|opencode|unknown); skipping cross-model pass" ;;
+  codex|claude|grok|cursor|opencode|antigravity|omp|unknown) ;;
+  *) skip "host harness '$HOST_HARNESS' invalid (want codex|claude|grok|cursor|opencode|antigravity|omp|unknown); skipping cross-model pass" ;;
 esac
 [ "$HOST_PROVIDER" != "unknown" ] || skip "host serving family unattested; automatic cross-model review skipped"
 
@@ -543,6 +673,7 @@ provider_available() {
     cursor)   command -v cursor-agent >/dev/null 2>&1 ;;
     composer) command -v cursor-agent >/dev/null 2>&1 ;;
     opencode) command -v opencode >/dev/null 2>&1 ;;
+    antigravity) command -v agy_acp_server.par >/dev/null 2>&1 ;;
     *) return 1 ;;
   esac
 }
@@ -559,8 +690,10 @@ OLDIFS="$IFS"; IFS=','
 for p in $CANDIDATES; do
   p="$(printf '%s' "$p" | tr -d '[:space:]')"
   [ -n "$p" ] || continue
-  case "$p" in codex|claude|grok|cursor|composer|opencode) ;; *) log "ignoring unknown target '$p' in candidates"; continue ;; esac
+  case "$p" in codex|claude|grok|cursor|composer|opencode|antigravity) ;; *) log "ignoring unknown target '$p' in candidates"; continue ;; esac
   [ "$HOST_PROVIDER" != "unknown" ] && [ "$(target_serving_family "$p")" = "$HOST_PROVIDER" ] && continue
+  # An Antigravity host can serve several families; never send it to itself.
+  [ "$p" = antigravity ] && [ "$HOST_HARNESS" = antigravity ] && continue
   case " $SELECTED " in *" $p "*) continue ;; esac   # dedup
   if [ -n "$ALLOW" ] && ! in_csv "$p" "$ALLOW"; then log "provider '$p' not in CROSS_MODEL_PEERS allowlist; skipping"; continue; fi
   if ! provider_available "$p"; then log "provider '$p' has no installed route; skipping"; continue; fi
@@ -570,7 +703,7 @@ IFS="$OLDIFS"
 SELECTED="$(printf '%s' "$SELECTED" | sed 's/^ *//')"
 
 [ "$MAX_PEERS" -ge 1 ] || skip "CROSS_MODEL_MAX_PEERS=0; cross-model pass disabled"
-[ -n "$SELECTED" ] || skip "no different-provider peer reachable (host=$HOST_PROVIDER, candidates='$CANDIDATES'); the pass needs a peer agent CLI on PATH (codex, claude, grok, cursor-agent, or opencode), not an API key alone; skipping"
+[ -n "$SELECTED" ] || skip "no different-provider peer reachable (host=$HOST_PROVIDER, candidates='$CANDIDATES'); the pass needs a peer agent CLI on PATH (codex, claude, grok, cursor-agent, opencode, or the Antigravity ACP runtime), not an API key alone; skipping"
 log "reachable cross-model candidates for lens $REVIEWER_NAME: $SELECTED (host $HOST_PROVIDER excluded; up to $MAX_PEERS successful peer(s))"
 
 # first_n <max> <space-separated list> -> the first <max> tokens.
@@ -613,6 +746,7 @@ TEXT_OUT="$SCRATCH/reply.txt"
 MCP_CONFIG="$SCRATCH/mcp.json"
 printf '{"mcpServers":[]}\n' > "$MCP_CONFIG"
 CLAUDE_WRAPPER=""
+GEMINI_HOME_DIR=""
 RUN_SUCCEEDED=false
 PROVIDER_OUTCOME="failed"
 # Basename only in the peer prompt: content is already embedded (KTD3). An absolute
@@ -625,6 +759,10 @@ DOC_BASENAME="$(basename "$DOC_PATH")"
   # to, so the peer calibrates like its in-process twin.
   [ -n "$OUTPUT_CONTRACT_RULES" ] && printf '%s\n\n' "$OUTPUT_CONTRACT_RULES"
   printf 'This is an authorized document review of the maintainer\047s own repository.\n'
+  # The whole document is embedded below. Say so, so a peer never goes looking for the
+  # prompt or the document on disk: a read outside its workspace is a permission
+  # request that is denied, and a peer that stops to explain the denial returns no JSON.
+  printf 'The complete document is embedded below under "Document content". Do not call tools or read files; if any read is denied, ignore it and answer from the embedded text.\n'
   printf 'Return ONE JSON object and nothing else (no prose, no code fence) matching this schema:\n\n'
   printf '%s' "$SCHEMA_CONTENT"
   printf '\n\nSet the top-level "reviewer" field to "%s" (it will be namespaced to the peer provider on fold-in).\n' "$REVIEWER_NAME"
@@ -638,6 +776,10 @@ DOC_BASENAME="$(basename "$DOC_PATH")"
   printf '\n</review-context>\n'
   [ -n "$CONTEXT_SLOT_RULES" ] && printf '\n%s\n' "$CONTEXT_SLOT_RULES"
 } > "$PROMPT_FILE"
+# codex-acp's only refusal option is cancel, which ends the turn.
+if [ "${CROSS_MODEL_FIXED_ROUTE:-}" = codex ]; then
+  printf '\nYour sandbox is read-only and no approval is available: never request escalated or out-of-sandbox permissions (for example to launch a browser, use the network, or write outside the repository). Any permission request ends this review with no result. When a check needs more access than the sandbox gives, reason from the source instead and name the unrun check in residual_risks.\n' >> "$PROMPT_FILE"
+fi
 chmod 600 "$PROMPT_FILE" "$MCP_CONFIG" 2>/dev/null || skip "cannot make peer scratch files private; skipping"
 
 # --- run machinery -----------------------------------------------------------
@@ -766,8 +908,9 @@ stop_heartbeat() {
   _HEARTBEAT_PID=""
 }
 
-run_peer_cmd() {   # CMD already built; streams to PEERLOG, diagnostics to PEERERR
+run_peer_cmd() {   # CMD already built for PEER_ROUTE; streams to PEERLOG, diagnostics to PEERERR
   local prev; case "$-" in *m*) prev=1;; *) prev=0;; esac
+  SESSION_STALLED=false
   set -m
   # Start npx from private scratch: npx resolves packages from its working
   # directory's node_modules and .npmrc first, and acpx gets the agent's cwd from --cwd.
@@ -776,7 +919,8 @@ run_peer_cmd() {   # CMD already built; streams to PEERLOG, diagnostics to PEERE
   ACTIVE_PEER_PID="$pid"
   [ "$prev" = 0 ] && set +m
   start_heartbeat
-  local start last=-1 lastchg now size
+  local start last=-1 lastchg now size session=open
+  [ "$PEER_ROUTE" = antigravity ] && session=starting
   start="$(date +%s)"; lastchg="$start"
   while peer_alive "$pid"; do
     now="$(date +%s)"; size="$(wc -c <"$PEERLOG" 2>/dev/null || echo 0)"
@@ -786,6 +930,13 @@ run_peer_cmd() {   # CMD already built; streams to PEERLOG, diagnostics to PEERE
     fi
     if [ $(( now - start )) -ge "$HARD_SECS" ]; then
       log "peer exceeded hard cap ${HARD_SECS}s; reaping peer process group"; reap "$pid"; break
+    fi
+    if [ "$session" != open ] && [ $(( now - start )) -ge "$ACPX_SESSION_START_SECS" ]; then
+      session="$(acpx_session_state "$PEERLOG")"
+      if [ "$session" = pending ]; then
+        SESSION_STALLED=true
+        log "Antigravity opened no session within ${ACPX_SESSION_START_SECS}s; reaping peer process group"; reap "$pid"; break
+      fi
     fi
     sleep 1
   done
@@ -901,16 +1052,27 @@ provider_overloaded() {
 }
 
 # Run one route for a provider; leaves a schema-shaped (pre-normalization) $RAW_OUT on success.
-# Success is the prompt's own end_turn result: acpx exits 5 when a permission
-# request was denied even though the turn completed, and exits 0 on a cancelled one.
+# Success is the prompt's own end_turn result, not acpx's exit status.
 attempt_route() {   # <provider> <route>
-  local provider="$1" route="$2" outcome reason
+  local provider="$1" route="$2" outcome reason started remaining node_line cancel_reason
   : > "$PEERLOG"; : > "$PEERERR"; rm -f "$RAW_OUT" "$OUT" "$TEXT_OUT"
   RUN_SUCCEEDED=false
   PROVIDER_OUTCOME="failed"
   build_cmd "$route"
-  log "peer run: provider=$provider route=$route model=$(route_model "$route") (effort $(route_effort "$route")) transport=acpx@$ACPX_VERSION lens=$REVIEWER_NAME read-only least-privilege (idle ${IDLE_SECS}s / hard ${HARD_SECS}s); full document content egresses to this provider via this route"
+  PEER_ROUTE="$route"
+  log "peer run: provider=$provider route=$route model=$(route_model "$route") (effort $(route_effort "$route")) transport=$(acpx_package_spec) lens=$REVIEWER_NAME read-only least-privilege (idle ${IDLE_SECS}s / hard ${HARD_SECS}s); full document content egresses to this provider via this route"
+  started="$(date +%s)"
   run_peer_cmd
+  if acpx_npm_resolution_retryable "$PEERERR" "$PEERLOG" && [ "$(acpx_outcome "$PEERLOG")" = not-sent ]; then
+    remaining=$(( HARD_SECS - ( $(date +%s) - started ) ))
+    if [ "$remaining" -gt 0 ]; then
+      log "npm could not resolve a package; retrying the same route once with fresh metadata in the ${remaining}s left (nothing was sent; npm policy unchanged)"
+      ACPX_NPM_REFRESH=true
+      HARD_SECS="$remaining"
+      build_cmd "$route"
+      run_peer_cmd
+    fi
+  fi
   outcome="$(acpx_outcome "$PEERLOG")"
   case "$outcome" in
     end_turn)
@@ -922,19 +1084,32 @@ attempt_route() {   # <provider> <route>
     not-sent)
       # Nothing reached the provider: npm could not fetch acpx (every route
       # fails alike), or the adapter refused before the prompt (this route only).
-      reason="$(grep -m1 '^npm error' "$PEERERR" 2>/dev/null)"
+      reason="$(acpx_npm_failure_reason "$PEERERR")"
       if [ -n "$reason" ]; then
         PRE_EGRESS="transport unavailable (pre-egress, shared): ${reason:0:200}"
+      elif [ "$SESSION_STALLED" = true ]; then
+        PRE_EGRESS="transport unavailable (pre-egress, route): Antigravity is waiting for a Google sign-in; the agy CLI's sign-in does not carry over, so sign the ACP runtime in once: put {\"auth\":{\"type\":\"oauth-personal\"}} in ${GEMINI_HOME:-~/.gemini}/antigravity-acp/settings.json, run npx -y --package '$(acpx_package_spec)' -- acpx antigravity exec ok in a terminal and finish the browser sign-in, then retry"
       else
-        reason="$(acpx_failure_evidence "$PEERLOG")"
-        PRE_EGRESS="transport unavailable (pre-egress, route): ${reason:-acpx exited $PEER_EXIT before sending the prompt}"
+        node_line="$(acpx_node_startup_line "$PEERERR")"
+        if [ -n "$node_line" ]; then
+          PRE_EGRESS="transport unavailable (pre-egress, route): ${node_line:0:200}"
+        else
+          reason="$(acpx_npm_failure_reason "$PEERLOG")"
+          [ -n "$reason" ] || reason="$(acpx_failure_evidence "$PEERLOG")"
+          PRE_EGRESS="transport unavailable (pre-egress, route): ${reason:-acpx exited $PEER_EXIT before sending the prompt}"
+        fi
       fi
       ;;
     *)
       if [ "$outcome" = error ] && jq -eR 'fromjson? | select(.error.data.errorKind? == "overloaded")' "$PEERLOG" >/dev/null 2>&1; then
         PROVIDER_OUTCOME="overloaded"
       fi
-      log "peer run ended with $outcome (acpx exit $PEER_EXIT)"
+      cancel_reason="$(acpx_permission_cancel_reason "$PEERLOG" "$PEER_EXIT")"
+      if [ -n "$cancel_reason" ]; then
+        log "peer run ended: $cancel_reason (acpx exit $PEER_EXIT)"
+      else
+        log "peer run ended with $outcome (acpx exit $PEER_EXIT)"
+      fi
       ;;
   esac
 }
@@ -968,6 +1143,9 @@ run_provider() {   # <provider>
   if [ "$primary" = claude ]; then
     CLAUDE_WRAPPER="$(acpx_claude_wrapper "$SCRATCH")" || { log "transport unavailable (pre-egress, route): cannot prepare the Claude --safe-mode launcher"; rm -f "$OUT"; return 0; }
   fi
+  if [ "$primary" = antigravity ]; then
+    GEMINI_HOME_DIR="$(acpx_antigravity_home "$SCRATCH")" || { log "transport unavailable (pre-egress, route): cannot prepare a private Antigravity home"; rm -f "$OUT"; return 0; }
+  fi
   # Track the route that actually produced the fold-in, so the artifact records
   # whether a grok return went out directly (grok-cli -> xAI) or through Cursor
   # (grok-cursor -> Cursor also received the full document). The <lens>-<provider>
@@ -976,6 +1154,23 @@ run_provider() {   # <provider>
   provider_deadline=$(( $(date +%s) + HARD_SECS ))
   PRE_EGRESS=""
   attempt_route "$provider" "$primary"
+  # A configured model is exact; only the editorial Argon request falls back.
+  if [ "$primary" = antigravity ] && [ "$(route_model antigravity)" = "$M_ANTIGRAVITY" ] &&
+     [ "${CROSS_MODEL_MODEL_OVERRIDE_TARGET:-}" != antigravity ]; then
+    case "$PRE_EGRESS" in
+      *"did not advertise"*)
+        # The fallback shares the original deadline, as the overload retry does.
+        remaining=$(( provider_deadline - $(date +%s) ))
+        if [ "$remaining" -gt 0 ]; then
+          log "Antigravity does not offer $M_ANTIGRAVITY on this account; falling back to $M_ANTIGRAVITY_FALLBACK"
+          ANTIGRAVITY_MODEL="$M_ANTIGRAVITY_FALLBACK"
+          PRE_EGRESS=""
+          HARD_SECS="$remaining"
+          attempt_route "$provider" "$primary"
+        fi
+        ;;
+    esac
+  fi
   if [ -n "$PRE_EGRESS" ]; then
     log "$PRE_EGRESS"
     rm -f "$OUT"
@@ -1056,9 +1251,14 @@ run_provider() {   # <provider>
     # empty review) and, in a repeated-pass session, deprioritize an exhausted
     # route. Harness-agnostic: the agent classifies from the text; this only makes
     # the evidence visible in out.log. Provider errors arrive as ACP error
-    # messages on stdout; npm and adapter diagnostics on stderr.
-    _pt="$(acpx_failure_evidence "$PEERLOG")"
+    # messages or as reply text on stdout; npm and adapter diagnostics on stderr.
+    _pt="$(acpx_permission_cancel_reason "$PEERLOG" "$PEER_EXIT")"
+    [ -n "$_pt" ] || _pt="$(acpx_failure_evidence "$PEERLOG")"
     [ -n "$_pt" ] && log "  peer skip evidence: $_pt"
+    _pr="$(acpx_reply_evidence "$PEERLOG")"
+    [ -n "$_pr" ] && log "  peer skip evidence (reply): $_pr"
+    _pm="$(acpx_advertised_models "$PEERLOG")"
+    [ -n "$_pm" ] && log "  peer skip evidence (advertised models): $_pm"
     if [ -s "$PEERERR" ]; then
       _pe="$(bounded_failure_evidence "$PEERERR")"
       log "  peer skip evidence (stderr): $_pe"

@@ -153,10 +153,12 @@ const WORKFLOW_DEFINITIONS = {
   },
   "ce-simplify-code": {
     stages: {
-      "reviewer-analysis": stage("skills/ce-simplify-code/SKILL.md", "Dispatch three generic subagents", {
-        "code-reuse-reviewer": promptRole("skills/ce-simplify-code/references/personas/code-reuse-reviewer.md", { activation: "always", modelTier: "mid", required: true }),
-        "code-quality-reviewer": promptRole("skills/ce-simplify-code/references/personas/code-quality-reviewer.md", { activation: "always", modelTier: "mid", required: true }),
-        "efficiency-reviewer": promptRole("skills/ce-simplify-code/references/personas/efficiency-reviewer.md", { activation: "always", modelTier: "mid", required: true }),
+      "reviewer-analysis": stage("skills/ce-simplify-code/SKILL.md", "Dispatch generic subagents", {
+        "code-reuse-reviewer": promptRole("skills/ce-simplify-code/references/personas/code-reuse-reviewer.md", { activation: "conditional", modelTier: "mid", required: true }),
+        "code-quality-reviewer": promptRole("skills/ce-simplify-code/references/personas/code-quality-reviewer.md", { activation: "conditional", modelTier: "mid", required: true }),
+        "efficiency-reviewer": promptRole("skills/ce-simplify-code/references/personas/efficiency-reviewer.md", { activation: "conditional", modelTier: "mid", required: true }),
+        "test-value-reviewer": promptRole("skills/ce-simplify-code/references/personas/test-value-reviewer.md", { modelTier: "mid", required: true }),
+        "comment-reviewer": promptRole("skills/ce-simplify-code/references/personas/comment-reviewer.md", { modelTier: "mid", required: true }),
       }),
     },
   },

@@ -1,13 +1,13 @@
 {
   "identities": {
-    "ceVersion": "3.30.5",
-    "integrationVersion": "3.30.5-orca.7",
+    "ceVersion": "3.33.2",
+    "integrationVersion": "3.33.2-orca.7",
     "protocolVersion": "orca.local-protocol/v1",
-    "registryVersion": "ce-orca.registry/v1@3.30.5-orca.7",
+    "registryVersion": "ce-orca.registry/v1@3.33.2-orca.7",
     "requestVersion": "orca.execution-config/v1"
   },
   "schema": "ce-orca.role-registry/v1",
-  "version": "ce-orca.registry/v1@3.30.5-orca.7",
+  "version": "ce-orca.registry/v1@3.33.2-orca.7",
   "workflows": {
     "ce-simplify-code": {
       "controller": "ce-controller",
@@ -16,13 +16,13 @@
       "stages": {
         "reviewer-analysis": {
           "activation": "always",
-          "anchor": "Dispatch three generic subagents",
+          "anchor": "Dispatch generic subagents",
           "defaultOwner": "orca",
           "mutation": "read-only",
           "resultMode": "structured",
           "roles": {
             "code-quality-reviewer": {
-              "activation": "always",
+              "activation": "conditional",
               "modelTier": "mid",
               "mutation": "read-only",
               "required": true,
@@ -31,7 +31,7 @@
               "sourcePath": "references/personas/code-quality-reviewer.md"
             },
             "code-reuse-reviewer": {
-              "activation": "always",
+              "activation": "conditional",
               "modelTier": "mid",
               "mutation": "read-only",
               "required": true,
@@ -39,14 +39,32 @@
               "sourceKind": "prompt-asset",
               "sourcePath": "references/personas/code-reuse-reviewer.md"
             },
+            "comment-reviewer": {
+              "activation": "conditional",
+              "modelTier": "mid",
+              "mutation": "read-only",
+              "required": true,
+              "resultMode": "structured",
+              "sourceKind": "prompt-asset",
+              "sourcePath": "references/personas/comment-reviewer.md"
+            },
             "efficiency-reviewer": {
-              "activation": "always",
+              "activation": "conditional",
               "modelTier": "mid",
               "mutation": "read-only",
               "required": true,
               "resultMode": "structured",
               "sourceKind": "prompt-asset",
               "sourcePath": "references/personas/efficiency-reviewer.md"
+            },
+            "test-value-reviewer": {
+              "activation": "conditional",
+              "modelTier": "mid",
+              "mutation": "read-only",
+              "required": true,
+              "resultMode": "structured",
+              "sourceKind": "prompt-asset",
+              "sourcePath": "references/personas/test-value-reviewer.md"
             }
           },
           "sourcePath": "SKILL.md"

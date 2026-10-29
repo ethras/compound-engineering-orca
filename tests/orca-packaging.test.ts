@@ -194,7 +194,7 @@ describe("CE-Orca packaging", () => {
     })
     expect(JSON.parse(stdout)).toEqual({
       name: "compound-engineering-orca",
-      version: "3.30.5-orca.7",
+      version: "3.33.2-orca.7",
       upstream,
       integrationRevision: 7,
       orca: {

@@ -140,6 +140,34 @@ describe("CE-Orca first-wave read adapters", () => {
     await expect(fs.stat(prompts)).rejects.toMatchObject({ code: "ENOENT" })
   })
 
+  test.each([
+    ["tests", "test-value-reviewer"],
+    ["comments", "comment-reviewer"],
+  ])("builds and fails closed for a focused %s reviewer", async (id, role) => {
+    const directory = await runDir()
+    const prompts = path.join(directory, "prompts")
+    await fs.mkdir(prompts)
+    await fs.writeFile(path.join(prompts, `${id}.txt`), `Review ${id}`)
+    const packet = await simplify.buildReviewPacketFromDirectory(prompts)
+    expect(packet.nodes.map((node) => node.role)).toEqual([role])
+    const result = await simplify.executeReadWorkflow({ engine: fakeEngine({}), packet, runDir: directory })
+    expect(result.status).toBe("failed")
+    expect(result.failures[0].role).toBe(role)
+  })
+
+  test("includes conditional tests and comments with the complete core roster", async () => {
+    const directory = await runDir()
+    const prompts = path.join(directory, "prompts")
+    await fs.mkdir(prompts)
+    for (const id of ["reuse", "quality", "efficiency", "tests", "comments"]) {
+      await fs.writeFile(path.join(prompts, `${id}.txt`), `Review ${id}`)
+    }
+    const packet = await simplify.buildReviewPacketFromDirectory(prompts)
+    expect(packet.nodes).toHaveLength(5)
+    await expect(simplify.buildReviewPacketFromDirectory(path.join(directory, "missing")))
+      .rejects.toThrow("non-empty array")
+  })
+
   test("bounds simplification prompt sources and writes through an unpredictable private temporary", async () => {
     const directory = await runDir()
     const prompts = path.join(directory, "prompts")
@@ -358,7 +386,7 @@ describe("CE-Orca first-wave read adapters", () => {
       id: "reuse",
       stage: "reviewer-analysis",
       role: "code-reuse-reviewer",
-    }]))).toThrow("exactly the three installed simplification roles")
+    }]))).toThrow("the complete core roster or one focused tests/comments reviewer")
 
     const finder = packetFor(compound, [{
       id: "related",
@@ -726,7 +754,7 @@ export async function integrateChange(change) {
     const checks = [
       ["ce-plan/references", "ce-plan.read-analysis", "All specialist research and deepening prompts used in this phase are skill-local prompt assets", "research.md"],
       ["ce-code-review/references", "ce-code-review.persona-dispatch", "### Stage 4: Spawn sub-agents", "dispatch-reviewers.md"],
-      ["ce-simplify-code", "ce-simplify-code.reviewer-analysis", "Dispatch three generic subagents"],
+      ["ce-simplify-code", "ce-simplify-code.reviewer-analysis", "Dispatch generic subagents"],
       ["ce-debug/references", "ce-debug.hypothesis-investigation", "### Phase 1: Investigate", "investigate.md"],
       ["ce-compound/references", "ce-compound.research-dispatch", "You classify the learning and draft its body in this context", "research.md"],
     ]
@@ -736,7 +764,10 @@ export async function integrateChange(change) {
       expect(skill).toContain(`<!-- ce-orca-hook:start ${hook} -->`)
       expect(skill).toContain(`<!-- ce-orca-hook:end ${hook} -->`)
       expect(skill).toContain(nativeText)
-      expect(skill).toContain("references/orca-routing.md")
+      const routing = skillName === "ce-simplify-code"
+        ? await fs.readFile(path.join(REPO_ROOT, "skills/ce-simplify-code/references/orca-delegation.md"), "utf8")
+        : skill
+      expect(routing).toContain("references/orca-routing.md")
     }
   })
 

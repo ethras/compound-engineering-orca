@@ -36,9 +36,9 @@ describe("CE-Orca role registry", () => {
     expect(registry.schema).toBe("ce-orca.role-registry/v1")
     expect(Object.keys(registry.workflows).sort()).toEqual(firstWaveWorkflowIds())
     expect(registry.identities).toEqual({
-      ceVersion: "3.30.5",
-      integrationVersion: "3.30.5-orca.7",
-      registryVersion: "ce-orca.registry/v1@3.30.5-orca.7",
+      ceVersion: "3.33.2",
+      integrationVersion: "3.33.2-orca.7",
+      registryVersion: "ce-orca.registry/v1@3.33.2-orca.7",
       protocolVersion: "orca.local-protocol/v1",
       requestVersion: "orca.execution-config/v1",
     })
@@ -142,6 +142,8 @@ describe("CE-Orca role registry", () => {
 
     const simplifyRoles = registry.workflows["ce-simplify-code"].stages["reviewer-analysis"].roles
     expect(Object.values<any>(simplifyRoles).map((role) => role.modelTier)).toEqual([
+      "mid",
+      "mid",
       "mid",
       "mid",
       "mid",

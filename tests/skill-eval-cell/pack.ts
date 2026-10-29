@@ -19,7 +19,7 @@ import {
 import { arg, flag } from "./cli"
 import { REPO_ROOT } from "./extract"
 import { gradeArm, type EvalArm } from "./grade"
-import { PACK_SCHEMA_VERSION, graderFingerprint, prepareOutput, valueHash, verifyEvidence, verifyWorkspaceGradePaths, writeJSON } from "./provenance"
+import { PACK_SCHEMA_VERSION, graderFingerprint, prepareOutput, valueHash, verifyEvidence, verifyWorkspaceGradePaths, workspaceGradePaths, writeJSON } from "./provenance"
 
 type Arm = EvalArm | "ab"
 
@@ -69,8 +69,10 @@ function runCell(scenario: Scenario, arm: EvalArm, out: string, hosts?: string) 
   ]
   if (scenario.read_only) argv.push("--read-only")
   if (scenario.git_init) argv.push("--git-init")
+  if (scenario.with_skill?.length) argv.push("--with-skill", scenario.with_skill.join(","))
   if (scenario.git_untracked?.length) argv.push("--git-untracked", scenario.git_untracked.join(","))
   if (scenario.git_staged?.length) argv.push("--git-staged", scenario.git_staged.join(","))
+  if (scenario.git_deleted?.length) argv.push("--git-deleted", scenario.git_deleted.join(","))
   if (scenario.git_remote) argv.push("--git-remote")
   if (scenario.shim_git_push) {
     argv.push("--shim-git-push")
@@ -86,6 +88,7 @@ function runCell(scenario: Scenario, arm: EvalArm, out: string, hosts?: string) 
   if (hosts) argv.push("--hosts", hosts)
   const r = spawnSync(argv[0], argv.slice(1), {
     cwd: REPO_ROOT,
+    env: { ...process.env, ...scenario.env },
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
   })
@@ -216,7 +219,7 @@ function main() {
       ;(row.arms as Record<string, unknown>)[arm] = info
       writeJSON(packPath, pack)
       try {
-        verifyWorkspaceGradePaths((snapshot.grade.workspace_contains ?? []).map((check) => check.path))
+        verifyWorkspaceGradePaths(workspaceGradePaths(snapshot.grade))
         info.summary = runCell(snapshot, arm, out, hosts)
         verifyEvidence(out)
         info.evidence_sha256 = valueHash(JSON.parse(fs.readFileSync(path.join(out, "evidence-manifest.json"), "utf8")))

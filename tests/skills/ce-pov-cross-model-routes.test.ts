@@ -14,8 +14,8 @@ import {
 } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
-import { ACPX_PIN } from "../helpers/acpx-pin"
-import { alive } from "../helpers/process"
+import { ACPX_PIN, ACPX_RANGE } from "../helpers/acpx-pin"
+import { survivors } from "../helpers/process"
 
 setDefaultTimeout(30_000)
 
@@ -30,7 +30,7 @@ afterAll(() => roots.forEach((dir) => rmSync(dir, { recursive: true, force: true
 const SCRIPT = path.join(__dirname, "../../skills/ce-pov/scripts/cross-model-pov.sh")
 const STUB_NPX = path.join(__dirname, "../fixtures/acp-stub-npx.sh")
 const STREAMS = path.join(__dirname, "../fixtures/acpx-streams")
-const ROUTES = ["codex", "claude", "grok-cli", "grok-cursor", "cursor", "composer", "opencode"] as const
+const ROUTES = ["codex", "claude", "grok-cli", "grok-cursor", "cursor", "composer", "opencode", "antigravity"] as const
 const ROUTE_BIN: Record<string, string> = {
   codex: "codex",
   claude: "claude",
@@ -277,7 +277,7 @@ describe("ce-pov cross-model route safety", () => {
     ["opencode", "--non-interactive-permissions deny --agent", ["opencode acp exec --config-option mode=plan"]],
   ])("--emit-adapter %s launches pinned acpx with the route's agent, model, and read-only options", (route, agent, options) => {
     const command = emit(route)
-    expect(command).toContain(`npx -y acpx@${ACPX_PIN} --cwd <read-root> --format json --mcp-config <mcp-config> --timeout 600`)
+    expect(command).toContain(`npx -y --package ${ACPX_RANGE} -- acpx --cwd <read-root> --format json --mcp-config <mcp-config> --timeout 600`)
     expect(command).toContain("env npm_config_prefer_offline=true npm_config_fetch_retries=0")
     expect(command).toContain("--approve-reads --non-interactive-permissions deny")
     expect(command).toContain(agent)
@@ -563,6 +563,15 @@ describe("ce-pov output gate and receipts", () => {
     expect(result.stderr).toContain("peer skip evidence: stopReason=cancelled")
   })
 
+  test("a cancelled turn after a refused permission names that refusal", () => {
+    const sb = sandbox(["codex"], acpStream({ text: pov(), stopReason: "cancelled", exit: 5 }))
+    const dir = runDir()
+    const result = run(["claude", "codex", payload(), dir], dir, sb.env)
+    expect(result.files).not.toContain("pov-codex.json")
+    expect(result.stderr).toContain("peer skip evidence: permission request cancelled the turn")
+    expect(result.stderr).not.toContain("peer skip evidence: stopReason=cancelled")
+  })
+
   test.each([
     ["prompt-error", "stub agent failure"],
     ["timeout", "Timed out after 2000ms"],
@@ -575,6 +584,15 @@ describe("ce-pov output gate and receipts", () => {
     expect(result.files).not.toContain("pov-codex.json")
     expect(result.stderr).toContain(`peer skip evidence: ${evidence}`)
     expect(result.stderr).not.toContain("pre-egress")
+  })
+
+  test("a model the provider rejects in reply text is named in skip evidence with the advertised models", () => {
+    const sb = sandbox(["codex"], path.join(STREAMS, "model-rejected-end-turn"))
+    const dir = runDir()
+    const result = run(["claude", "codex", payload(), dir], dir, sb.env)
+    expect(result.files).not.toContain("pov-codex.json")
+    expect(result.stderr).toContain("The 'gpt-6-luna' model is not supported when using Codex with a ChatGPT account.")
+    expect(result.stderr).toContain("peer skip evidence (advertised models): gpt-6.1-sol, gpt-6-sol, gpt-6-luna, gpt-5.6-sol")
   })
 
   test.each([
@@ -624,7 +642,7 @@ describe("ce-pov output gate and receipts", () => {
     expect(readdirSync(scratchParent)).toEqual([])
   })
 
-  test("a peer still running at the hard cap is reaped with its whole process group", () => {
+  test("a peer still running at the hard cap is reaped with its whole process group", async () => {
     const sb = sandbox(["codex"], acpStream({ text: "working", stopReason: null, sleep: 30 }))
     const dir = runDir()
     const started = Date.now()
@@ -634,10 +652,10 @@ describe("ce-pov output gate and receipts", () => {
     expect(result.files).not.toContain("pov-codex.json")
     const pids = readFileSync(sb.logs.pids, "utf8").trim().split("\n").map(Number)
     expect(pids).toHaveLength(2)
-    for (const pid of pids) expect(alive(pid)).toBe(false)
+    expect(await survivors(pids)).toEqual([])
   })
 
-  test("without ps -o (Git Bash), the idle guard still reaps a silent peer", () => {
+  test("without ps -o (Git Bash), the idle guard still reaps a silent peer", async () => {
     const sb = sandbox(["codex"], acpStream({ text: "working", stopReason: null, sleep: 30 }))
     const realPs = realTools().find(([tool]) => tool === "ps")?.[1]
     expect(realPs).toBeTruthy()
@@ -648,7 +666,7 @@ describe("ce-pov output gate and receipts", () => {
     expect(Date.now() - started).toBeLessThan(15_000)
     expect(result.stderr).toContain("peer output idle 2s")
     const pids = readFileSync(sb.logs.pids, "utf8").trim().split("\n").map(Number)
-    for (const pid of pids) expect(alive(pid)).toBe(false)
+    expect(await survivors(pids)).toEqual([])
   })
 
   test("opencode on native Windows is a route pre-egress failure and acpx is never called", () => {
@@ -737,11 +755,12 @@ describe("ce-pov acpx transport preflight and launch", () => {
     expect(log).toContain("CODEX_PATH=<unset>")
   })
 
-  test("the codex route points the adapter at the installed codex CLI", () => {
+  test("the codex route points the adapter at the installed codex CLI with the user's plugins disabled (issue #1788)", () => {
     const sb = sandbox(["codex"])
     const dir = runDir()
-    run(["claude", "codex", payload(), dir], dir, sb.env)
+    run(["claude", "codex", payload(), dir], dir, { ...sb.env, CODEX_CONFIG: '{"features":{"plugins":true}}' })
     expect(envLog(sb)).toContain(`CODEX_PATH=${path.join(sb.bin, "codex")}\n`)
+    expect(envLog(sb)).toContain('CODEX_CONFIG={"features":{"plugins":false}}\n')
     expect(envLog(sb)).toContain("npm_config_prefer_offline=true\nnpm_config_fetch_retries=0\n")
   })
 
@@ -751,7 +770,72 @@ describe("ce-pov acpx transport preflight and launch", () => {
     const result = run(["claude", "codex", payload(), dir], dir, sb.env)
     expect(result.code).toBe(0)
     expect(result.stderr).toContain("transport unavailable (pre-egress, shared): npm error code ECONNREFUSED")
+    expect(calls(sb)).toBe(1)
     expect(result.files).toEqual([])
+  })
+
+  test("the first line of a Node startup error is the pre-egress reason", () => {
+    const base = path.join(temp("pov-node-"), "s")
+    const line = "Error [ERR_MODULE_NOT_FOUND]: Cannot find module '@openclaw/fs-safe/dist/advanced.js'"
+    writeFileSync(`${base}.stderr`, `node:internal/modules/esm/resolve:275\n${line}\n    at Function._resolveFilename (node:internal/modules/cjs/loader:1207:15)\n`)
+    writeFileSync(`${base}.exit`, "1\n")
+    const sb = sandbox(["codex"], base)
+    const dir = runDir()
+    const result = run(["claude", "codex", payload(), dir], dir, sb.env)
+    expect(result.stderr).toContain(`transport unavailable (pre-egress, route): ${line}`)
+    expect(result.stderr).not.toContain("acpx exited 1 before sending the prompt")
+    expect(result.files).toEqual([])
+  })
+
+  test.each(ROUTES.filter((route) => route in ROUTE_BIN))("only the codex prompt rules out escalation requests (%s)", (route) => {
+    const sb = sandbox([ROUTE_BIN[route]])
+    const dir = runDir()
+    const host = route === "claude" ? "codex" : "claude"
+    const result = run([host, route, payload(), dir], dir, sb.env)
+    expect(result.files.some((file) => file.startsWith("pov-"))).toBe(true)
+    const sent = readFileSync(`${sb.logs.prompt}.1`, "utf8")
+    const rule = "never request escalated or out-of-sandbox permissions"
+    if (route === "codex") {
+      expect(sent).toContain(rule)
+      expect(sent).toContain("name the unrun check in reasoning")
+      expect(sent).not.toContain("name the unrun check in residual_risks")
+    } else {
+      expect(sent).not.toContain(rule)
+    }
+  })
+
+  test.each([["npm-release-age", "shared"], ["npm-release-age-adapter", "route"]])("%s reports the date cutoff after one policy-respecting refresh (%s)", (stream, scope) => {
+    const sb = sandbox(["codex"], path.join(STREAMS, stream))
+    const dir = runDir()
+    const r = run(["claude", "codex", payload(), dir], dir, sb.env)
+    expect(calls(sb)).toBe(2)
+    expect(r.stderr).toContain(`transport unavailable (pre-egress, ${scope}): npm could not resolve ${ACPX_RANGE}`)
+    expect(r.stderr).toContain("check min-release-age/before policy or wait for the cooldown")
+    expect(r.stderr).not.toContain("stale cached")
+    expect(r.stderr).toContain("npm policy unchanged")
+    expect(r.files).toEqual([])
+  })
+
+  test("an npm resolve on stale cached metadata retries the same route once with fresh metadata", () => {
+    const base = path.join(temp("pov-stale-"), "s")
+    for (const ext of ["stderr", "exit"]) writeFileSync(`${base}.1.${ext}`, readFileSync(path.join(STREAMS, `stale-npm-metadata.${ext}`)))
+    acpStream({ text: pov() }, `${base}.2`)
+    const sb = sandbox(["codex"], base)
+    const dir = runDir()
+    const r = run(["claude", "codex", payload(), dir], dir, sb.env)
+    expect(calls(sb)).toBe(2)
+    expect(r.files).toContain("pov-codex.json")
+    expect(envLog(sb)).toContain("npm_config_prefer_offline=false\nnpm_config_fetch_retries=0\nnpm_config_prefer_online=true\n")
+    expect(r.stderr).not.toContain("transport unavailable")
+  })
+
+  test("stale-metadata text after the prompt was sent is not retried", () => {
+    const sb = sandbox(["codex"], acpStream({ error: "No matching version found", stderr: readFileSync(path.join(STREAMS, "stale-npm-metadata.stderr"), "utf8"), exit: 1 }))
+    const dir = runDir()
+    const r = run(["claude", "codex", payload(), dir], dir, sb.env)
+    expect(calls(sb)).toBe(1)
+    expect(envLog(sb)).toContain("npm_config_prefer_offline=true\n")
+    expect(r.files).not.toContain("pov-codex.json")
   })
 
   test("an unknown model is a route pre-egress failure naming the available models", () => {
@@ -762,6 +846,122 @@ describe("ce-pov acpx transport preflight and launch", () => {
     expect(result.stderr).toMatch(/transport unavailable \(pre-egress, route\): Cannot apply --model .*Available models: stub-model-a, stub-model-b/)
     expect(calls(sb)).toBe(1)
     expect(result.files).toEqual([])
+  })
+})
+
+const ANTIGRAVITY_BINS = ["agy_acp_server.par", "localharness_external"]
+// What acpx@0.19.4 prints when --model names a model the session did not
+// advertise: the session opens, then the run ends before any prompt is sent.
+function unadvertisedStream(model: string, available: string, base: string) {
+  const rpc = (body: Record<string, unknown>) => JSON.stringify({ jsonrpc: "2.0", ...body })
+  writeFileSync(`${base}.stdout`, [
+    rpc({ id: 0, method: "initialize", params: { protocolVersion: 1 } }),
+    rpc({ id: 0, result: { protocolVersion: 1, authMethods: [] } }),
+    rpc({ id: 1, method: "session/new", params: { cwd: "/tmp/cwd", mcpServers: [] } }),
+    rpc({ id: 1, result: { sessionId: "stub-session-1" } }),
+    rpc({ id: null, error: { code: -32603, message: `Cannot apply --model "${model}": the ACP agent did not advertise that model. Available models: ${available}.`, data: { acpxCode: "RUNTIME" } } }),
+  ].join("\n") + "\n")
+  writeFileSync(`${base}.exit`, "1\n")
+  return base
+}
+// The stub overwrites its argv log per call; this wrapper keeps each call's --model.
+function logModelsPerCall(sb: Sandbox) {
+  const log = path.join(path.dirname(sb.bin), "npx-models.log")
+  replaceTool(sb.bin, "npx", `#!/bin/sh\nprev=""\nfor a in "$@"; do [ "$prev" = "--model" ] && printf '%s\\n' "$a" >> "${log}"; prev="$a"; done\nexec "${STUB_NPX}" "$@"\n`)
+  return () => existsSync(log) ? readFileSync(log, "utf8").split("\n").slice(0, -1) : []
+}
+
+describe("ce-pov antigravity route", () => {
+  test("--emit-adapter antigravity requests Argon read-only at thinking_level=high with a private GEMINI_HOME", () => {
+    const command = emit("antigravity")
+    expect(command).toContain(`npx -y --package ${ACPX_RANGE} -- acpx --cwd`)
+    expect(command).toStartWith("env -u GEMINI_API_KEY -u GOOGLE_API_KEY")
+    expect(command).toContain("GEMINI_HOME=<gemini-home>")
+    expect(command).toContain("--approve-reads --non-interactive-permissions deny --model gemini-4-argon antigravity exec --config-option mode=default --config-option thinking_level=high")
+  })
+
+  test("Argon unoffered falls back to Flash, and the non-final retry reuses Flash without another Argon attempt", () => {
+    const base = path.join(temp("pov-stream-"), "s")
+    unadvertisedStream("gemini-4-argon", "gemini-3.8-flash", `${base}.1`)
+    acpStream({ text: pov({ position: "pending: reading the tree", final: false }) }, `${base}.2`)
+    acpStream({ text: pov() }, `${base}.3`)
+    const sb = sandbox(ANTIGRAVITY_BINS, base)
+    const models = logModelsPerCall(sb)
+    const dir = runDir()
+    const result = run(["claude", "antigravity", payload(), dir], dir, sb.env)
+    expect(calls(sb)).toBe(3)
+    expect(models()).toEqual(["gemini-4-argon", "gemini-3.8-flash", "gemini-3.8-flash"])
+    expect(result.stderr).toContain("Antigravity does not offer gemini-4-argon on this account; falling back to gemini-3.8-flash")
+    expect(readFileSync(`${sb.logs.prompt}.3`, "utf8")).toContain("This response is the final one")
+    expect(published(dir, "antigravity").model_requested).toBe("gemini-3.8-flash")
+  })
+
+  test("a final POV is published with family gemini, an unverified served model, and independence from a Claude host", () => {
+    const sb = sandbox(ANTIGRAVITY_BINS, acpStream({ text: pov() }))
+    const dir = runDir()
+    run(["claude", "antigravity", payload(), dir], dir, sb.env)
+    const out = published(dir, "antigravity")
+    expect(out.final).toBe(true)
+    expect(out.cross_model_harness).toBe("antigravity")
+    expect(out.serving_family).toBe("gemini")
+    expect(out.model_requested).toBe("gemini-4-argon")
+    expect(out.model_actual).toBe("unverified")
+    expect(out.independence_verified).toBe(true)
+  })
+
+  test("a Gemini host and an Antigravity-harness host both skip the route before acpx", () => {
+    for (const [host, harness] of [["gemini", "unknown"], ["claude", "antigravity"]]) {
+      const sb = sandbox(ANTIGRAVITY_BINS)
+      const dir = runDir()
+      const result = run([host, "antigravity", payload(), dir], dir, { ...sb.env, CROSS_MODEL_HOST_HARNESS: harness })
+      expect(result.stderr).toContain("skipping before egress")
+      expect(calls(sb)).toBe(0)
+      expect(result.files).toEqual([])
+    }
+    // A Gemini host is a valid attestation for every other target.
+    const sb = sandbox(["claude"])
+    const dir = runDir()
+    run(["gemini", "claude", payload(), dir], dir, sb.env)
+    expect(published(dir, "claude").independence_verified).toBe(true)
+  })
+
+  test("a runtime waiting for sign-in is reaped before any prompt with a sign-in remedy", () => {
+    const base = path.join(temp("pov-stream-"), "s")
+    const rpc = (body: Record<string, unknown>) => JSON.stringify({ jsonrpc: "2.0", ...body })
+    writeFileSync(`${base}.stdout`, [
+      rpc({ id: 0, method: "initialize", params: { protocolVersion: 1 } }),
+      rpc({ id: 0, result: { protocolVersion: 1, authMethods: [{ id: "oauth-personal" }] } }),
+      rpc({ id: 1, method: "session/new", params: { cwd: "/tmp/cwd", mcpServers: [] } }),
+    ].join("\n") + "\n")
+    writeFileSync(`${base}.sleep`, "30\n")
+    const sb = sandbox(ANTIGRAVITY_BINS, base)
+    const dir = runDir()
+    const result = run(["claude", "antigravity", payload(), dir], dir, { ...sb.env, CROSS_MODEL_SESSION_START_SECS: "1" })
+    expect(result.stderr).toContain("transport unavailable (pre-egress, route): Antigravity is waiting for a Google sign-in")
+    expect(calls(sb)).toBe(1)
+    expect(result.files).toEqual([])
+  })
+
+  test("a pinned non-Gemini model skips before acpx", () => {
+    const sb = sandbox(ANTIGRAVITY_BINS)
+    const dir = runDir()
+    const result = run(["claude", "antigravity", payload(), dir], dir, {
+      ...sb.env,
+      CROSS_MODEL_MODEL_OVERRIDE_TARGET: "antigravity",
+      CROSS_MODEL_MODEL_OVERRIDE: "claude-sonnet-4-6",
+    })
+    expect(result.stderr).toContain("not compatible with route 'antigravity'")
+    expect(calls(sb)).toBe(0)
+  })
+
+  test("the egress allowlist sanctions the route only by the literal antigravity token", () => {
+    for (const [allow, allowed] of [["antigravity", true], ["gemini", false]] as const) {
+      const sb = sandbox(ANTIGRAVITY_BINS)
+      const dir = runDir()
+      const result = run(["claude", "antigravity", payload(), dir], dir, { ...sb.env, CROSS_MODEL_PEERS: allow })
+      expect(result.files.includes("pov-antigravity.json")).toBe(allowed)
+      expect(calls(sb)).toBe(allowed ? 1 : 0)
+    }
   })
 })
 
@@ -898,7 +1098,7 @@ describe("ce-pov fixed route and egress allowlist", () => {
     child.kill(signal)
     await new Promise<void>((resolve) => child.once("exit", () => resolve()))
     expect(readdirSync(scratchParent)).toEqual([])
-    for (const pid of [...childPids, ...stubPids]) expect(alive(pid)).toBe(false)
+    expect(await survivors([...childPids, ...stubPids])).toEqual([])
   })
 
   test("peer brief restricts external queries to public subject terms", () => {

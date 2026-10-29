@@ -28,7 +28,7 @@ const REPO_ROOT = path.resolve(import.meta.dir, "..")
 const SKILL_FILE = path.join(REPO_ROOT, "skills/ce-doc-review/SKILL.md")
 const tempRoots: string[] = []
 
-const NATIVE_DISPATCH = "Dispatch generic subagents with **bounded parallelism** through the platform's subagent primitive. Seed each one with the full content of its `references/personas/<reviewer-name>.md`. Never dispatch a standalone agent by type or name."
+const NATIVE_DISPATCH = "Dispatch generic subagents with **bounded parallelism** through the platform's subagent primitive. Give each one its `references/personas/<reviewer-name>.md` as `references/dispatch.md` describes. Never dispatch a standalone agent by type or name."
 
 const fixtureOutput = (reviewer: string) => ({
   reviewer,
@@ -135,7 +135,11 @@ test("local placement hooks preserve upstream bodies and ship their owned polici
     ["ce-compound", "references/research.md", "compound-delegation.md"],
   ]) {
     const relative = `skills/${skill}/${file}`
-    const current = await fs.readFile(path.join(REPO_ROOT, relative), "utf8")
+    let current = await fs.readFile(path.join(REPO_ROOT, relative), "utf8")
+    if (skill === "ce-simplify-code") {
+      const modelSelection = await fs.readFile(path.join(REPO_ROOT, "skills/ce-simplify-code/references/reviewer-model-selection.md"), "utf8")
+      current = current.replace("Read `references/reviewer-model-selection.md` before selecting reviewer models.\n\n", modelSelection)
+    }
     const upstream = execFileSync("git", ["show", `${sourceCommit}:${relative}`], {
       cwd: REPO_ROOT,
       encoding: "utf8",
@@ -241,11 +245,11 @@ const PARITY_CASES: ParityCase[] = [
   },
   makeReadParityCase({
     adapter: simplifyWorkflow,
-    upstreamAnchor: "Dispatch three generic subagents",
+    upstreamAnchor: "Dispatch generic subagents",
     hooks: [{
       id: "ce-simplify-code.reviewer-analysis",
-      before: "## Step 2: Launch 3 review agents in parallel",
-      after: "Dispatch three generic subagents",
+      before: "## Step 2: Launch review agents in parallel",
+      after: "Dispatch generic subagents",
     }],
     reference: "skills/ce-simplify-code/references/orca-review-dispatch.md",
     controllerAnchors: [
