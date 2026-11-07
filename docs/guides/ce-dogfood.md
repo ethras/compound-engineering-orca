@@ -2,11 +2,11 @@
 
 > Hands-off, diff-scoped browser QA of the active branch. Maps the journeys the diff touches, drives them in a real browser, fixes small breakages (with a regression test and a commit), and writes a durable report.
 
-`ce-dogfood` is on-demand **autonomous QA** of what this branch changed versus the trunk. It maps those journeys, exercises them with `agent-browser`, judges correctness and feel (including per-persona paper cuts), fixes what is small and unambiguous, escalates the rest, and leaves a report under `docs/dogfood-reports/`.
+`ce-dogfood` is autonomous QA of what this branch changed versus the trunk. It maps those changes as user journeys, exercises them in a real browser (the host's built-in one when it can cover the run, otherwise `agent-browser`), judges correctness and feel (including per-persona paper cuts), fixes what is small and unambiguous, escalates the rest, and leaves a report under `docs/dogfood-reports/`.
 
-It is diff-scoped, not a whole-app crawl. Once invoked it runs the loop without check-ins, except for external flows (OAuth, real email, payments, SMS) and for resume questions. It edits code and creates commits, so it is manual invocation only.
+It is diff-scoped, not a whole-app crawl. Once invoked it runs without check-ins. It stops only when it cannot continue without something only you have, and lists anything else waiting on you at the end. It edits code and creates commits, so it is manual invocation only.
 
-It is not `ce-test-browser` (test and report; it fixes only if you pick "fix now"), not `ce-polish` (you drive live UX), and not `ce-simplify-code` (code cleanup with no browser).
+It is not `ce-test-browser` (test and report; fixes only if you pick "fix now"), not `ce-polish` (you drive live UX), and not `ce-simplify-code` (code cleanup, no browser).
 
 ---
 
@@ -16,24 +16,24 @@ It is not `ce-test-browser` (test and report; it fixes only if you pick "fix now
 |----------|--------|
 | What does it do? | Maps the branch diff to user flows, drives them in a browser, auto-fixes small issues, escalates the rest, writes a report |
 | When to use it | Before shipping a branch, when you want a real-browser pass that also fixes what it can |
-| What it produces | `docs/dogfood-reports/<YYYY-MM-DD>-<branch-slug>-dogfood.md`: flows, matrix, fixes, paper cuts, escalations, learnings, verdict. Plus any fix commits |
-| How it differs from `ce-test-browser` | That skill tests and reports. This one also fixes, adds regression tests, commits, judges feel per persona, and keeps a resume-able report |
+| What it produces | `docs/dogfood-reports/<YYYY-MM-DD>-<branch-slug>-dogfood.md`: flows, matrix, fixes, paper cuts, escalations, verdict. Plus any fix commits |
+| How it differs from `ce-test-browser` | That skill tests and reports. This one also fixes, adds regression tests, commits, judges feel per persona, and keeps a resumable report |
 | Invocation | Manual only. Type `/ce-dogfood` |
 
 ---
 
 ## Example invocations
 
-Arguments pick which ref to dogfood and, optionally, which port. Empty runs **in place** on the current branch.
+Arguments pick which ref to dogfood and, optionally, which port. Empty runs in place on the current branch.
 
 ```text
 # Current feature branch, in this checkout. Refuses main/master/the default branch
 /ce-dogfood
 
-# A PR. Always allowed, even if the head branch is named main. Offers a worktree
+# A PR. Always allowed, even if the head branch is named main. Runs in a worktree
 /ce-dogfood 847
 
-# A named branch you are not on. Offers isolation, then dogfoods that ref
+# A named branch you are not on. Dogfoods that ref in a worktree
 /ce-dogfood feature/new-dashboard
 
 # Reuse or force a port (detection still applies if you omit this)
@@ -43,7 +43,7 @@ Arguments pick which ref to dogfood and, optionally, which port. Empty runs **in
 /ce-dogfood 847 --port 5000
 ```
 
-If a matching unfinished report already exists, it asks resume or start fresh. Use `/ce-test-browser` when you want a bounded route test rather than this QA loop.
+If a matching unfinished report already exists, it resumes that report. Use `/ce-test-browser` when you want a bounded route test rather than this QA loop.
 
 ---
 
@@ -61,7 +61,7 @@ A branch can pass review and unit tests and still be broken or rough in the brow
 
 One pass:
 
-- Map each user-visible change as a Mermaid flowchart *before* building the test matrix
+- Map each user-visible change as a Mermaid flowchart before building the test matrix
 - Ground flows in product personas (`STRATEGY.md`, `VISION.md`, persona docs, or one inferred persona)
 - Walk each flow for paper cuts as well as functional failures
 - Auto-fix only small, low-risk, unambiguous breakages, each with a regression test (or a documented replay/screenshot check when no automated test is meaningful) and its own commit
@@ -75,19 +75,21 @@ One pass:
 
 ### Flows before the matrix
 
-Each user-visible change becomes a flowchart: entry, actions, branches, side effects, true end state (including email click-through). The matrix is derived from those diagrams, not from a flat page list. A one-route change gets one small chart. Mapping is never skipped.
+Each user-visible change becomes a flowchart: entry, actions, branches, side effects, true end state (including email click-through). The matrix comes from those diagrams, not from a flat page list. A one-route change gets one small chart. Mapping is never skipped.
 
 ### Functional and experiential judgment
 
-Every scenario is scored twice: right data, right destination, no console errors; and whether it feels aligned with the product. Walking the flow as each primary persona produces **paper cuts**: small frictions that still `Pass` functionally. A sharp paper cut can enter the fix loop. The rest stay in the report.
+Every scenario is scored twice: right data, right destination, no console errors; and whether it feels aligned with the product. Walking the flow as each primary persona produces paper cuts, small frictions that still `Pass` functionally. A sharp paper cut can enter the fix loop. The rest stay in the report.
+
+Declared [Compound Packs](./packs.md) feed both scores. A pack rule that describes a user is a persona the flows are walked as; one that prescribes how the product must look or behave is a criterion attached to every scenario it reaches, and a scenario that contradicts it fails with the `(pack: <id>, <path within the pack>)` citation. The report's Pack Compliance section lists each matched rule as honored, contradicted (fixed or escalated), or not exercised. When the branch contradicts a rule on purpose, the rule is what is in question: dogfood escalates a stale-rule decision instead of fighting the product. Judgments that generalize beyond the branch are handed to `ce-compound`, which owns whether they land in a writable pack; dogfood never writes a pack itself. Successive runs against the same packs therefore climb: each run fixes what contradicts the rules and refines the rules the product has outgrown.
 
 ### Size-gated autonomous fixes
 
-Auto-fix when the change is small, understood, and low-risk. Do not auto-fix when it needs an architecture or schema decision, changes product behavior, spans many files, or has competing answers. Each autonomous fix gets a regression test and a `ce-commit`. Too-big items go under **Decisions for a human** and the scenario is `Blocked (human decision)`.
+Auto-fix when the change is small, understood, and low-risk. Not when it needs an architecture or schema decision, changes product behavior, spans many files, or has competing answers. Each autonomous fix gets a regression test and a `ce-commit`. Too-big items go under "Decisions for a human" and the scenario becomes `Blocked (human decision)`.
 
 ### Resumable report
 
-The report is created at the end of mapping (`docs/dogfood-reports/<date>-<branch-slug>-dogfood.md`) and updated as it goes. `<branch-slug>` is the branch name, lowercased, with non-alphanumeric runs collapsed to `-`. On resume, `Pass` / `Fixed` / `Skipped` stay done; `Pending` is re-queued. `Blocked (needs human verify)` and `Blocked (human decision)` are shown to you, not silently re-run.
+The report is created at the end of mapping (`docs/dogfood-reports/<date>-<branch-slug>-dogfood.md`) and updated as it goes. `<branch-slug>` is the branch name, lowercased, with non-alphanumeric runs collapsed to `-`. A later run resumes it without asking: `Pass` / `Fixed` / `Skipped` stay done; `Pending` is re-queued. `Blocked (needs human verify)` and `Blocked (human decision)` stay blocked and are listed for you at the end, not silently re-run.
 
 ### A suite check before "ready"
 
@@ -97,7 +99,7 @@ A green browser matrix with a red test suite is not ready. Before the verdict it
 
 ## `ce-dogfood` vs `ce-test-browser`
 
-Both take a PR or branch and drive a browser over diff-affected surfaces. `ce-test-browser` prefers a host-native browser and falls back to `agent-browser`. `ce-dogfood` requires `agent-browser`.
+Both take a PR or branch and drive a browser over diff-affected surfaces. `ce-test-browser` prefers a host-native browser and falls back to `agent-browser`. `ce-dogfood` does the same, but picks `agent-browser` when the host browser cannot cover the run's scenarios (for example, a separate login per test user or simulated failed requests).
 
 | | `ce-test-browser` | `ce-dogfood` |
 |---|---|---|
@@ -107,7 +109,7 @@ Both take a PR or branch and drive a browser over diff-affected surfaces. `ce-te
 | Model | Route-oriented | Journey-first (Mermaid flowcharts) |
 | Autonomy | Asks how to proceed on failures | Fixes, escalates, continues |
 | Invocation | Model or user | Manual only |
-| Checkout | Diff only; does not switch branches | Current branch in place; PR / other branch offers a worktree |
+| Checkout | Diff only; does not switch branches | Current branch in place; PR / other branch gets a worktree |
 
 Use `ce-test-browser` for "do these pages still work." Use `ce-dogfood` when you want the branch driven, fixed where safe, and written up.
 
@@ -127,7 +129,7 @@ Skip it when:
 - The change is backend-only → the project's test runner
 - You only want a quick render check → `/ce-test-browser`
 - You want to sit with the page and direct the edits → `/ce-polish`
-- `agent-browser` is missing → `/ce-setup`, then retry
+- The run needs `agent-browser` and it is missing → `/ce-setup`, then retry
 - The dev server cannot run locally
 
 ---
@@ -138,29 +140,16 @@ On-demand. Nothing in the core loop calls this. After a green (or explicitly blo
 
 ---
 
-## Use Standalone
-
-- **Current branch:** `/ce-dogfood` (in place; refuses the trunk)
-- **PR:** `/ce-dogfood 847` (offers a worktree so this checkout stays put)
-- **Other branch:** `/ce-dogfood feature/new-dashboard` (same isolation offer)
-- **Port:** `/ce-dogfood --port 5000`
-
-A PR is always diffable against its base, so a PR whose head happens to be named `main` still runs. A bare `/ce-dogfood` on the trunk does not.
-
-If a server is already listening on the chosen port, it reuses it. Otherwise it starts `bin/dev`, `rails server`, or `npm run dev` without asking.
-
----
-
 ## Reference
 
 | Argument | Effect |
 |----------|--------|
 | _(empty)_ | Dogfood the current branch in place. Stops if that branch is the trunk |
-| `<PR number>` | Dogfood that PR. Offers a worktree. Never refused for a `main`-named head |
-| `<branch name>` | Dogfood that branch. Offers a worktree if you are not already on it |
+| `<PR number>` | Dogfood that PR in a worktree so this checkout stays put. Never refused for a `main`-named head, because a PR always has a base to diff against |
+| `<branch name>` | Dogfood that branch, in a worktree if you are not already on it |
 | `--port <number>` | Skip port detection |
 
-Required: `agent-browser` on PATH (not `npx agent-browser`), and a local dev server the skill can start or reuse. Port order matches the other browser skills: `--port`, a port already in active project instructions, `package.json`, `.env*`, then `3000`.
+Required: a browser the run can drive (the host's built-in browser, or `agent-browser` on PATH, not `npx agent-browser`), and a local dev server the skill can start or reuse. It reuses a server already listening on the chosen port only when that server runs from the checkout under test; otherwise it starts its own, on a free port if needed, from `bin/dev`, `rails server`, or `npm run dev` without asking. Port order matches the other browser skills: `--port`, a port already in active project instructions, `package.json`, `.env*`, then `3000`.
 
 Report path relocates with `docs_root` (see [configuration](./configuration.md)).
 
@@ -172,16 +161,22 @@ Report path relocates with `docs_root` (see [configuration](./configuration.md))
 There is no branch diff to dogfood. A PR still has a base, so `/ce-dogfood 847` is fine even when the head is `main`.
 
 **Does it always create a worktree?**
-No. Current-branch runs stay here. Isolation is offered only for a PR or a different named branch.
+No. Current-branch runs stay here. A PR or a different named branch gets a worktree without asking.
 
 **What if `agent-browser` is missing?**
-It stops and tells you to run `/ce-setup`, then retry the same `/ce-dogfood` arguments.
+If the run needs it, it stops and tells you to run `/ce-setup`, then retry the same `/ce-dogfood` arguments.
 
 **Will it rewrite product behavior?**
 Not on its own. Large, ambiguous, or product-changing issues are escalated. Small obvious bugs get a test and a commit.
 
 **What do the Blocked states mean?**
-`Blocked (needs human verify)` is an external flow waiting on you. `Blocked (human decision)` is too big to auto-fix. Resume asks about those instead of re-running them.
+`Blocked (needs human verify)` is a real outside-service leg the branch changed that no local stand-in could cover. `Blocked (human decision)` is too big to auto-fix. Neither stops the run: it keeps going and lists them for you at the end.
+
+**When does it stop to ask me?**
+Only when it cannot continue without something only you have (such as secrets the app needs to start) or when the next step would touch your own work (such as checking out over uncommitted changes).
+
+**Can a pack be my persona source?**
+Yes. A pack rule whose body describes who the user is and what they notice or refuse is walked as a persona, cited from the pack; product-doc personas join it when present. See [Personas as packs](./packs.md#personas-as-packs).
 
 ---
 
@@ -189,7 +184,7 @@ Not on its own. Large, ambiguous, or product-changing issues are escalated. Smal
 
 - [`ce-test-browser`](./ce-test-browser.md): lighter test-and-report sibling
 - [`ce-polish`](./ce-polish.md): you drive UX on a working feature
-- [`ce-worktree`](./ce-worktree.md): isolation offered for a PR or other branch
+- [`ce-worktree`](./ce-worktree.md): isolation for a PR or other branch
 - [`ce-debug`](./ce-debug.md): used when a failure's cause is not obvious
 - [`ce-commit`](./ce-commit.md): each autonomous fix
 - [`ce-compound`](./ce-compound.md): reusable lessons from the pass

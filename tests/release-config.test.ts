@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { readFileSync } from "fs"
 import path from "path"
-import { getVersionInfo } from "../integrations/orca/version.mjs"
 import { validateReleasePleaseConfig } from "../src/release/config"
 
 describe("release-please config validation", () => {
@@ -84,20 +83,32 @@ describe("release-please config validation", () => {
     expect(errors).toEqual([])
   })
 
-  test("orders Orca fork revisions after their stable upstream baseline", () => {
+  test("orders fork revisions after their stable upstream baseline", () => {
     expect(validateReleasePleaseConfig(
-      { packages: { ".": { "release-as": "3.19.0-orca.1" } } },
-      { ".": "3.19.0" },
+      { packages: { ".": { "release-as": "3.36.1-t3.1" } } },
+      { ".": "3.36.1" },
     )).toEqual([])
 
     expect(validateReleasePleaseConfig(
-      { packages: { ".": { "release-as": "3.19.0-orca.2" } } },
-      { ".": "3.19.0-orca.1" },
+      { packages: { ".": { "release-as": "3.36.1-t3.2" } } },
+      { ".": "3.36.1-t3.1" },
     )).toEqual([])
 
     expect(validateReleasePleaseConfig(
-      { packages: { ".": { "release-as": "3.19.0-orca.1" } } },
-      { ".": "3.19.0-orca.1" },
+      { packages: { ".": { "release-as": "3.36.1-t3.1" } } },
+      { ".": "3.24.0" },
+    )).toEqual([])
+
+    expect(validateReleasePleaseConfig(
+      { packages: { ".": { "release-as": "3.36.1-t3.1" } } },
+      { ".": "3.36.1-t3.1" },
+    )[0]).toContain("stale")
+  })
+
+  test("does not treat a retired -orca suffix as a fork revision", () => {
+    expect(validateReleasePleaseConfig(
+      { packages: { ".": { "release-as": "3.36.1-orca.7" } } },
+      { ".": "3.36.1" },
     )[0]).toContain("stale")
   })
 
@@ -138,20 +149,23 @@ describe("release-please config validation", () => {
     })
   })
 
-  test("current root package pins the exact fork identity until that release ships", async () => {
+  test("current root package pin, when present, is a fork identity ahead of the manifest", () => {
     const configPath = path.join(import.meta.dir, "..", ".github", "release-please-config.json")
     const manifestPath = path.join(import.meta.dir, "..", ".github", ".release-please-manifest.json")
     const config = JSON.parse(readFileSync(configPath, "utf8")) as {
       packages: Record<string, { "release-as"?: string }>
     }
     const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as Record<string, string>
-    const expected = (await getVersionInfo()).version
     const releaseAs = config.packages["."]?.["release-as"]
+    if (releaseAs === undefined) return
 
-    if (manifest["."] === expected) {
-      expect([undefined, expected]).toContain(releaseAs)
-    } else {
-      expect(releaseAs).toBe(expected)
+    expect(releaseAs).toMatch(/^\d+\.\d+\.\d+-t3\.\d+$/)
+    // A release-please PR bumps the working manifest to the pin itself.
+    if (manifest["."] !== releaseAs) {
+      expect(validateReleasePleaseConfig(
+        { packages: { ".": { "release-as": releaseAs } } },
+        { ".": manifest["."] },
+      )).toEqual([])
     }
   })
 })

@@ -1,0 +1,13 @@
+# Full research execution placement
+
+This fork policy owns only the placement of Full mode's Related Docs Finder. Classification and the body draft remain in the controller's conversation. It does not select Lightweight mode or remove Full mode's overlap search, session-history probe, grounding validation, vocabulary work, or report.
+
+Honor applicable user, caller, and project execution assignments before choosing placement. An assignment names a provider, model, or reasoning level for the Related Docs Finder or for research subagents, in the prompt, in the caller's invocation, or in the project's instructions. An assignment requires delegated research on that target. Do not silently replace an assigned model or requested independent research with the parent. Defaults that the host or the user's instructions give for subagents in general are not assignments; they apply only once research is delegated.
+
+Otherwise, use **local research** when the current conversation contains the solved problem, its explanation, and verification evidence, and the defining code and related learning corpus can be inspected within the remaining context. Use **delegated research** when reconstructing missing evidence or searching the corpus needs separate substantial investigations. When coverage is uncertain, retain delegated research. A short conversation alone is not evidence that the problem is solved.
+
+Announce the selected placement and its reason. On the local path, read the rest of `references/research.md` and perform its setup and the finder contract in the parent alongside classification and drafting. Inspect the current tree and search the learning corpus afresh; session familiarity does not replace either check. Produce the same `related.json` artifact in the run directory, using the existing complete-inline-output fallback if an artifact cannot be written. Do not enter the subagent dispatch instructions on this path. Assembly still waits for classification, the body draft, the finder result, and the Full mode session-history flow.
+
+Return to Full mode's session-history step after the local finder output exists. Later phases keep their existing activation and independence requirements; local research does not satisfy a separate grounding validator. If investigation outgrows the context, retain useful source evidence and enter the existing finder dispatch before assembly. Delegated research keeps the upstream finder contract; classification and drafting never cross that dispatch boundary.
+
+In the existing completion report, identify local or delegated Phase 1 research and the actual delegated research-worker count. Report later delegates separately so a local research pass is never described as an entirely subagent-free Full run.

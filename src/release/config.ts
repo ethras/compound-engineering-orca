@@ -17,14 +17,9 @@ type ReleasePleaseConfig = {
 // look stale. See validateReleasePleaseConfig and scripts/release/validate.ts.
 type ReleasePleaseManifest = Record<string, string>
 
-// Compares release lineage versions. Returns a negative number when `a` is
-// lower than `b`, 0 when equal, positive when higher. The CE-Orca fork treats
-// `<upstream>-orca.N` as revision N after the stable upstream baseline (revision
-// zero), rather than as SemVer prerelease precedence. Other suffixes retain the
-// historical behavior and are ignored.
 function compareReleaseVersions(a: string, b: string): number {
   const parse = (version: string) => {
-    const fork = /^(\d+)\.(\d+)\.(\d+)-orca\.(\d+)$/.exec(version)
+    const fork = /^(\d+)\.(\d+)\.(\d+)-t3\.(\d+)$/.exec(version)
     const core = version
       .split("-")[0]
       .split(".")

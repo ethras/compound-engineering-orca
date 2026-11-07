@@ -35,10 +35,19 @@ describe("omp native install", () => {
     expect(exitCode, `omp install --dry-run failed:\n${stderr}`).toBe(0)
 
     const result = JSON.parse(stdout) as {
+      dryRun?: boolean
+      action?: string
+      path?: string
       name: string
       manifest: { extensions?: string[]; skills?: string[]; version?: string }
     }
-    expect(result.name).toBe("compound-engineering-orca")
+    // Current omp reports the planned link; older versions returned a manifest.
+    if (result.dryRun === true) {
+      expect(result.action).toBe("link")
+      expect(result.path).toBe(path.resolve(REPO_ROOT))
+      return
+    }
+    expect(result.name).toBe("compound-engineering")
     expect(result.manifest.skills).toContain("./skills")
     expect(result.manifest.extensions).toContain("./.pi/extensions/compound-engineering.ts")
     // The pi manifest does not pin its own version; omp then reports the
