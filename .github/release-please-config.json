@@ -96,8 +96,7 @@
           "path": "plugin.json",
           "jsonpath": "$.version"
         }
-      ],
-      "release-as": "3.36.1-t3.1"
+      ]
     },
     ".claude-plugin": {
       "release-type": "simple",
