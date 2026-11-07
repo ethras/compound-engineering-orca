@@ -1,5 +1,9 @@
 ### Stage 4: Spawn sub-agents
 
+<!-- ce-fork-hook:start t3 -->
+When T3 Code's `delegate_task` tool is available, including as a deferred tool, read `references/t3-subagents.md` before dispatching reviewers. It decides each reviewer's provider and model and how the batch is launched and collected.
+<!-- ce-fork-hook:end t3 -->
+
 #### Inline fast pass (emit before the reviewer queue)
 
 To show findings within seconds, the orchestrator does a quick first-principles scan of the diff it already holds **immediately before the first foreground reviewer dispatch**. Emit the fast-pass block as text, then begin the deterministic reviewer queue without an intervening wait.

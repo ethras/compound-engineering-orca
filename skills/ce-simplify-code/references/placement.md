@@ -12,4 +12,4 @@ After all selected local outcomes exist, continue at Step 3 without entering the
 
 Include the placement and actual number of delegated reviewers in the final summary alongside the existing applied, skipped, and verification outcomes.
 
-A local pass resumes at Step 3 after all selected outcomes exist. A delegated pass follows Step 2.
+A local pass resumes at Step 3 after all selected outcomes exist. A delegated pass follows Step 2. On a delegated pass, when T3 Code's `delegate_task` tool is available, including as a deferred tool, read `references/t3-subagents.md` before dispatching the reviewers.

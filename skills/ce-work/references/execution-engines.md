@@ -8,6 +8,10 @@ Invocation origin supplies no routing authority and may not be detectable. Resol
 
 ## Decide whether an external route applies
 
+<!-- ce-fork-hook:start t3 -->
+When T3 Code's `delegate_task` tool is available, including as a deferred tool, read `references/t3-subagents.md` before weighing any route source below. An implementation unit on a provider T3 can run is served as that reference states, not by the cross-model engine.
+<!-- ce-fork-hook:end t3 -->
+
 Resolve one implementation binding from applicable authority and scope; do not reduce routing to keyword matching or a closed state machine. Obey the host's instruction hierarchy first. Within the same authority, prefer narrower and more current intent, using these sources:
 
 1. an explicit assignment or constraint in the current task;

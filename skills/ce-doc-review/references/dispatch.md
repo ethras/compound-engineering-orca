@@ -1,5 +1,9 @@
 # Dispatching the reviewers
 
+<!-- ce-fork-hook:start t3 -->
+When T3 Code's `delegate_task` tool is available, including as a deferred tool, read `references/t3-subagents.md` before dispatching reviewers. It decides each reviewer's provider and model and how the batch is launched and collected.
+<!-- ce-fork-hook:end t3 -->
+
 Dispatch generic subagents with **bounded parallelism** using the platform's subagent primitive (e.g., `Agent` in Claude Code, `spawn_agent` in Codex) where available; otherwise run the work inline or serially. Omit the `mode` parameter so the user's configured permission settings apply.
 
 A spawned worker or peer starts a new context and does not continue the parent conversation.
