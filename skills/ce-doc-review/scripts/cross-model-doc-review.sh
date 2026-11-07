@@ -110,20 +110,12 @@ M_ANTIGRAVITY="gemini-4-argon"            # antigravity (thinking_level=high)
 M_ANTIGRAVITY_FALLBACK="gemini-3.8-flash"
 ANTIGRAVITY_MODEL=""   # set by the fallback; empty requests M_ANTIGRAVITY
 
-# ce-orca-hook:start ce-doc-review.codex-default-model
-# Orca defaults to GPT-6.1 Sol; route-scoped explicit overrides still win.
-M_CODEX="gpt-6.1-sol"
-# ce-orca-hook:end ce-doc-review.codex-default-model
-
 route_effort() {   # <route> -> requested effort: the override where the route takes one, else editorial
   if [ -n "${CROSS_MODEL_EFFORT_OVERRIDE:-}" ]; then
     case "$1" in
       codex|claude|grok-cli|antigravity|opencode) printf '%s' "$CROSS_MODEL_EFFORT_OVERRIDE"; return 0 ;;
     esac
   fi
-  # ce-orca-hook:start review.codex-default-effort
-  [ "$1" != codex ] || { printf '%s' xhigh; return 0; }
-  # ce-orca-hook:end review.codex-default-effort
   case "$1" in
     grok-cli) printf 'xhigh' ;;
     codex|claude|antigravity) printf 'high' ;;

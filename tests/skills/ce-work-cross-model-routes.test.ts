@@ -259,7 +259,7 @@ function flagValue(args: string[], flag: string) {
 describe("ce-work fixed write routes", () => {
   // One emit per case: each is a subprocess, and a loop of them can outrun the file timeout.
   const ROUTE_ARGV: Record<string, { contains: string[]; model?: string }> = {
-    codex: { contains: ["codex exec --config-option mode=agent --config-option reasoning_effort=high"], model: "gpt-6.1-sol" },
+    codex: { contains: ["codex exec --config-option mode=agent --config-option reasoning_effort=high"] },
     claude: {
       contains: [
         "CLAUDE_CODE_EXECUTABLE=<claude-safe-mode-wrapper>",
@@ -439,7 +439,7 @@ describe("ce-work fixed write routes", () => {
 
     const codex = emit("codex", composerOverride)
     expect(codex.status).toBe(0)
-    expect(codex.stdout).toContain("--model gpt-6.1-sol")
+    expect(codex.stdout).not.toContain("--model")
     expect(emit("composer", composerOverride).stdout).toContain("--model composer-next[fast=true]")
   })
 

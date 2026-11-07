@@ -105,8 +105,6 @@ All settings are optional. Commented examples are documentation, not active valu
 | [`ce-promote`](./ce-promote.md) | `ce_promote_spiral_optout` | `true` suppresses the one-time Spiral setup offer; remove the key to enable it again. |
 | [`ce-sweep`](./ce-sweep.md) | `feedback_sources`, `sweep_state_path`, `sweep_ack_cap`, `sweep_lease_ttl_minutes`, `sweep_shared_branch` | Feedback connectors, durable state location, acknowledgment circuit breaker, lease expiry, and optional push-gated shared-branch coordination. The setup interview writes these values. |
 
-When `cross_model_model` is unset in the Orca fork, Codex code and document reviewers request `gpt-6.1-sol` at extra-high reasoning. An explicit conversation or checkout selector takes precedence.
-
 ## Implementation routing
 
 The work engine list is host-relative rather than tied to the checkout's usual harness:
@@ -121,7 +119,7 @@ work_engine_preferences:
   - harness: claude
 ```
 
-Supported harnesses are `codex`, `claude`, `grok`, `antigravity`, `cursor`, and `opencode`. Omitting `model` uses that harness's configured default; in the Orca fork, a selected cross-model Codex route uses `gpt-6.1-sol` instead; for `antigravity` that is `gemini-4-argon` when the account offers it, otherwise `gemini-3.8-flash`, and an explicit model must be a `gemini-*` id. Composer is a model family reached through Cursor, so request it with `harness: cursor` and `model: composer`.
+Supported harnesses are `codex`, `claude`, `grok`, `antigravity`, `cursor`, and `opencode`. Omitting `model` uses that harness's configured default; for `antigravity` that is `gemini-4-argon` when the account offers it, otherwise `gemini-3.8-flash`, and an explicit model must be a `gemini-*` id. Composer is a model family reached through Cursor, so request it with `harness: cursor` and `model: composer`.
 
 `ce-work` walks the list in order and skips an entry equivalent to the current host/default model. A different explicit model in the same harness remains eligible. With either `prefer` or `require`, an unavailable list falls back to native implementation on the current harness and session model with one disclosure. `require` keeps the requested external identity fixed while viable; it never authorizes an unrequested external recipient or turns route unavailability into a blocker.
 

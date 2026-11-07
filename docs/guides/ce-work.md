@@ -269,7 +269,7 @@ work_engine_preferences:
 
 The [central configuration reference](./configuration.md#implementation-routing) explains how this checkout-local default interacts with current-task, session, and project instructions.
 
-Each candidate has a `harness` (`codex`, `claude`, `grok`, `cursor`, `opencode`, or `antigravity`) and an optional `model`. Omitting `model` means that harness's configured default; in the Orca fork, a selected cross-model Codex route uses `gpt-6.1-sol` instead. Explicit model selections take precedence. Antigravity runs only Gemini models: with no `model`, `ce-work` uses `gemini-4-argon` when your account offers it and otherwise `gemini-3.8-flash`, checked before anything is sent. Composer is a model family reached through Cursor, so it is written as `harness: cursor` plus `model: composer`. Keep CLI flags and commands out of config.
+Each candidate has a `harness` (`codex`, `claude`, `grok`, `cursor`, `opencode`, or `antigravity`) and an optional `model`. Omitting `model` means that harness's configured default. Antigravity runs only Gemini models: with no `model`, `ce-work` uses `gemini-4-argon` when your account offers it and otherwise `gemini-3.8-flash`, checked before anything is sent. Composer is a model family reached through Cursor, so it is written as `harness: cursor` plus `model: composer`. Keep CLI flags and commands out of config.
 
 To choose the reasoning effort the external worker runs at, add a `work_engine_effort` map from harness to one of that harness's own levels:
 
