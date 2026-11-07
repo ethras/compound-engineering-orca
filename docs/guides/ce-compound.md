@@ -12,9 +12,9 @@ It is optional. A completed or non-trivial fix is not enough: skip it when the f
 
 Captures land in `docs/solutions/`, where `ce-plan`'s research and `ce-code-review`'s learnings pass rediscover them. Declared [Compound Packs](./packs.md#growing-packs-from-learnings) participate in capture too: an insight a pack rule already prescribes is recognized rather than re-captured, and interactive runs can route a prescriptive, cross-repo capture directly into a writable pack — or scaffold a new one — with the learning rewritten as a rule.
 
-## Orca execution placement
+## Execution placement
 
-In the Orca fork, Full mode can run the Related Docs Finder in the main agent when the solved problem, verification evidence, source, and learning corpus fit its context. Classification and drafting always stay in the controller. The finder still searches the live corpus and resolved Compound Packs and produces `related.json`. Substantial corpus investigations and applicable execution assignments retain finder delegation. Session-history and independent grounding-validation requirements remain unchanged; local research is not Lightweight mode.
+In this fork, Full mode can run the Related Docs Finder in the main agent when the solved problem, verification evidence, source, and learning corpus fit its context. Classification and drafting always stay in the controller. The finder still searches the live corpus and resolved Compound Packs and produces `related.json`. Substantial corpus investigations, and any provider, model, or reasoning level named for the finder, retain finder delegation. Session-history and independent grounding-validation requirements remain unchanged; local research is not Lightweight mode.
 
 ## TL;DR
 

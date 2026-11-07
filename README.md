@@ -14,9 +14,10 @@
 
 Compound Engineering is a plugin of 37 skills for AI coding agents. It structures the work around a loop — brainstorm, plan, build, review, then **capture what you learned** — so the knowledge from each change is written down where the next change can read it.
 
-This fork tracks upstream Compound Engineering and adds optional, bounded Orca orchestration. The upstream skill semantics remain authoritative; see the [Orca integration overlay](integrations/orca/README.md) for runtime details.
+This fork tracks upstream Compound Engineering and keeps its skills unchanged except for two additions:
 
-For bounded work, the fork can run simplification reviews and Full-mode learning research in the main agent, preserving their required coverage and checks. Broader investigations and explicit execution assignments retain delegated execution.
+- **T3 Code.** When an agent runs in T3 Code and T3's `delegate_task` tool is available, `ce-code-review`, `ce-doc-review`, `ce-simplify-code` and `ce-work` route their reviewers and implementation workers through it. A provider, model or reasoning level you name for those subagents wins. Otherwise reviewers run on Codex `gpt-6.1-sol` at `xhigh`, implementation units on Codex `gpt-6.1-sol` at `medium` in their own T3 worktree, and every other subagent on the parent's model. Outside T3 nothing changes.
+- **Execution placement.** For bounded work, `ce-simplify-code` reviews and `ce-compound` Full-mode research can run in the main agent, keeping their required coverage and checks. Broader investigations, and any model named for those subagents, keep delegated execution.
 
 It runs on 14 agent hosts, including Claude Code, Cursor, and Codex.
 
@@ -46,9 +47,6 @@ codex plugin marketplace add ethras/compound-engineering-orca
 In the Codex app, edit the custom marketplace to source `ethras/compound-engineering-orca`.
 For other checkout-based installations, remove the old source and reinstall from the fork; a clean
 checkout can be prepared with `git clone https://github.com/ethras/compound-engineering-orca.git /tmp/compound-engineering-orca-cleanup`.
-
-Cursor remains catalogued for native CE routing, but cannot attest `orca.read-policy/v1`; strict
-Orca execution is therefore limited to runtimes that can enforce and attest that policy.
 
 ### Claude Code
 

@@ -28,9 +28,9 @@ This is not `ce-polish` (live UX on a working page), not `ce-code-review` (deepe
 
 ---
 
-## Orca execution placement
+## Execution placement
 
-In the Orca fork, a bounded scope can run locally with all three persona rubrics and a separate outcome for each. Substantial investigations and applicable execution assignments retain the existing three-reviewer dispatch. The summary identifies placement and actual worker count; local lenses are not independent corroboration.
+In this fork, a bounded scope can run locally with all three persona rubrics and a separate outcome for each. Substantial investigations, and any provider, model, or reasoning level named for the reviewers, retain the existing three-reviewer dispatch. The summary identifies placement and actual worker count; local lenses are not independent corroboration.
 
 ## Invoking it
 

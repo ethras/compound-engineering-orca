@@ -98,19 +98,18 @@ cat .claude-plugin/marketplace.json | jq .
 cat .claude-plugin/plugin.json | jq .
 ```
 
-## Orca Fork Overlay
+## Fork Seams
 
-Keep Orca-specific implementation under `integrations/orca/`. Upstream owns the skill tree, prompt assets, roles, and workflow semantics; changes under `skills/` require an explicit, bounded integration hook and a matching parity-test update.
+Upstream owns `skills/`. This fork differs from it only by:
 
-The `upstream` remote must point to `https://github.com/EveryInc/compound-engineering-plugin.git`. When incorporating a release, merge `upstream/main`, update `integrations/orca/upstream.json`, reconcile role and hook drift explicitly, then run:
+- marked seams (`<!-- ce-fork-hook:start <id> -->` … `<!-- ce-fork-hook:end <id> -->`) in `skills/ce-simplify-code/SKILL.md`, `skills/ce-compound/references/research.md`, `skills/ce-code-review/references/dispatch-reviewers.md`, `skills/ce-doc-review/references/dispatch.md` and `skills/ce-work/references/execution-engines.md`;
+- the fork-only files `references/placement.md` (in `ce-simplify-code` and `ce-compound`) and `references/t3-subagents.md` (in `ce-code-review`, `ce-doc-review`, `ce-simplify-code` and `ce-work`). `skills/ce-code-review/references/t3-subagents.md` is the canonical copy; edit it and copy it to the others.
 
-```bash
-bun run orca:upstream-check
-bun test tests/orca-upstream-parity.test.ts tests/orca-packaging.test.ts
-bun run release:validate
-```
+`tests/fork-seams.test.ts` enforces this. A new fork change under `skills/` needs a new seam and a matching entry in that test.
 
-Do not add fork-only personas to make an upstream role mismatch pass. The fork release identity is `<upstream-version>-orca.<integration-revision>` and is reported by `bun run orca:version`. For a fork release, increment `integration.revision` in `integrations/orca/protocol.json` and set the root component's `release-as` in `.github/release-please-config.json` to that exact reported version. Release automation owns the platform manifest writes. Once the pinned release has shipped, remove the now-stale `release-as` before unrelated work; `release:validate` enforces that lifecycle.
+The `upstream` remote must point to `https://github.com/EveryInc/compound-engineering-plugin.git`. To incorporate a release, merge `upstream/main`, set `UPSTREAM_BASELINE` in `tests/fork-seams.test.ts` to the merged upstream commit, re-anchor any seam whose surrounding upstream text changed, and run `bun run test` and `bun run release:validate`. Land a sync PR as a merge commit, never a squash: a squash drops upstream's history from `main`, and the next merge then re-conflicts on every file the fork touches.
+
+The fork release identity is `<upstream-version>-t3.<N>`, where `N` counts fork releases on that upstream version. Every fork release sets the root component's `release-as` in `.github/release-please-config.json` to that exact version: an ordinary release-please bump keeps the suffix and could claim an upstream base that does not exist. Release automation owns the platform manifest writes. Once the pinned release has shipped, remove the stale `release-as` before unrelated work; `release:validate` enforces that lifecycle.
 
 ## Runtime vs Authoring Context
 
