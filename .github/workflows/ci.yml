@@ -107,9 +107,9 @@ jobs:
       - name: Fetch canonical upstream baseline
         run: |
           git remote add upstream https://github.com/EveryInc/compound-engineering-plugin.git
-          # --tags: the provenance currency check resolves the latest
-          # compound-engineering-v* release tag, not the upstream/main tip.
-          git fetch --tags upstream main
+          # The fork-seam guard reads the pinned upstream baseline commit,
+          # which squash-merged syncs do not keep reachable from main.
+          git fetch upstream main
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2

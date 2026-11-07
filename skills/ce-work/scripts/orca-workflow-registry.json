@@ -1,8 +1,0 @@
-{
-  "version": "orca.workflow-registry/v1",
-  "workflows": {
-    "ce-work": {
-      "entry": "orca-workflow.mjs"
-    }
-  }
-}

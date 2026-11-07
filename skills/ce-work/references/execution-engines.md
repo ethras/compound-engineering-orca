@@ -45,12 +45,6 @@ When no source applies, run native execution and do not load the cross-model ref
 
 For a bare prompt, cross-model execution is eligible only after Phase 0 has established a concrete goal, bounded scope, and authoritative verification. The cross-model reference turns that discovery into a private prompt brief and conservative P-unit packet. An unclear bare prompt returns to clarification or planning before any work is sent to an external worker; it does not fall through to a smarter external worker and ask that worker to invent the scope.
 
-<!-- ce-orca-hook:start ce-work-execution-engine -->
-Only after the upstream resolution above selects native execution with no applicable live/session/project cross-model source, typed caller binding, enabled standing preference, or recovery binding/run may the Orca fork read `references/orca-routing.md`. A same-host collapse and an exhausted `prefer` route remain upstream-owned resolutions and are not Orca-eligible because they still have a cross-model source or binding.
-
-When that bounded gate resolves Orca, follow `references/orca-execution.md` as the native implementation-worker adapter and do not enter another native or cross-model dispatch path for the same batch. When it resolves native, continue with the native engine below unchanged.
-<!-- ce-orca-hook:end ce-work-execution-engine -->
-
 ## Run the chosen engine
 
 - **Native:** follow `references/execution-strategy.md` for scheduling and dispatch, and the Phase 2 loop in `references/implementation-loop.md`. `ce-work` creates the tasks, orders the units, dispatches, verifies, and commits.

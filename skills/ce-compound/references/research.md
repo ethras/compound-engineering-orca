@@ -27,10 +27,9 @@ If no relevant entries are found, proceed to Phase 1 without memory context.
 
 You classify the learning and draft its body in this context, because both depend on the conversation, which only this context holds. A fresh subagent sees only what you paste into its prompt. The Related Docs Finder runs as a subagent alongside, because its corpus search reads many docs this context does not need to keep. Each Phase 1 subagent writes its full output to a per-run scratch artifact and returns only the artifact path to the orchestrator.
 
-<!-- ce-orca-hook:start ce-compound.research-dispatch -->
-Read `references/orca-delegation.md` before Phase 1 dispatch to choose local or delegated corpus research. Classification and the body draft stay in this context on both paths. A local pass completes the Related Docs Finder contract and returns to Full mode's session-history step.
-For a delegated pass, read `references/orca-routing.md` and `references/orca-read-analysis.md`. When the selected finder stage resolves to Orca, replace only that subagent call with the packet path and do not launch it natively. This controller keeps session gates, assembly, scratch persistence, and every product write. Lightweight mode remains subagent-free. For native routing, continue below unchanged.
-<!-- ce-orca-hook:end ce-compound.research-dispatch -->
+<!-- ce-fork-hook:start placement -->
+Read `references/placement.md` before Phase 1 dispatch to choose local or delegated corpus research. Classification and the body draft stay in this context on both paths. A local pass completes the Related Docs Finder contract and returns to Full mode's session-history step.
+<!-- ce-fork-hook:end placement -->
 
 **Run ID and run dir (before dispatching the finder):** generate a unique run identifier and create the run directory. This scopes every Phase 1 artifact file to the same directory so the orchestrator can Read them back in Phase 2.
 

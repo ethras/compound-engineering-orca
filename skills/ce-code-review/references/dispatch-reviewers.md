@@ -1,9 +1,5 @@
 ### Stage 4: Spawn sub-agents
 
-<!-- ce-orca-hook:start ce-code-review.persona-dispatch -->
-Before dispatching the materialized local roster, read `references/orca-routing.md` and `references/orca-review-dispatch.md`. Send only the already-selected local reviewer nodes whose stage resolves to Orca, using the complete prompts and context defined by this reference, and do not also launch those nodes through the foreground native queue. Keep roster selection, the fast pass, and cross-model peer handling in the dispatch context. The native finish leaves retain merge, validation selection, fixes, and reporting ownership. For native routing, continue with the foreground queue unchanged.
-<!-- ce-orca-hook:end ce-code-review.persona-dispatch -->
-
 #### Inline fast pass (emit before the reviewer queue)
 
 To show findings within seconds, the orchestrator does a quick first-principles scan of the diff it already holds **immediately before the first foreground reviewer dispatch**. Emit the fast-pass block as text, then begin the deterministic reviewer queue without an intervening wait.

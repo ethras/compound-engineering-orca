@@ -1,9 +1,5 @@
 # Dispatching the reviewers
 
-<!-- ce-orca-hook:start ce-doc-review.persona-dispatch -->
-Read `references/orca-routing.md` and resolve the current run before dispatch. If the resolved execution request assigns `persona-review` to Orca, read `references/orca-dispatch.md` now and use that dispatch path for the selected reviewers. Otherwise, execute the native dispatch paragraph below unchanged.
-<!-- ce-orca-hook:end ce-doc-review.persona-dispatch -->
-
 Dispatch generic subagents with **bounded parallelism** using the platform's subagent primitive (e.g., `Agent` in Claude Code, `spawn_agent` in Codex) where available; otherwise run the work inline or serially. Omit the `mode` parameter so the user's configured permission settings apply.
 
 A spawned worker or peer starts a new context and does not continue the parent conversation.

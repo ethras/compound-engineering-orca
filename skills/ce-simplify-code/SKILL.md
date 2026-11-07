@@ -31,9 +31,9 @@ When the platform's task-tracking capability is available, show the review, appl
 
 ## Step 2: Launch review agents in parallel
 
-<!-- ce-orca-hook:start orca -->
-Read `references/orca-delegation.md` first.
-<!-- ce-orca-hook:end orca -->
+<!-- ce-fork-hook:start fork -->
+Read `references/placement.md` first.
+<!-- ce-fork-hook:end fork -->
 
 Dispatch each reviewer as its own generic subagent via the platform's subagent primitive (`Agent`/`Task` in Claude Code, `spawn_agent` in Codex). Run reviews inline only when the platform has no subagent primitive, or when a dispatch fails as `references/reviewer-dispatch.md` describes. For each reviewer, read its prompt asset from this skill's directory and pass the **full file content** as the subagent's prompt, together with the resolved scope (the full diff or file set), the mode, any proof test, the user's constraints, and the project standards governing the scope (or their file paths):
 

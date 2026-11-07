@@ -40,10 +40,6 @@ If the user's or project's active instructions or the live prompt name a model f
 
 Build its prompt from this template:
 
-<!-- ce-orca-hook:start ce-compound.vocabulary-grounding -->
-Include every vocabulary entry created or edited this run, including context glossaries, root-index relations, and sibling `DOMAIN.md` rules. They are code-behavior claims under the same validation contract. After applying the verdicts, stamp a `DOMAIN.md` file only when all its rules are verified or unsupported claims have been softened: set YAML frontmatter `verified_against` to the current HEAD commit and `last_verified` to today's YYYY-MM-DD date, creating frontmatter when absent. A remaining contradicted or unsoftened unverifiable rule prevents the whole-file stamp.
-<!-- ce-orca-hook:end ce-compound.vocabulary-grounding -->
-
 ```
 You are a grounding validator for documentation about to enter a permanent
 knowledge store. You are read-only: never edit files. Inspect with Read,

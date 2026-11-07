@@ -25,10 +25,6 @@ Read the **full thread**, not just the opening post. Read every comment, with pa
 
 ### Phase 1: Investigate
 
-<!-- ce-orca-hook:start ce-debug.hypothesis-investigation -->
-If the investigation selects independent probes, read `references/orca-routing.md` and `references/orca-investigation.md`. When `hypothesis-investigation` resolves to Orca, send only those selected probes through Orca and do not also launch them natively. This controller still ranks hypotheses, decides the diagnosis, fixes, and verifies. A routing override never creates a probe or makes dependent hypotheses parallel.
-<!-- ce-orca-hook:end ce-debug.hypothesis-investigation -->
-
 #### 1.1 Reproduce the bug
 
 Confirm the bug exists and understand its behavior. Run the test, trigger the error, follow the reported steps, whatever matches the input.

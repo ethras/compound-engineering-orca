@@ -97,10 +97,6 @@ The doc (and any `CONCEPTS.md` entries from Phase 2.4) is about to become perman
 
 2. **Semantic grounding validator (Full mode, including non-interactive Full; lightweight skips it).** Dispatch one read-only generic subagent built from the prompt template in the reference, covering the written doc plus any `CONCEPTS.md` entries added or edited this run. It verifies code-behavior claims by quoting the defining source line, merge-state claims against remote truth (`gh` primary, git reachability fallback), and internal completeness of countable assertions. Apply its verdicts per the reference (fix contradicted claims from the quoted evidence; soften or drop unverifiable ones; mark offline merge-state checks as degraded), then re-run the mechanical check if the body changed.
 
-<!-- ce-orca-hook:start ce-compound.grounding-validation -->
-When the semantic validator is selected and `grounding-validation` resolves to Orca, use `references/orca-read-analysis.md` for that one node instead of dispatching it natively. This controller owns verdict adjudication, edits, and the mechanical re-check.
-<!-- ce-orca-hook:end ce-compound.grounding-validation -->
-
 ## What It Creates
 
 **Organized documentation:**
