@@ -143,6 +143,7 @@ describe("CE-Orca first-wave read adapters", () => {
   test.each([
     ["tests", "test-value-reviewer"],
     ["comments", "comment-reviewer"],
+    ["structure", "structure-reviewer"],
   ])("builds and fails closed for a focused %s reviewer", async (id, role) => {
     const directory = await runDir()
     const prompts = path.join(directory, "prompts")
@@ -155,15 +156,15 @@ describe("CE-Orca first-wave read adapters", () => {
     expect(result.failures[0].role).toBe(role)
   })
 
-  test("includes conditional tests and comments with the complete core roster", async () => {
+  test("includes conditional tests, comments, and structure with the complete core roster", async () => {
     const directory = await runDir()
     const prompts = path.join(directory, "prompts")
     await fs.mkdir(prompts)
-    for (const id of ["reuse", "quality", "efficiency", "tests", "comments"]) {
+    for (const id of ["reuse", "quality", "efficiency", "tests", "comments", "structure"]) {
       await fs.writeFile(path.join(prompts, `${id}.txt`), `Review ${id}`)
     }
     const packet = await simplify.buildReviewPacketFromDirectory(prompts)
-    expect(packet.nodes).toHaveLength(5)
+    expect(packet.nodes).toHaveLength(6)
     await expect(simplify.buildReviewPacketFromDirectory(path.join(directory, "missing")))
       .rejects.toThrow("non-empty array")
   })
@@ -386,7 +387,7 @@ describe("CE-Orca first-wave read adapters", () => {
       id: "reuse",
       stage: "reviewer-analysis",
       role: "code-reuse-reviewer",
-    }]))).toThrow("the complete core roster or one focused tests/comments reviewer")
+    }]))).toThrow("the complete core roster or one focused tests/comments/structure reviewer")
 
     const finder = packetFor(compound, [{
       id: "related",
@@ -754,7 +755,7 @@ export async function integrateChange(change) {
     const checks = [
       ["ce-plan/references", "ce-plan.read-analysis", "All specialist research and deepening prompts used in this phase are skill-local prompt assets", "research.md"],
       ["ce-code-review/references", "ce-code-review.persona-dispatch", "### Stage 4: Spawn sub-agents", "dispatch-reviewers.md"],
-      ["ce-simplify-code", "ce-simplify-code.reviewer-analysis", "Dispatch generic subagents"],
+      ["ce-simplify-code", "orca", "Dispatch each reviewer as its own generic subagent"],
       ["ce-debug/references", "ce-debug.hypothesis-investigation", "### Phase 1: Investigate", "investigate.md"],
       ["ce-compound/references", "ce-compound.research-dispatch", "You classify the learning and draft its body in this context", "research.md"],
     ]

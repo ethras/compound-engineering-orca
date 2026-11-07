@@ -84,9 +84,7 @@ case "$TRANSIENT_RETRY_DELAY_SECS" in ''|*[!0-9]*) skip "transient retry delay m
 # CROSS_MODEL_MODEL_OVERRIDE, same target/family only) and the reasoning effort
 # (CROSS_MODEL_EFFORT_OVERRIDE, validated per route); both fail closed.
 # Keep these in sync with ce-doc-review's script (parity-tested in CI).
-# codex: luna/xhigh is the benchmarked pick on API dollars (~0.30x sol-medium, tied
-# detection, slower tail) -- docs/solutions/skill-design/benchmark-review-peer-model-and-reasoning-tier.md
-M_CODEX="gpt-6-luna"           # codex     (reasoning_effort=xhigh)
+M_CODEX="gpt-6.1-sol"          # codex     (reasoning_effort=high)
 M_CLAUDE="claude-opus-5-5"     # claude    (effort=high)
 M_GROK="grok-4.7"              # grok CLI  (reasoning_effort=xhigh)
 # Cursor's ACP server offers one preset per model and rejects effort variants,
@@ -110,9 +108,12 @@ route_effort() {   # <route> -> requested effort: the override where the route t
       codex|claude|grok-cli|antigravity|opencode) printf '%s' "$CROSS_MODEL_EFFORT_OVERRIDE"; return 0 ;;
     esac
   fi
+  # ce-orca-hook:start review.codex-default-effort
+  [ "$1" != codex ] || { printf '%s' xhigh; return 0; }
+  # ce-orca-hook:end review.codex-default-effort
   case "$1" in
-    codex|grok-cli) printf 'xhigh' ;;
-    claude|antigravity) printf 'high' ;;
+    grok-cli) printf 'xhigh' ;;
+    codex|claude|antigravity) printf 'high' ;;
     grok-cursor) printf 'model-implied-high' ;;
     composer) printf 'fast' ;;
     cursor|opencode) printf 'unverified' ;;
@@ -184,7 +185,7 @@ route_available() {
 # Every route reaches its agent through acpx, which speaks the Agent Client
 # Protocol and prints the JSON-RPC stream, so one parser covers every CLI.
 # The calling worker supplies route_available, route_model, and log.
-ACPX_VERSION="0.21.0"
+ACPX_VERSION="0.21.1"
 # 0.18.0 fixes approve-reads allowing ambiguous destructive permission requests.
 ACPX_MIN_VERSION="0.18.0"
 ACPX_UNAVAILABLE=""   # pre-egress reason; ACPX_SCOPE says whether every route shares it
@@ -327,7 +328,9 @@ acpx_base_argv() {   # <route> <cwd> <mcp-config> <timeout-secs> <claude-wrapper
     antigravity) printf '%s\0' "GEMINI_HOME=$6" "ANTIGRAVITY_HARNESS_PATH=$(acpx_antigravity_helper)" ;;
   esac
   # Explicit --package avoids npx reusing a global binary that violates npm age policy.
-  printf '%s\0' npx -y --package "$(acpx_package_spec)" -- acpx --cwd "$2" --format json --mcp-config "$3" --timeout "$4"
+  # npx also exports npm_config_package, which breaks the nested npx acpx uses
+  # to launch the codex adapter when npm is not beside node (exit 127).
+  printf '%s\0' npx -y --package "$(acpx_package_spec)" -- env -u npm_config_package acpx --cwd "$2" --format json --mcp-config "$3" --timeout "$4"
 }
 
 acpx_agent_argv() {   # <route>

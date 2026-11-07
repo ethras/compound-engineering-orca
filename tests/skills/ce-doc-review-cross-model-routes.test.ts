@@ -271,7 +271,7 @@ describe("cross-model-doc-review route safety (R17)", () => {
     ["opencode", "--deny-all --agent", ["opencode acp exec --config-option mode=plan"]],
   ])("--emit-adapter %s denies every permission from the empty peer workspace", (route, agent, options) => {
     const command = emitAdapter(route)
-    expect(command).toContain(`npx -y --package ${ACPX_RANGE} -- acpx --cwd <peer-workdir> --format json --mcp-config <mcp-config> --timeout 1200 --deny-all`)
+    expect(command).toContain(`npx -y --package ${ACPX_RANGE} -- env -u npm_config_package acpx --cwd <peer-workdir> --format json --mcp-config <mcp-config> --timeout 1200 --deny-all`)
     expect(command).toContain("env npm_config_prefer_offline=true npm_config_fetch_retries=0")
     expect(command).toContain(agent)
     for (const option of options) expect(command).toContain(option)
@@ -868,7 +868,7 @@ function unadvertisedStream(model: string, available: string, base: string) {
 describe("cross-model-doc-review antigravity route", () => {
   test("--emit-adapter antigravity denies every permission and isolates GEMINI_HOME", () => {
     const command = emitAdapter("antigravity")
-    expect(command).toContain(`npx -y --package ${ACPX_RANGE} -- acpx --cwd`)
+    expect(command).toContain(`npx -y --package ${ACPX_RANGE} -- env -u npm_config_package acpx --cwd`)
     expect(command).toContain("GEMINI_HOME=<gemini-home>")
     expect(command).toContain("--deny-all --model gemini-4-argon antigravity exec --config-option mode=default --config-option thinking_level=high")
   })
@@ -946,6 +946,7 @@ describe("cross-model-doc-review normalization (R18, KTD5)", () => {
 
   test.each([
     ["codex", "claude", { quota: { model_usage: [{ model: "gpt-6.1-sol", token_count: { totalTokens: 1200 } }] } }, "gpt-6.1-sol", false],
+    ["codex", "claude", { quota: { model_usage: [{ model: "gpt-6-luna", token_count: { totalTokens: 1200 } }] } }, "gpt-6-luna", true],
     ["claude", "codex", { quota: { model_usage: [
       { model: "claude-haiku-4-5", token_count: { totalTokens: 5000 } },
       { model: "claude-opus-5-5-20260801", token_count: { totalTokens: 100 } },

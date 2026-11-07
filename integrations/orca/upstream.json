@@ -1,8 +1,8 @@
 {
   "schema": "ce-orca.upstream-baseline/v1",
   "repository": "https://github.com/EveryInc/compound-engineering-plugin.git",
-  "version": "3.33.2",
-  "commit": "fbd794f329f5b65d0ea00a5e6487336c385ff2be",
+  "version": "3.36.1",
+  "commit": "173bd337fa639aac19ce7363d288836a074231a5",
   "skillInventory": [
     "ce-babysit-pr",
     "ce-bakeoff",
@@ -17,6 +17,7 @@
     "ce-dogfood",
     "ce-explain",
     "ce-handoff",
+    "ce-help",
     "ce-ideate",
     "ce-noslop",
     "ce-optimize",
@@ -109,6 +110,7 @@
       "code-reuse-reviewer.md",
       "comment-reviewer.md",
       "efficiency-reviewer.md",
+      "structure-reviewer.md",
       "test-value-reviewer.md"
     ],
     "ce-work": [
@@ -126,7 +128,7 @@
     {
       "id": "ce-plan.organizational-research",
       "file": "skills/ce-plan/references/research.md",
-      "contains": "**Slack context** (opt-in) \u2014 never auto-dispatch. Route by condition:"
+      "contains": "**Slack context** (opt-in) — never auto-dispatch. Route by condition:"
     },
     {
       "id": "ce-work.unit-dispatch",
@@ -141,7 +143,7 @@
     {
       "id": "ce-simplify-code.reviewer-dispatch",
       "file": "skills/ce-simplify-code/SKILL.md",
-      "contains": "Dispatch generic subagents"
+      "contains": "Dispatch each reviewer as its own generic subagent"
     },
     {
       "id": "ce-code-review.persona-dispatch",
@@ -179,5 +181,5 @@
       "contains": "invoke the `ce-work` skill with `mode:return-to-caller"
     }
   ],
-  "mergedCommit": "310e87ba63f6158d94d96f5f7a3be1e4919f67a0"
+  "mergedCommit": "2921168fc84b4070308a9ef6d115063cf62198cf"
 }

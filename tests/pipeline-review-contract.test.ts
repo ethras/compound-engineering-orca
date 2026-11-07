@@ -454,6 +454,14 @@ describe("cross-model execution receipt seam parity (ce-work <-> lfg)", () => {
     }
   })
 
+  test("ce-work returns simplified_through only when a phase-boundary simplify pass ran", async () => {
+    const returned = await readRepoFile("skills/ce-work/references/return-to-caller.md")
+    const loop = await readRepoFile("skills/ce-work/references/implementation-loop.md")
+    expect(returned).toMatch(/`simplified_through`: present only when a phase-boundary `ce-simplify-code` pass ran/)
+    expect(returned).toContain("Omit the field otherwise")
+    expect(loop).toContain("record that commit's SHA (HEAD when the pass changed nothing) as `simplified_through`")
+  })
+
   test("lfg fails closed for unknown or malformed work returns", async () => {
     const lfg = await readRepoFile("skills/lfg/SKILL.md")
     const gate = sliceSection(
@@ -632,7 +640,7 @@ describe("ce-debug regression test selection", () => {
 
     expect(debug).toMatch(/Only when that gate qualifies the fix, offer capture/i)
     expect(debug).toMatch(/only the artifacts it actually wrote or updated/i)
-    expect(debug).toMatch(/If it writes nothing, no documentation joins the commit/i)
+    expect(debug).toMatch(/If it writes nothing, no artifact joins the commit/i)
     // Capture is settled before the fix commits, so an accepted learning ships with the
     // fix. The older after-PR offer never fired in real sessions and cost a second push.
     expect(debug).toMatch(/Settle learning capture before anything commits/i)
@@ -834,9 +842,15 @@ describe("ce-doc-review contract", () => {
     expect(synthesis).toContain("cannot trigger anchor promotion")
     expect(synthesis).toContain("Cursor default/Auto")
 
-    // R29 and R30 round-2 rules
-    expect(synthesis).toContain("R29 Rejected-Finding Suppression")
-    expect(synthesis).toContain("R30 Fix-Landed Matching Predicate")
+    // R29 and R30 round-2 rules load only on later rounds (#1770)
+    const laterRound = await readRepoFile(
+      "skills/ce-doc-review/references/later-round-synthesis.md"
+    )
+    expect(laterRound).toContain("R29 Rejected-Finding Suppression")
+    expect(laterRound).toContain("R30 Fix-Landed Matching Predicate")
+    expect(synthesis).not.toContain("R29 Rejected-Finding Suppression")
+    expect(synthesis).not.toContain("R30 Fix-Landed Matching Predicate")
+    expect(synthesis).toContain("also read `references/later-round-synthesis.md` before 3.1")
   })
 
   test("non-interactive envelope surfaces new tiers distinctly", async () => {
@@ -854,6 +868,16 @@ describe("ce-doc-review contract", () => {
 
     // Terminal signal preserved for programmatic callers
     expect(synthesis).toContain("Review complete")
+  })
+
+  test("non-interactive result goes to a file the caller reads, not into the chat", async () => {
+    const synthesis = await readRepoFile("skills/ce-doc-review/references/synthesis-and-presentation.md")
+    const handoff = await readRepoFile("skills/ce-plan/references/plan-handoff.md")
+    expect(synthesis).toContain("**Deliver the result through a file.**")
+    expect(synthesis).toContain("Full result: <absolute path to result.md>")
+    expect(synthesis).toMatch(/If the file cannot be written, print the whole block in the chat instead/)
+    expect(handoff).toMatch(/prints the path on a `Full result:` line; read that file before acting on the review/)
+    expect(handoff).toMatch(/Do not paste the review's result block; the caller reads the file if it needs more/)
   })
 
   test("non-interactive result records a cleanly skipped cross-model peer", async () => {
@@ -979,6 +1003,38 @@ describe("ce-doc-review contract", () => {
     expect(block).toMatch(/\*Strategic weight\*/)
   })
 
+  test("adversarial fires on what a plan does, not on who made its choices", async () => {
+    const content = await readRepoFile("skills/ce-doc-review/references/persona-selection.md")
+    const block = sliceSection(content, "**adversarial**", "## Announce the review team")
+    const depth = await readRepoFile("skills/ce-doc-review/references/depth.md")
+    expect(block).not.toMatch(/product choice/)
+    expect(depth).not.toMatch(/product choice/)
+    expect(block).toMatch(/high-stakes domain/)
+    expect(block).toMatch(/change to a public contract\*\* that an outside consumer already relies on/)
+    expect(block).not.toMatch(/no validated upstream Product Contract signal/)
+    expect(block).not.toMatch(/ce-plan-bootstrap/)
+  })
+
+  test("plan review depth is lite only when no challenge lens activates, and never lowers", async () => {
+    const skill = await readRepoFile("skills/ce-doc-review/SKILL.md")
+    const depth = await readRepoFile("skills/ce-doc-review/references/depth.md")
+    const handoff = await readRepoFile("skills/ce-plan/references/plan-handoff.md")
+    expect(skill).toContain("references/depth.md")
+    expect(depth).toMatch(/Only a plan document .* can run lite/)
+    expect(depth).toMatch(/conditional persona other than `scope-guardian-reviewer` activates/)
+    expect(depth).toMatch(/what the files and code paths it names actually do/)
+    expect(depth).toContain("`depth:full`")
+    expect(depth).toMatch(/keeps or raises the recorded depth, never lowers it/)
+    expect(depth).toMatch(/Lite never runs the cross-model pass/)
+    expect(depth).toMatch(/Severity alone never escalates/)
+    expect(depth).toContain("`ESCALATE:`")
+    expect(depth).toMatch(/switch to `full` in the same invocation/)
+    expect(depth).toMatch(/unless the caller passed `depth:full`/)
+    expect(depth).toMatch(/lite review was not independent/)
+    expect(depth).toMatch(/does not begin with the word "depth"/)
+    expect(handoff).toContain("`depth:full`")
+  })
+
   test("keeps security document review on the parent capability tier", async () => {
     const content = await readRepoFile("skills/ce-doc-review/references/dispatch.md")
     const modelTierSection = content.slice(content.indexOf("Model tiering lives here"))
@@ -1001,7 +1057,7 @@ describe("ce-doc-review contract", () => {
     // Routing question distinguishing words present (front-loaded per AGENTS.md Interactive Question Tool Design)
     expect(walkthrough).toContain("Review each finding one by one")
     expect(walkthrough).toContain("Auto-resolve with best judgment")
-    expect(walkthrough).toContain("Append findings to the doc's Open Questions section")
+    expect(walkthrough).toContain("append the decisions to the doc's Open Questions section")
     expect(walkthrough).toContain("Report only")
 
     // Four per-finding options
@@ -1048,6 +1104,37 @@ describe("ce-doc-review contract", () => {
     expect(bulkPreview).not.toContain("Acknowledging (N):")
   })
 
+  test("interactive output asks one question and keeps review bookkeeping out of the report", async () => {
+    const walkthrough = await readRepoFile("skills/ce-doc-review/references/walkthrough.md")
+    const template = await readRepoFile("skills/ce-doc-review/references/review-output-template.md")
+    const synthesis = await readRepoFile("skills/ce-doc-review/references/synthesis-and-presentation.md")
+    const selection = await readRepoFile("skills/ce-doc-review/references/persona-selection.md")
+
+    expect(walkthrough).toContain("Ask about both in one question")
+    expect(walkthrough).not.toContain("Grouped confirmation (asked before routing)")
+    expect(walkthrough).toMatch(/Do not list the applied fixes, FYI observations, or residual concerns a second time/)
+    expect(template).not.toContain("| Persona | Status")
+    expect(template).not.toMatch(/\| Confidence \| Tier \|/)
+    expect(synthesis).not.toContain("Dropped: N")
+    expect(synthesis).not.toContain("Restated: N")
+    expect(synthesis).toMatch(/Do not restate it in prose; the caller summarizes it/)
+    expect(selection).toMatch(/do not post an update as each one returns/)
+  })
+
+  test("later rounds rerun only reviewers whose scope changed", async () => {
+    const selection = await readRepoFile("skills/ce-doc-review/references/persona-selection.md")
+    expect(selection).toMatch(/Rerun only the reviewers whose lens covers something that changed since their last return/)
+    expect(selection).toMatch(/Coherence reruns whenever anything changed/)
+    expect(selection).toMatch(/Rerun the whole team when the user asks for a fresh full review/)
+  })
+
+  test("synthesis holds additions and cuts to one bar and keeps cuts out of FYI", async () => {
+    const synthesis = await readRepoFile("skills/ce-doc-review/references/synthesis-and-presentation.md")
+    expect(synthesis).toContain("Additions and removals meet the same bar")
+    expect(synthesis).toMatch(/Making the work more thorough, robust, or explicit is not a consequence/)
+    expect(synthesis).toMatch(/A concern whose remedy cuts something the document commits to is never FYI/)
+  })
+
   test("open-questions-defer reference implements append mechanic with failure path", async () => {
     const defer = await readRepoFile(
       "skills/ce-doc-review/references/open-questions-defer.md"
@@ -1090,18 +1177,6 @@ describe("ce-compound frontmatter schema expansion contract", () => {
 
     // best_practice remains valid as fallback
     expect(schema).toContain("best_practice")
-  })
-
-  test("ce-compound-refresh schema stays in sync with canonical ce-compound schema", async () => {
-    const canonical = await readRepoFile(
-      "skills/ce-compound/references/schema.yaml"
-    )
-    const refresh = await readRepoFile(
-      "skills/ce-compound-refresh/references/schema.yaml"
-    )
-
-    // Duplicate schemas must be identical (kept in sync intentionally per AGENTS.md)
-    expect(refresh).toEqual(canonical)
   })
 
   test("yaml-schema.md documents category mappings for the four new values", async () => {
@@ -1172,8 +1247,8 @@ describe("ce-compound vocabulary is corpus-first, not Rails-specific (issue #126
     expect(lightweight).toMatch(/existing docs/)
   })
 
-  test("ce-compound-refresh replace flow keeps the old learning's component/root_cause", async () => {
-    const flows = await readRepoFile("skills/ce-compound-refresh/references/per-action-flows.md")
+  test("refresh replace flow keeps the old learning's component/root_cause", async () => {
+    const flows = await readRepoFile("skills/ce-compound/references/refresh/per-action-flows.md")
     const replaceFlow = sliceSection(flows, "## Replace Flow", "3. **Validate parser-safety")
     expect(replaceFlow).toMatch(/corpus-first rule in `references\/yaml-schema\.md`/)
     expect(replaceFlow).toMatch(/counting the old learning as one of the corpus's docs/)
@@ -1346,6 +1421,42 @@ describe("ce-simplify-code pipeline callers", () => {
     expect(skill).toContain("mode:pipeline")
     expect(skill).toContain("proof-test:<path>")
     expect(skill).toContain("The proof-test path is context for Step 3, never scope")
+  })
+
+  // The caller owns the threshold and the callee owns the measurement. Without the
+  // token, a standalone or ce-work run keeps the full team at any size.
+  test("lfg passes the size cutoff and scopes step 3 after ce-work's own pass", async () => {
+    const lfg = await readRepoFile("skills/lfg/SKILL.md")
+    const followup = await readRepoFile("skills/lfg/references/review-followup.md")
+    const debugReturn = await readRepoFile("skills/lfg/references/debug-return.md")
+    const skill = await readRepoFile("skills/ce-simplify-code/SKILL.md")
+    const singlePass = await readRepoFile("skills/ce-simplify-code/references/single-pass.md")
+
+    expect(lfg).toContain("with `mode:pipeline` and `size-cutoff:30`")
+    expect(lfg).toContain("roughly sub-10-line change")
+    expect(followup).toContain("`simplified_through: <sha>`")
+    expect(followup).toContain("pass only the changes after it as the scope")
+    expect(followup).toContain("the `size-cutoff:` token step 3 names")
+    expect(debugReturn).toContain("the `size-cutoff:` token step 3 names")
+
+    expect(skill).toContain("a `size-cutoff:<N>` token")
+    expect(skill).toContain("When the input carried `size-cutoff:<N>`, read `references/single-pass.md` before dispatching")
+    expect(skill).toContain("any size or cost threshold is the caller's to set")
+    expect(singlePass).toContain("A count of N or more runs Step 2 as written")
+    expect(singlePass).toContain("A count below N runs one combined reviewer")
+    expect(singlePass).toContain("Anything the preflight says is not code never counts")
+    expect(singlePass).toContain("Step 5's summary names the mode that ran")
+  })
+
+  // Skill and prompt markdown is product code in some repos, but it is never code to simplify.
+  test("the callee and lfg both say prose, including agent-read markdown, is not code", async () => {
+    const skill = await readRepoFile("skills/ce-simplify-code/SKILL.md")
+    const followup = await readRepoFile("skills/lfg/references/review-followup.md")
+    for (const text of [skill, followup]) {
+      expect(text).toContain("Prose is not code")
+      expect(text).toContain("markdown that agents read")
+    }
+    expect(followup).toContain("A change with none of that code is docs-only for step 3's skip, however large it is")
   })
 })
 

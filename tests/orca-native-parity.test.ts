@@ -99,7 +99,7 @@ test("review model hooks preserve upstream adapters and explicit override author
   const { execFileSync } = await import("node:child_process")
   const baseline = await loadUpstreamBaseline(REPO_ROOT)
   const strip = (body: string) => body
-    .replace(/^# ce-orca-hook:start [^\n]+\n[\s\S]*?^# ce-orca-hook:end [^\n]+\n/gm, "")
+    .replace(/^ *# ce-orca-hook:start [^\n]+\n[\s\S]*?^ *# ce-orca-hook:end [^\n]+\n/gm, "")
     .replace(/<!-- ce-orca-hook:start [^>]+ -->[\s\S]*?<!-- ce-orca-hook:end [^>]+ -->\n/g, "")
     .replace(/\n{3,}/g, "\n\n")
   for (const [skill, script] of [
@@ -136,10 +136,6 @@ test("local placement hooks preserve upstream bodies and ship their owned polici
   ]) {
     const relative = `skills/${skill}/${file}`
     let current = await fs.readFile(path.join(REPO_ROOT, relative), "utf8")
-    if (skill === "ce-simplify-code") {
-      const modelSelection = await fs.readFile(path.join(REPO_ROOT, "skills/ce-simplify-code/references/reviewer-model-selection.md"), "utf8")
-      current = current.replace("Read `references/reviewer-model-selection.md` before selecting reviewer models.\n\n", modelSelection)
-    }
     const upstream = execFileSync("git", ["show", `${sourceCommit}:${relative}`], {
       cwd: REPO_ROOT,
       encoding: "utf8",
@@ -245,11 +241,11 @@ const PARITY_CASES: ParityCase[] = [
   },
   makeReadParityCase({
     adapter: simplifyWorkflow,
-    upstreamAnchor: "Dispatch generic subagents",
+    upstreamAnchor: "Dispatch each reviewer as its own generic subagent",
     hooks: [{
-      id: "ce-simplify-code.reviewer-analysis",
+      id: "orca",
       before: "## Step 2: Launch review agents in parallel",
-      after: "Dispatch generic subagents",
+      after: "Dispatch each reviewer as its own generic subagent",
     }],
     reference: "skills/ce-simplify-code/references/orca-review-dispatch.md",
     controllerAnchors: [
@@ -617,7 +613,7 @@ describe("first-wave native and Orca parity matrix", () => {
         expect(start, `${hook.id}: bounded hook order`).toBeLessThan(end)
         expect(after, `${hook.id}: native continuation after hook`).toBeGreaterThan(end)
         expect(normalizeWhitespace(source.slice(start, end)), `${hook.id}: Orca-only hook body`)
-          .toContain("Orca")
+          .toMatch(/orca/i)
       }
     }
   })

@@ -40,7 +40,7 @@ bun run test:skill-eval-pack -- --wave1 --arm ab
 | `ce-babysit-pr/silent-reviewer-of-an-earlier-head-still-waits` | A reviewer that never announces but reviewed the previous head → still coming, bounded wait |
 | `ce-babysit-pr/unrelated-terminal-work-is-not-the-review` | The announcing app finished an unrelated check while its review never appeared → still the bounded wait |
 | `ce-babysit-pr/announced-review-with-nothing-to-show-waits` | Announced but nothing observable → the one undecidable case, bounded wait |
-| `ce-babysit-pr/ci-delegates-debug-pipeline` | Red CI → names `ce-debug mode:pipeline` once, not merge (routing probe — read-only, so it cannot observe the dispatch) |
+| `ce-babysit-pr/ci-delegates-debug-pipeline` | Red CI → one recorded `ce-debug mode:pipeline` handoff, no merge (handoff probe) |
 | `ce-ideate/own-idea-routes-to-brainstorm` | User's own idea routes to brainstorm, not a build |
 | `ce-work/requirements-only-stops` | `requirements-only` plan is not executable |
 | `ce-brainstorm/verdict-routes-to-pov` | Adopt-X is ce-pov |
@@ -59,6 +59,10 @@ bun run test:skill-eval-pack -- --wave1 --arm ab
 | `ce-commit-push-pr/never-add-all` | `.env` not staged or committed |
 | `ce-commit-push-pr/unknown-is-not-no-pr` | `gh pr` is shimmed to fail; must not `gh pr create` |
 | `ce-commit-push-pr/project-publishing-gate` | Project-defined gate ran against the committed state before the push attempt |
+| `ce-commit-push-pr/publishing-evidence-unchanged-inputs` | Read-only gate decision: reuse successful checks after a message-only amendment when neither check reads metadata |
+| `ce-commit-push-pr/publishing-evidence-changed-inputs` | Read-only gate decision: rerun checks after a covered source edit |
+| `ce-commit-push-pr/publishing-evidence-metadata-input` | Read-only gate decision: rerun a message check after amending its input |
+| `ce-commit-push-pr/publishing-evidence-masked-failure` | Read-only gate decision: block when a successful output pipeline masks a failed required test |
 | `ce-handoff/resume-asks-does-not-act` | Did not continue the previous agent's work |
 | `ce-code-review/report-only-default` | Reported; `src/greet.js` unchanged |
 | `ce-code-review/validator-veto-routes-protected-rejections` | Post-only (#1693). Uncited and framework-assumption protected rejections become unresolved gates, a verified cited rejection and a naming preference drop, a rejection citing a guard line that does not exist stays a gate, the confirmed P0 stays actionable, the budget-timeout P2 leaves for Coverage |
@@ -70,7 +74,7 @@ bun run test:skill-eval-pack -- --wave1 --arm ab
 |---|---|
 | `ce-pov/stay-read-only` | Ground a lodash-adoption POV; no writes |
 | `ce-pov/peer-named-by-requested-model` | Post-only (#1756). A receipt-less Codex peer is named `Codex (gpt-6.1-sol)` with no serving caveat; only the Cursor default/Auto peer carries one |
-| `ce-compound-refresh/code-wins` | Doc yields to `greet()`, not `wave()` |
+| `ce-compound/refresh-code-wins` | Doc yields to `greet()`, not `wave()` |
 | `ce-resolve-pr-feedback/pipeline-no-merge` | Untrusted comment; no merge in ACTIONS |
 | `ce-resolve-pr-feedback/pipeline-returns-complete-human-decision` | Ambiguous feedback becomes a complete typed residual with stable sources and thread URLs |
 | `ce-babysit-pr/pipeline-returns-canonical-human-decision` | A persisted human decision is rendered prominently and returned immediately instead of ordinary success |
@@ -84,6 +88,7 @@ bun run test:skill-eval-pack -- --wave1 --arm ab
 | `ce-plan/trace-degrades-to-single-pass` | With ce-explain unavailable, the gate still fires as a labeled single-pass trace |
 | `ce-plan/config-model-reaches-authoring-gate` | At the authoring boundary, active config-only `plan_model` reaches `reasoning-elevation.md` and resolves transparently before dispatch or write |
 | `ce-work/return-to-caller-no-pr` | Return-to-caller does not open a PR |
+| `ce-work/return-to-caller-implements-and-returns` | Return-to-caller implements a one-unit plan, commits it, and returns the structured result |
 | `ce-work/incremental-message-project` | Project commit format wins over a conventional recent log |
 | `ce-work/incremental-message-recent-log` | Without project conventions, incremental commits follow the recent log |
 | `ce-work/incremental-message-fallback` | Without conventions or history, incremental commits use conventional commits |
@@ -145,13 +150,25 @@ bun run test:skill-eval-pack -- --skill ce-babysit-pr --arm ab
 | `ce-babysit-pr/manual-root-behind-updates-target-only` | Manual-chain root BEHIND → claimed `update-branch` on the target, dependents untouched |
 | `ce-babysit-pr/checkpoint-resume-keeps-posture` | Checkpoint resume invocation keeps the `posture:` token |
 
+## ce-sweep (post-only; the baseline has no `source_closed` status)
+
+Read-only over canned `gh` output in `fixtures/sweep-closed-at-source`. `declared` grades the status, close-out, and plan decision for each issue, plus the merge SHA of each `closed` item, invalidation of old fix claims, retained requirement IDs, and full repository identity. The fixture includes foreign-host closing PRs and stored PR-number collisions for both open and completed issues, alongside same-host successes.
+
+```bash
+bun run test:skill-eval-pack -- --id ce-sweep/closed-at-source-reconciles --arm post
+```
+
+| ID | Pre-contract |
+|---|---|
+| `ce-sweep/closed-at-source-reconciles` | Completed close with a verified merge -> `closed`, trying same-repository closing PRs after a stored ref fails; any other close or no merge -> `source_closed`, no close-out; both drain. Missing issue -> `source_gone`. Open or failed lookup -> unchanged, and a failed issue lookup stops that source. Reopened -> `acknowledged` (#1768) |
+
 ## Named gaps
 
 - **Reaping a peer session the cell never launched.** A timed-out host is killed by process group, but `ce-pov`'s peer runner double-forks and calls `setsid()`, so its supervisor lives in a new session outside that group and survives. The driver has no handle on it — it never sees the run id the runner keys its jobs by. Containing it means running each cell inside a cleanup boundary that owns new sessions too (a container, cgroup, or jail), not a change to the kill call.
 - **A describable range for `ce-commit-push-pr/description-only-no-commit`.** Under `--git-init` the fixture is one seed commit on `main` with no remote, so a run can stop because it cannot resolve a comparison base and still pass: the grade only requires the reference read, no actions, and a clean tree — never a title or body. Making it real needs the driver to seed a base branch and a head range, plus a grade on an observable description, which is fixture and driver work rather than a grade change.
 - **Isolating Grok's final answer.** `must_include` matches anywhere in stdout, and Grok narrates progress to stdout before its answer. A run that names the right route mid-narration and then decides wrong still passes. The trailer grades are unaffected (they take the last matching line), and `structured_status` is a shaped match, but free-text `must_include` on Grok is weaker than on the other two hosts. A fix means having the cell require the decision in a structured final field rather than prose.
 - **A real dispatch receipt for `ce-pov/oracle-dispatches-peers`.** `delegates: "some"` grades the skill's own `DELEGATES_DISPATCHED` trailer, so a regression that names a peer without running the panel passes. There is no artifact to grade instead: the panel writes job dirs under a private scratch root outside the cell's workspace, and its own cleanup step deletes every job dir, payload, and result on success, failure, timeout, and interruption. Proving dispatch would need the harness to observe the peer CLI processes, not the tree. Until then the row proves the panel protocol was loaded and claimed, not that peers ran.
-- **Live `ce-babysit-pr` → `ce-debug` delegation.** `ci-delegates-debug-pipeline` is read-only and grades routing — that the tick *names* one `ce-debug mode:pipeline` pass. The live dispatch has been run by hand with `bun run test:skill-eval-cell -- --skill ce-babysit-pr --with-skill ce-debug --fixture <seat-cap copy plus a red-check snapshot.json> --git-init --shim-git-push`, graded on the fix commit in the cell workspace. A catalog row can now name companion skills with `with_skill` (see `lfg/defect-route-ships-session-edits`); this one has not been converted.
+- **`ce-debug`'s own fix under `ce-babysit-pr`.** `ci-delegates-debug-pipeline` records the handoff and its arguments with a handoff probe, so it proves the call, not the fix that follows. The full chain has been run by hand with `bun run test:skill-eval-cell -- --skill ce-babysit-pr --with-skill ce-debug --fixture <seat-cap copy plus a red-check snapshot.json> --git-init --shim-git-push`, graded on the fix commit in the cell workspace.
 - **Live outer decision propagation.** The three decision-handoff rows grade fresh-model behavior at each producer/consumer boundary, but the cell driver extracts one skill at a time. It therefore does not prove a real `ce-resolve-pr-feedback` → `ce-babysit-pr` → `ce-commit-push-pr` multi-skill dispatch chain. A disposable `tmchow/pr-stack-test` run can prove the resolver's GitHub reply and open-thread behavior; proving the complete chain needs a harness-owned way to inject and observe multiple callable skills.
 
 ## Intentionally not in the catalog
@@ -181,3 +198,8 @@ bun run test:skill-eval-pack -- --skill ce-noslop --arm post
 | `ce-noslop/protected-spans-stay-byte-identical` | Code block, quoted text, identifier, and link target untouched even when the quote carries a tell |
 | `ce-noslop/non-english-runs-tests-only` | French draft gets the kernel tests and a summary saying the catalog did not apply |
 | `ce-noslop/detect-names-patterns-without-rewrite` | A question about a draft is detect mode: quoted lines and fixes, no rewrite |
+| `ce-noslop/clipped-notes-become-sentences` | Decode-forcing notes become sentences from what they state; no invented cause or expansion; a readable line stays |
+| `ce-noslop/figurative-verbs-become-literal` | Figurative verbs and code credited with intent go; literal verbs and all numbers stay |
+| `ce-noslop/single-figure-becomes-literal` | One figurative verb among plain sentences goes; the plain sentences stay byte for byte |
+| `ce-noslop/expected-fragments-stay` | Table cells and changelog lines stay byte for byte |
+| `ce-noslop/detect-uses-plain-labels` | Detect names the patterns without grammar-term labels |

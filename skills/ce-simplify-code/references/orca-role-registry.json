@@ -1,13 +1,13 @@
 {
   "identities": {
-    "ceVersion": "3.33.2",
-    "integrationVersion": "3.33.2-orca.7",
+    "ceVersion": "3.36.1",
+    "integrationVersion": "3.36.1-orca.7",
     "protocolVersion": "orca.local-protocol/v1",
-    "registryVersion": "ce-orca.registry/v1@3.33.2-orca.7",
+    "registryVersion": "ce-orca.registry/v1@3.36.1-orca.7",
     "requestVersion": "orca.execution-config/v1"
   },
   "schema": "ce-orca.role-registry/v1",
-  "version": "ce-orca.registry/v1@3.33.2-orca.7",
+  "version": "ce-orca.registry/v1@3.36.1-orca.7",
   "workflows": {
     "ce-simplify-code": {
       "controller": "ce-controller",
@@ -16,7 +16,7 @@
       "stages": {
         "reviewer-analysis": {
           "activation": "always",
-          "anchor": "Dispatch generic subagents",
+          "anchor": "Dispatch each reviewer as its own generic subagent",
           "defaultOwner": "orca",
           "mutation": "read-only",
           "resultMode": "structured",
@@ -56,6 +56,15 @@
               "resultMode": "structured",
               "sourceKind": "prompt-asset",
               "sourcePath": "references/personas/efficiency-reviewer.md"
+            },
+            "structure-reviewer": {
+              "activation": "conditional",
+              "modelTier": "mid",
+              "mutation": "read-only",
+              "required": true,
+              "resultMode": "structured",
+              "sourceKind": "prompt-asset",
+              "sourcePath": "references/personas/structure-reviewer.md"
             },
             "test-value-reviewer": {
               "activation": "conditional",

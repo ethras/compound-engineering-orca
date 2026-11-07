@@ -10,7 +10,8 @@ Do not launch native reviewers for an Orca-owned packet.
 Create a private prompt directory outside the checkout. Write one raw prompt file per selected reviewer, carrying the full persona,
 resolved scope, mode, proof tests, user constraints, and project standards.
 The file mapping is `reuse.txt`, `quality.txt`, `efficiency.txt`, `tests.txt`,
-and `comments.txt` for reuse, quality, efficiency, tests, and comments.
+`comments.txt`, and `structure.txt` for reuse, quality, efficiency, tests, comments,
+and the structural reviewer.
 Do not hand-escape prompt bytes inside JSON. Build and validate the selected packet:
 
 ```bash
@@ -31,8 +32,9 @@ building a fresh packet.
 
 Include exactly one node for every reviewer selected by Step 2. Each selected
 node is required and shares wave 0. A focused standalone tests/comments request
-uses only that reviewer; other passes include the three core reviewers and any
-conditional tests/comments reviewers. A target override does not select roles. Do not add executable command fields,
+uses only that reviewer. The structural follow-up selected by `references/structural-pass.md`
+also uses only its structure reviewer. Other passes include the three core reviewers and any
+conditional tests/comments/structure reviewers. A target override does not select roles. Do not add executable command fields,
 credentials, environment dumps, or mutation instructions; the prompt may keep
 the native read-only inspection guidance. Submit through
 `references/orca-routing.md`.

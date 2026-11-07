@@ -92,15 +92,18 @@ If **`ce-simplify-code`** is available, invoke it with `mode:pipeline` at phase 
 
 When the plan carries `session-settled:`-labeled KTDs or Key Decisions, pass the plan path as context for which structures must stay as they are, not as the simplification scope, with the one-line constraint that labeled entries are settled decisions the simplification must preserve (e.g., deliberate duplication stays duplicated).
 
+In return-to-caller mode, commit the pass's edits once its checks pass, then record that commit's SHA (HEAD when the pass changed nothing) as `simplified_through`. The caller's own simplify step then covers only what came after it. A later pass replaces the recorded SHA. Reviewing the files yourself records nothing.
+
 4. **UI Verification** (if applicable)
 
 For UI work built from a Figma design, read `references/agents/figma-design-sync.md` and dispatch a generic subagent seeded with that local prompt to compare the implementation against the design. Do not dispatch a standalone agent by type/name. Apply the reported fixes that hold up against the project's conventions, then compare again until it reports a match or only differences you judge intentional.
 
-For other user-visible UI changes, check the changed UI in a browser at desktop and mobile widths when browser tooling is available. If none is available, review the layout code for overflow and responsive breakage and record that browser verification was unavailable. Phase 4's screenshot capture still applies when the change is user-visible.
+For other user-visible UI changes, check the changed UI in a browser at desktop and mobile widths when browser tooling is available. If none is available, review the layout code for overflow and responsive breakage and record that browser verification was unavailable.
 
 5. **Track Progress**
 - Add a task when requested work turns out larger than expected; a mechanism nobody asked for goes through **Build what was asked** first
 - When the plan defines U-IDs for Implementation Units, or the plan or origin document carries stable R-IDs (and optionally A/F/AE IDs), reference them in blockers, deferred-work notes, task summaries, and final verification — not routine status updates. U-IDs anchor units across plan edits; R/A/F/AE anchor product intent across the brainstorm-plan handoff. Use the IDs the plan supplies and do not invent ones it does not. This preserves traceability without burying signal under noise.
+- **Plan IDs stay out of written files.** U-, R-, A-, F-, AE-, and KTD-IDs mean something only to a reader who has the plan open. Keep them out of the files the work writes, including code, comments, docs, scripts, and skills. Where an ID would go, write what the requirement or decision says instead: `# allowlist read-only tools`, not `# (R7)`.
 
 ## Settled decisions during implementation
 

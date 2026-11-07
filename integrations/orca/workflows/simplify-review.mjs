@@ -18,6 +18,7 @@ export const ROLE_POLICY = Object.freeze({
     "efficiency-reviewer": Object.freeze({ required: true, repeatable: false }),
     "test-value-reviewer": Object.freeze({ required: true, repeatable: false }),
     "comment-reviewer": Object.freeze({ required: true, repeatable: false }),
+    "structure-reviewer": Object.freeze({ required: true, repeatable: false }),
   }),
 })
 
@@ -28,6 +29,7 @@ const REVIEW_PROMPTS = Object.freeze([
   Object.freeze({ id: "efficiency", role: "efficiency-reviewer", file: "efficiency.txt" }),
   Object.freeze({ id: "tests", role: "test-value-reviewer", file: "tests.txt" }),
   Object.freeze({ id: "comments", role: "comment-reviewer", file: "comments.txt" }),
+  Object.freeze({ id: "structure", role: "structure-reviewer", file: "structure.txt" }),
 ])
 
 const PACKET_KEYS = new Set(["schema", "workflowId", "nodes"])
@@ -64,9 +66,9 @@ export function validatePacket(packet) {
   const seenRoles = new Set()
   packet.nodes.forEach((node, index) => validateNode(node, index, seenIds, seenRoles))
   const suppliedRoles = packet.nodes.map(({ role }) => role).sort()
-  const focused = suppliedRoles.length === 1 && ["test-value-reviewer", "comment-reviewer"].includes(suppliedRoles[0])
+  const focused = suppliedRoles.length === 1 && ["test-value-reviewer", "comment-reviewer", "structure-reviewer"].includes(suppliedRoles[0])
   if (!focused && !CORE_ROLES.every((role) => suppliedRoles.includes(role))) {
-    throw new Error("reviewer-analysis requires the complete core roster or one focused tests/comments reviewer")
+    throw new Error("reviewer-analysis requires the complete core roster or one focused tests/comments/structure reviewer")
   }
   return packet
 }

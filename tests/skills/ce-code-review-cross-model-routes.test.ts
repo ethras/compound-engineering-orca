@@ -326,7 +326,7 @@ describe("cross-model-adversarial-review route safety", () => {
     ["opencode", "--non-interactive-permissions deny --agent", ["opencode acp exec --config-option mode=plan"]],
   ])("--emit-adapter %s approves only reads, from the repository root", (route, agent, options) => {
     const command = emitAdapter(route)
-    expect(command).toContain(`npx -y --package ${ACPX_RANGE} -- acpx --cwd <repo-root> --format json --mcp-config <mcp-config> --timeout 1200 --approve-reads --non-interactive-permissions deny`)
+    expect(command).toContain(`npx -y --package ${ACPX_RANGE} -- env -u npm_config_package acpx --cwd <repo-root> --format json --mcp-config <mcp-config> --timeout 1200 --approve-reads --non-interactive-permissions deny`)
     expect(command).toContain("env npm_config_prefer_offline=true npm_config_fetch_retries=0")
     expect(command).toContain(agent)
     for (const option of options) expect(command).toContain(option)
@@ -1111,6 +1111,7 @@ describe("cross-model-adversarial-review normalization", () => {
 
   test.each([
     ["codex", "claude", { quota: { model_usage: [{ model: "gpt-6.1-sol", token_count: { totalTokens: 1200 } }] } }, "gpt-6.1-sol", false],
+    ["codex", "claude", { quota: { model_usage: [{ model: "gpt-6-luna", token_count: { totalTokens: 1200 } }] } }, "gpt-6-luna", true],
     ["claude", "codex", { quota: { model_usage: [
       { model: "claude-haiku-4-5", token_count: { totalTokens: 5000 } },
       { model: "claude-opus-5-5-20260801", token_count: { totalTokens: 100 } },
@@ -1328,7 +1329,7 @@ function signInWaitStream(base = path.join(temp("xmodel-cr-stream-"), "s")) {
 describe("cross-model-adversarial-review antigravity route", () => {
   test("--emit-adapter antigravity requests Argon read-only, strips Google credentials, and isolates GEMINI_HOME", () => {
     const command = emitAdapter("antigravity")
-    expect(command).toContain(`npx -y --package ${ACPX_RANGE} -- acpx --cwd`)
+    expect(command).toContain(`npx -y --package ${ACPX_RANGE} -- env -u npm_config_package acpx --cwd`)
     expect(command).toStartWith("env -u GEMINI_API_KEY -u GOOGLE_API_KEY -u GOOGLE_APPLICATION_CREDENTIALS -u GOOGLE_CLOUD_PROJECT -u GOOGLE_CLOUD_LOCATION -u GOOGLE_GENAI_USE_VERTEXAI -u AGY_LLM_GATEWAY_URL npm_config_prefer_offline=true")
     expect(command).toContain("GEMINI_HOME=<gemini-home>")
     expect(command).toContain("--approve-reads --non-interactive-permissions deny --model gemini-4-argon antigravity exec --config-option mode=default --config-option thinking_level=high")

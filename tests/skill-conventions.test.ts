@@ -184,6 +184,10 @@ const DESCRIPTION_CHAR_BUDGET = 1024
 const NAME_CHAR_BUDGET = 64
 
 const EXPECTED_USER_INVOKED_SKILLS = new Set([
+  // ce-help: recommends a command and stops. Firing it unasked on a question like
+  // "what next?" would halt work in progress, and a miss costs little because the
+  // agent can still answer from skill descriptions. No skill or pipeline calls it.
+  "ce-help",
   "ce-dogfood",
   "ce-polish",
   "ce-product-pulse",
@@ -193,7 +197,6 @@ const EXPECTED_USER_INVOKED_SKILLS = new Set([
   // it, and model-routing it would let a cheaper request escalate into an
   // expensive measurement program, so it stays user-invoked.
   "ce-retune",
-  "ce-setup",
   "ce-sweep",
   "ce-test-xcode",
   // wtf: answers a user who says they did not follow something. No skill or
@@ -218,6 +221,8 @@ const REQUIRED_MODEL_INVOKED_CALLEES = new Set([
   "ce-prototype",
   "ce-resolve-pr-feedback",
   "ce-riffrec-feedback-analysis",
+  // ce-setup: ce-compound hands standards work to it.
+  "ce-setup",
   "ce-simplify-code",
   "ce-strategy",
   "ce-test-browser",

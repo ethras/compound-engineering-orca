@@ -111,6 +111,8 @@ Each unit heading is `### U1. Name`, `### U2. Name`, and so on. Existing IDs are
 
 This matters because `ce-work` references units by U-ID across plan edits. Renumbering during a deepening pass would silently break every blocker reference, every PR that cites a unit, and every downstream conversation.
 
+When the work ships as several PRs, units are grouped under one `### PR<N>: <title>` heading per PR. Each group heading is followed by a `Waits on:` line naming the PRs it waits on, whether each wait only orders the merges or must be met before the group can start, and any deployment that must be live before it merges. `ce-work` builds groups ahead of merges, so the line is what keeps merges and deploys in order.
+
 ### Origin tracing and per-unit tests
 
 When the plan is sourced from a `ce-brainstorm` requirements-only unified plan, identifiers flow through in the same file. Requirements (R-IDs) stay in the Product Contract. Actors (A-IDs) carry forward when they affect behavior or permissions. Key Flows (F-IDs) cite into the units that realize them. Acceptance Examples (AE-IDs) cite into test scenarios (`Covers AE3. <scenario>`). Every Product Contract section is checked against the Planning Contract before finalization.
@@ -172,7 +174,8 @@ Skip `ce-plan` when:
 
 - The change is already specified down to the files it touches and touches no risk surface (just do it, or `ce-work`); if it reaches `ce-plan` anyway, the Direct contract answers in a few sentences
 - The product or outcome is not yet decided → `ce-brainstorm` first
-- The bug has a known root cause and an obvious fix → `ce-debug` or just fix it
+- The cause of the bug is not known yet → `ce-debug`
+- The bug has a known root cause and an obvious fix → just fix it, or `ce-work`
 
 ---
 

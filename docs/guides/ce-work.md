@@ -111,6 +111,10 @@ When a plan cites a prototype for the active work, the host and its workers insp
 
 Before each task, it checks whether the unit's work already exists and matches the plan's intent. If verification is already satisfied, it marks the task complete and moves on. A unit whose deliverable is out-of-repo state (a console setting, a DNS record) has no git-derived completion signal, so its status is decided from the observed state of the deliverable, never re-applied off a clean tree. This matters most when resuming after context compaction, picking up someone else's branch, or returning to a partly-shipped plan weeks later.
 
+### Plans that ship as several PRs
+
+When a plan's execution profile splits the work into several PRs, a standalone run builds every group it can and lets only the merges go in order. It skips groups already merged or in an open PR, builds a group on top of the group whose code it uses, and holds a group back only when its `Waits on:` line says it needs an earlier merge or a deployment the user has confirmed. Where the project stacks PRs, the groups open as one stack; otherwise each group publishes on a fresh branch once the group before it merges, after rerunning its checks there. On hosts that can start separate long-lived sessions in their own checkouts (T3, Orca, Codex cloud tasks), each group runs in its own session and the main thread coordinates. Re-running `ce-work` on the same plan continues where the last run stopped. Under `lfg`, which calls `ce-work` in return-to-caller mode, every unit is built on one branch and `lfg` stacks the groups.
+
 ### Engine, workspace, and scheduling are separate decisions
 
 Independent units in the same dependency layer run as a parallel wave of fresh, single-use native workers, using whatever isolation the current harness provides. That spends more tokens than working inline, in exchange for finishing sooner. Units that must run in sequence gain no time from a worker, so they run inline in the active checkout unless the context is crowded enough that a fresh window would help. A detached external worker always gets a private linked worktree. The host alone applies, verifies, and commits that result in the canonical checkout.
@@ -167,7 +171,7 @@ Skip `ce-work` when:
 
 - Product behavior is not decided yet → `/ce-brainstorm`
 - Implementation guardrails are not established for non-trivial work → `/ce-plan`
-- The bug has a known root cause and an obvious fix → `/ce-debug`
+- The cause of the bug is not known yet → `/ce-debug`
 - The task is non-software and is not a marked `execution: knowledge-work` plan. Plain non-software work is a human activity; a marked knowledge-work plan does route to the carve-out.
 
 ---
@@ -229,7 +233,7 @@ When another workflow owns the post-implementation shipping gates (final simplif
 /ce-work mode:return-to-caller <plan path>
 ```
 
-This mode keeps `ce-work` on implementation and local verification. Mid-implementation "Simplify as You Go" still runs during Phase 2. After that, `ce-work` returns a structured envelope with changed files, completed units, verification evidence, and blockers, sets `standalone_shipping_skipped: true`, and does not run the standalone shipping tail. The caller remains responsible for every post-implementation gate.
+This mode keeps `ce-work` on implementation and local verification. Mid-implementation "Simplify as You Go" still runs during Phase 2. After that, `ce-work` returns a structured envelope with changed files, completed units, verification evidence, and blockers, sets `standalone_shipping_skipped: true`, and does not run the standalone shipping tail. When a mid-implementation `ce-simplify-code` pass ran, the envelope also carries `simplified_through: <sha>`, so the caller can simplify only what came after it. The caller remains responsible for every post-implementation gate.
 
 Automatic callers can also pass `implementation_engine:<compact-json>` (one `mode`, `target`, `model`, and `source` binding) and `implementation_run:<safe-id>` (resume that existing run) before the plan path.
 

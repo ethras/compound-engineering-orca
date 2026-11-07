@@ -38,8 +38,10 @@ describe("lfg work source and routes", () => {
     }
   })
 
-  test("only a verified plan or a fixed debug return is a work source, and nothing is discovered on disk", () => {
-    expect(lfg).toMatch(/only two things qualify/)
+  test("only a verified plan, a one-pass statement, or a fixed debug return is a work source, and nothing is discovered on disk", () => {
+    expect(lfg).toMatch(/only three things qualify/)
+    expect(intake).toContain("One pass, no plan.")
+    expect(workTriage).toContain("a work statement the caller already sized")
     expect(lfg).toMatch(/`fixed` return from `ce-debug`/)
     expect(lfg).toMatch(/Never search the plans directory/)
     // ce-work's blank-invocation discovery exists; lfg must never reach it.
@@ -87,6 +89,8 @@ describe("lfg work source and routes", () => {
     expect(compound).toBeLessThan(ship)
     expect(lfg).toContain("mode:non-interactive")
     expect(reviewFollowup).toContain("## Step 7 — compound before shipping")
+    expect(reviewFollowup).toContain("`Recommended form`")
+    expect(readRepoFile("skills/ce-compound/references/report.md")).toContain("Recommended form:")
   })
 })
 
@@ -140,6 +144,13 @@ describe("ce-debug return-to-caller seam (ce-debug <-> lfg)", () => {
     // ends must name the field so lfg's offered-scope check can see them.
     expect(debugReturn).toContain('"caller_edits":')
     expect(debugReturnGate).toContain("`pre_fix_scope.caller_edits`")
+  })
+
+  test("the always-on signal proposal reaches the user without becoming required or implemented", () => {
+    expect(debugReturn).toContain('"prevention_signal":')
+    expect(debugReturnGate).toContain("does not require `prevention_signal`")
+    expect(debugReturnGate).toMatch(/no step in this run implements it/)
+    expect(debugReturnGate).toMatch(/Step 11, close-out:[^\n]*`prevention_signal`/)
   })
 
   test("the debug gate requires the same evidence facts the ce-work gate requires", () => {
