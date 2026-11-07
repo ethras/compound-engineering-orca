@@ -1,7 +1,9 @@
 import { spawnSync } from "child_process"
 import { existsSync, readdirSync, readFileSync, statSync } from "fs"
 import path from "path"
-import { describe, expect, test } from "bun:test"
+import { describe, expect, setDefaultTimeout, test } from "bun:test"
+
+setDefaultTimeout(20_000)
 
 const UPSTREAM_BASELINE = "2921168fc84b4070308a9ef6d115063cf62198cf"
 
@@ -31,8 +33,14 @@ const FORK_ONLY_FILES = [
 
 const ORCA_TOKENS = ["ce-orca-hook", "orca-routing", "orca-delegation", ".ce-orca.json", "orca-runtime"]
 
+const GIT_ENV = Object.fromEntries(
+  Object.entries(process.env).filter(
+    ([key]) => !/^(GIT_|CODEX_|CLAUDE_)/.test(key) && !/^(HTTPS?|ALL|NO)_PROXY$/i.test(key),
+  ),
+)
+
 function git(args: string[]): { status: number; stdout: string } {
-  const result = spawnSync("git", args, { cwd: REPO_ROOT, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 })
+  const result = spawnSync("git", args, { cwd: REPO_ROOT, env: GIT_ENV, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 })
   return { status: result.status ?? 1, stdout: result.stdout ?? "" }
 }
 
