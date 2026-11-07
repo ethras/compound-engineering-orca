@@ -3,12 +3,6 @@ import { existsSync, readdirSync, readFileSync, statSync } from "fs"
 import path from "path"
 import { describe, expect, test } from "bun:test"
 
-// This fork keeps upstream's skills/ tree byte for byte except for a few marked
-// seams and fork-only reference files. An upstream merge that drops a seam,
-// edits upstream text around one, or brings back the retired Orca overlay
-// should fail here rather than ship silently.
-//
-// Update UPSTREAM_BASELINE to the merged upstream commit on every sync.
 const UPSTREAM_BASELINE = "2921168fc84b4070308a9ef6d115063cf62198cf"
 
 const REPO_ROOT = path.join(import.meta.dir, "..")
@@ -60,8 +54,6 @@ function markers(id: string) {
   return { start: `ce-fork-hook:start ${id}`, end: `ce-fork-hook:end ${id}` }
 }
 
-// Removes the whole marked block, including the marker lines and one blank
-// line after it, so the remainder can be compared with upstream.
 function stripSeam(content: string, id: string): string {
   const lines = content.split("\n")
   const { start, end } = markers(id)
@@ -94,7 +86,7 @@ describe("fork seams", () => {
       expect(stripSeam(content, seam.id)).toBe(upstreamContent(seam.file))
 
       const block = content.slice(content.indexOf(start), content.indexOf(end))
-      const skillDir = path.join(REPO_ROOT, path.dirname(seam.file).split(path.sep).slice(0, 2).join(path.sep))
+      const skillDir = path.join(REPO_ROOT, ...seam.file.split("/").slice(0, 2))
       const targets = [...block.matchAll(/`(references\/[^`]+\.md)`/g)].map((match) => match[1])
       expect(targets.length).toBeGreaterThan(0)
       for (const target of targets) expect(existsSync(path.join(skillDir, target))).toBe(true)
@@ -106,7 +98,7 @@ describe("fork seams", () => {
     for (const file of listFiles(SKILLS_ROOT)) {
       const content = readFileSync(file, "utf8")
       for (const match of content.matchAll(/ce-fork-hook:start (\S+)/g)) {
-        expect(listed).toContain(`${path.relative(REPO_ROOT, file)}:${match[1]}`)
+        expect(listed).toContain(`${path.relative(REPO_ROOT, file).split(path.sep).join("/")}:${match[1]}`)
       }
     }
   })
