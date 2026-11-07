@@ -12,7 +12,9 @@ When nothing names a target:
 - Implementation units run on Codex `gpt-6.1-sol` with reasoning `medium`.
 - Every other subagent runs on the parent's own model through the native subagent tool.
 
-A role covers only the subagents the skill dispatches for that role. "Reviewers" means the persona reviewers, not the merge, validation, or report steps around them.
+A role covers only the subagents the skill dispatches for that role. "Reviewers" means the persona reviewers, not the merge, validation, or report steps around them. These targets apply to the subagents the skill actually dispatches; whether a role runs in this context or in a subagent stays the skill's own decision.
+
+Running a subagent on another provider through T3 is not the skill's cross-model peer pass. A request to skip the cross-model or external peer review leaves these targets unchanged. Only an instruction not to send the code to another provider keeps every subagent on the parent's provider.
 
 Use the native subagent tool when the target is the parent's own provider and model with no setting the parent does not already have. Use `delegate_task` for every other target. Set the reasoning level with the option name the provider exposes in `orchestrator_capabilities` (for example `reasoningEffort` on Codex, `effort` on Claude). Without it, `gpt-6.1-sol` runs at T3's default, `low`.
 
@@ -24,7 +26,7 @@ When a provider or model the request named is unavailable in `orchestrator_capab
 
 A child starts with only its task text. Give it the complete prompt the native path would send, including every file path it must read.
 
-Independent subagents of one batch run concurrently and are collected in the launching turn, as the dispatching reference requires. Either issue their `delegate_task` calls with `mode: "wait"` together in one tool batch when the host runs those calls concurrently, or launch them with `mode: "async"` and collect each with the host's blocking wait on that child thread (`t3_thread_wait`). Ending the turn to wait for children is not collection, and waits issued one after another are not concurrency.
+Independent subagents of one batch run concurrently. Launch every one of them with `mode: "async"` before collecting any; some parents run `mode: "wait"` calls one after another even when they are issued together, so keep `mode: "wait"` for a single subagent whose result the next step needs. After the last launch, follow T3's `next` instruction: end the turn and continue when T3 wakes this thread, without waiting on or polling a running child. Each completion arrives as a host-delivered terminal message that names the launch and carries its result, which is the terminal outcome the dispatching reference collects. Continue past the batch only when every launch has such an outcome or is recorded as failed.
 
 Reviewers and other read-only subagents use `isolation: "shared"`, so uncommitted changes under review are visible to them.
 
