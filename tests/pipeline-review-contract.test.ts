@@ -618,27 +618,28 @@ describe("ce-debug regression test selection", () => {
     expect(handoff).toMatch(/never open a new record/i)
   })
 
-  // ce-compound's durable-learning gate must be applied by ce-debug before it
-  // offers the handoff. The old sentence-length and location-count heuristics
-  // admitted routine fixes that the callee then had to reject.
-  test("applies ce-compound eligibility before offering learning capture", async () => {
+  // ce-debug offers capture on a session signal and leaves the durable bar to
+  // ce-compound. A caller that applied the bar itself asked only whether a
+  // document was needed, and skipped lessons ce-compound would hold as a test or
+  // standard. The old sentence-length and location-count heuristics stay out.
+  test("offers capture on a correction signal and leaves eligibility to ce-compound", async () => {
     const compound = await readRepoFile("skills/ce-compound/SKILL.md")
     const debug = await readRepoFile("skills/ce-debug/SKILL.md")
     const handoff = await readRepoFile("skills/ce-debug/references/post-fix-handoff.md")
     const guide = await readRepoFile("docs/guides/ce-debug.md")
 
     for (const condition of [
-      "durable project reasoning",
-      "not readily recoverable from the final code, tests, types, comments, or existing documentation",
       "recurrence, material risk, or substantial rediscovery",
-      "if the learning document disappeared",
       "Completion, effort, and diff size do not establish eligibility",
     ]) {
       expect(compound).toContain(condition)
-      expect(handoff).toContain(condition)
+      expect(handoff).not.toContain(condition)
     }
+    expect(handoff).toContain("corrected a wrong belief about how something behaves")
+    expect(handoff).toContain("Do not judge whether the lesson deserves a document")
+    expect(`${compound}\n${handoff}`).not.toContain("learning document disappeared")
 
-    expect(debug).toMatch(/Only when that gate qualifies the fix, offer capture/i)
+    expect(debug).toMatch(/Only when they call for it, offer capture/i)
     expect(debug).toMatch(/only the artifacts it actually wrote or updated/i)
     expect(debug).toMatch(/If it writes nothing, no artifact joins the commit/i)
     // Capture is settled before the fix commits, so an accepted learning ships with the
@@ -1492,5 +1493,38 @@ describe("learnings-researcher local prompt domain-agnostic contract", () => {
     // Integration Points list no longer includes ce-doc-review (agent is ce-plan-owned)
     const integration = agent.substring(agent.indexOf("Integration Points"))
     expect(integration).not.toContain("ce-doc-review")
+  })
+})
+
+// Conditions from the 2026-11-08 ce-debug usage audit (45 real sessions, Claude and Codex).
+describe("ce-debug usage-audit conditions", () => {
+  // Codex cut the middle out of batched skill-file reads in five audited sessions; the same
+  // sentence ce-code-review pins as READ_EACH_FILE_RULE must precede ce-debug's first reference read.
+  test("reads each skill file whole before the first reference read", async () => {
+    const body = await readRepoFile("skills/ce-debug/SKILL.md")
+    const rule = body.indexOf("Give each file you read its own tool call, so its output comes back on its own")
+    expect(rule).toBeGreaterThan(-1)
+    expect(body.indexOf("**Read `references/investigate.md` now")).toBeGreaterThan(rule)
+  })
+
+  test("a bug in instructions a model reads is verified by a behavioral run", async () => {
+    const fix = await readRepoFile("skills/ce-debug/references/fix.md")
+    expect(fix).toMatch(/a test that checks the text is present/)
+  })
+
+  test("a fix that adds an early exit or widens a fallback checks what it now skips", async () => {
+    const fix = await readRepoFile("skills/ce-debug/references/fix.md")
+    expect(fix).toMatch(/what the new path now skips or swallows/)
+  })
+
+  test("an override that stops the handoff names the instruction", async () => {
+    const body = await readRepoFile("skills/ce-debug/SKILL.md")
+    const override = body.slice(body.indexOf("**Contextual override**"))
+    expect(override).toMatch(/say which instruction stopped it/)
+  })
+
+  test("a fix that changes after review is reviewed again", async () => {
+    const handoff = await readRepoFile("skills/ce-debug/references/post-fix-handoff.md")
+    expect(handoff).toMatch(/review the changed part again/)
   })
 })

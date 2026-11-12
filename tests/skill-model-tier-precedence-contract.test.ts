@@ -39,8 +39,10 @@ const EXPECTED_EMITTERS = [
   "skills/ce-code-review/references/dispatch-reviewers.md",
   "skills/ce-code-review/references/finish-input.md",
   "skills/ce-code-review/references/scope.md",
+  "skills/ce-code-review/references/subagent-model.md",
   "skills/ce-compound/references/grounding-validation.md",
   "skills/ce-doc-review/references/dispatch.md",
+  "skills/ce-doc-review/references/subagent-model.md",
   "skills/ce-explain/references/orchestration.md",
   "skills/ce-ideate/references/grounding.md",
   "skills/ce-plan/references/research.md",
@@ -48,6 +50,7 @@ const EXPECTED_EMITTERS = [
   "skills/ce-pov/references/grounding.md",
   "skills/ce-simplify-code/references/reviewer-dispatch.md",
   "skills/ce-sweep/references/model-tiers.md",
+  "skills/ce-work/references/worker-model.md",
 ]
 
 function proseOnly(markdown: string): string {

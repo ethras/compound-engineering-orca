@@ -27,17 +27,21 @@ Ask whether to delete it now. Delete only if the user approves.
 
 ### Step 5: Refresh Example Config
 
-Copy `references/config-template.yaml` to `<repo-root>/.compound-engineering/config.example.yaml`, creating the directory if needed. This file is committed to the repo and should always reflect the latest available settings.
+Copy `references/config-template.yaml` to `<repo-root>/.compound-engineering/config.example.yaml`, creating the directory if needed. This file is committed to the repo and should always reflect the latest available settings. When the health report says the example was written by a newer plugin, leave it alone, so an older plugin never rolls it back.
 
 If leftover `<repo-root>/.compound-engineering/config.local.example.yaml` remains after the new example exists, treat it as stale generated example (not user config) and remove it with `trash` (never `rm`).
 
 If the bundled template cannot be located by the current platform, print the source template path that failed and tell the user the example config could not be refreshed automatically.
 
+### Step 5a: Refresh Repo Config Files
+
+When the health report says `config.yaml` was written from an older template, names a retired config key in either file, or calls `config.local.yaml` a full copy of the old local template, read `references/config-refresh.md` and follow it. A file the report says was written by a newer plugin, or cannot be refreshed, stays untouched.
+
 ### Step 6: Create Repo Config If Missing
 
 If `.compound-engineering/config.yaml` does not exist, offer to create it, even when health is otherwise green. The user should learn that it is a shared file where the team can turn on Compound Engineering settings, that every setting starts commented out so nothing changes until someone enables one, and that declining keeps the defaults.
 
-If the user approves, copy `references/config-template.yaml` to `<repo-root>/.compound-engineering/config.yaml`. Never overwrite an existing `config.yaml` or `config.local.yaml`.
+If the user approves, copy `references/config-template.yaml` to `<repo-root>/.compound-engineering/config.yaml`. Change an existing `config.yaml` or `config.local.yaml` only through Step 5a's verified refresh or the repairs below.
 
 If `config.local.yaml` already exists, leave it. After creating (or if both files already exist), name ordinary local keys that would shadow the new team file. If local still has `docs_root`, say it is ignored and offer to move it into `config.yaml`.
 
@@ -45,7 +49,7 @@ Do not create `config.local.yaml`.
 
 ### Step 6a: Repair Invalid CE Work Preferences
 
-When the health report marks the CE Work implementation engine unavailable or invalid, detects retired scalar routing keys, or reports malformed dormant `work_engine_preferences`, do not guess the intended recipients. Explain the exact reported problem, derive a valid ordered `work_engine_preferences` block from the user's stated harness/model order (or remove malformed dormant preferences and use `work_engine_mode: off` when they want native-by-default), remove any retired scalar routing keys, and show the complete replacement block. Edit the layer that supplied the failing value. If the bad ordinary key is only in `config.yaml`, edit that file after preview. Do not hide a broken team value behind a new local override. Preserve every unrelated setting. Re-run the health check and require it to report either native or the intended normalized ordered list before setup is complete.
+When the health report marks the CE Work implementation engine unavailable or invalid, or reports malformed dormant `work_engine_preferences`, do not guess the intended recipients. Retired routing keys such as `work_engine_target` are Step 5a's to remove, not this step's. Explain the exact reported problem, derive a valid ordered `work_engine_preferences` block from the user's stated harness/model order (or remove malformed dormant preferences and use `work_engine_mode: off` when they want native-by-default), and show the complete replacement block. Edit the layer that supplied the failing value. If the bad ordinary key is only in `config.yaml`, edit that file after preview. Do not hide a broken team value behind a new local override. Preserve every unrelated setting. Re-run the health check and require it to report either native or the intended normalized ordered list before setup is complete.
 
 When the health report warns about `work_engine_effort`, the health status of the engine does not change, and the warning says what `ce-work` does with the value. A value that is not a map, or an entry for an unknown harness, requests nothing. A `cursor` entry is different: no Cursor route can run at an effort, so `ce-work` treats Cursor entries in the preference list as unavailable until the entry is removed. The key is a map from harness to one of that harness's own effort levels. Ask what effort the user wants for each harness rather than guessing, show the replacement map, and edit the layer the warning names. Re-run the health check and require the warning to be gone.
 
@@ -87,7 +91,7 @@ Runs whenever the repository has a root agent-instructions file (`AGENTS.md`, `C
 <root>/solutions/  # documented solutions to past problems (bugs, best practices, workflow patterns), organized by category with YAML frontmatter (module, tags, problem_type)
 ```
 
-**Compounding directive.** Offer it only when the repository treats the store as tracked, committed knowledge: git tracks at least one file under the resolved `<root>/solutions/` (`git ls-files` there is non-empty; an untracked or gitignored directory is not evidence), or the user just accepted the store mention. Skip the offer when the file already carries a standing instruction to invoke `ce-compound` at a completion checkpoint, in any wording. Otherwise offer it. The user should learn that agents would then record a lesson after fixing a problem whose reasoning the code alone does not show, so the next agent does not repeat the mistake. The choices are that agents ask first, that they do it without asking, or no instruction.
+**Compounding directive.** Offer it only when the repository treats the store as tracked, committed knowledge: git tracks at least one file under the resolved `<root>/solutions/` (`git ls-files` there is non-empty; an untracked or gitignored directory is not evidence), or the user just accepted the store mention. Skip the offer when the file already carries a standing instruction to invoke `ce-compound`, in any wording, that runs at a completion checkpoint and lets the skill decide whether a lesson qualifies. When the existing instruction has the agent first decide whether the lesson deserves a document, offer to replace it with the bundled variant of the same kind (ask first or automatic). That pre-judgment skips lessons the skill would hold in a test or a coding standard. Otherwise offer it. The user should learn that agents would then record a lesson as a test, a coding standard, or a learning after work that corrected a wrong belief about how something behaves, so the next agent does not repeat the mistake. The choices are that agents ask first, that they do it without asking, or no instruction.
 
 Insert the chosen variant verbatim from `assets/compounding-directive.md` in this skill's directory; the wording is pinned by a test, so do not paraphrase it. Place it beside the store mention when that landed in a conventions or working-agreement block, otherwise in the block where the file states how agents should work. Match the surrounding form (a bullet in a bullet list, a paragraph in prose). Say where the text would go and what it asks agents to do, and show the exact text if the user asks. Append only on approval and leave the rest of the file untouched.
 
