@@ -35,7 +35,7 @@ afterAll(() => roots.forEach((dir) => rmSync(dir, { recursive: true, force: true
 const SCRIPT = path.join(__dirname, "../../skills/ce-doc-review/scripts/cross-model-doc-review.sh")
 const STUB_NPX = path.join(__dirname, "../fixtures/acp-stub-npx.sh")
 const STREAMS = path.join(__dirname, "../fixtures/acpx-streams")
-const ROUTES = ["codex", "claude", "grok-cli", "grok-cursor", "cursor", "composer", "opencode"] as const
+const ROUTES = ["codex", "claude", "grok-cli", "grok-cursor", "cursor", "composer", "opencode", "pi"] as const
 const ROUTE_BIN: Record<string, string> = {
   codex: "codex",
   claude: "claude",
@@ -44,6 +44,7 @@ const ROUTE_BIN: Record<string, string> = {
   cursor: "cursor-agent",
   composer: "cursor-agent",
   opencode: "opencode",
+  pi: "pi",
 }
 // Flags that would grant the peer write / auto-approve / no-sandbox privileges (R17).
 const NEVER_FLAGS = ["--yolo", "--force", "-f", "--always-approve", "--dangerously-skip-permissions", "--approve-all", "--approve-reads"]
@@ -109,6 +110,8 @@ function sandbox(providers: string[], stream = acpStream({ text: review() }), ex
       ...process.env,
       PATH: bin,
       HOME: home,
+      // The omp session file names the serving family; never inherit the developer's real one.
+      PI_SESSION_FILE: "",
       // Mask any real Codex.app bundle so discovery sees only what the test stages.
       CROSS_MODEL_CODEX_APP_DIRS: temp("xmodel-nobundle-"),
       ACP_STUB_NPX_STREAM: stream,
@@ -262,7 +265,7 @@ describe("cross-model-doc-review route safety (R17)", () => {
   })
 
   test.each([
-    ["codex", "--model gpt-6.1-sol codex exec", ["--config-option mode=read-only", "--config-option reasoning_effort=high"]],
+    ["codex", "--model gpt-6.1-terra codex exec", ["--config-option mode=read-only", "--config-option reasoning_effort=high"]],
     ["claude", "--max-turns 15 --model claude-opus-5-5 claude exec", ["--config-option mode=default", "--config-option effort=high"]],
     ["grok-cli", "--model grok-4.7 grok-build exec", ["--config-option reasoning_effort=xhigh"]],
     ["grok-cursor", "--model grok-4.7[context=256k,reasoning_effort=high,fast=true] cursor exec", ["--config-option mode=ask"]],
@@ -332,6 +335,17 @@ describe("cross-model-doc-review route safety (R17)", () => {
     const args = argv(sb)
     expect(args[args.indexOf("--agent") + 1]).toBe(`${path.join(sb.bin, "opencode")} acp`)
     expect(args[args.lastIndexOf("--config-option") + 1]).toBe("mode=plan")
+  })
+
+  test("pi launches through a private wrapper that ignores project Pi files and turns tools and MCP off", () => {
+    const sb = sandbox(["pi"])
+    const runDir = makeRunDir()
+    const r = run(["claude", "pi", "adversarial", makeDoc(), "plan", "none", runDir], runDir, { ...sb.env, CROSS_MODEL_HOST_HARNESS: "claude" })
+    expect(r.files).toContain("adversarial-pi.json")
+    expect(envLog(sb)).toContain(`exec ${path.join(sb.bin, "pi")} --no-approve --no-tools --no-mcp "$@"`)
+    const out = published(runDir, "adversarial-pi.json")
+    expect(out.serving_family).toBe("unknown")
+    expect(out.independence_verified).toBe(false)
   })
 
   test("the claude route launches through a private --safe-mode wrapper", () => {
@@ -598,6 +612,124 @@ describe("cross-model-doc-review skip paths (R11, R16) — non-blocking, no file
     expect(r.files).not.toContain("adversarial-claude.json")
     expect(r.stderr).toContain("host serving family unattested")
     expect(calls(sb)).toBe(0)
+  })
+
+  describe("omp host family resolved from the session's recorded model", () => {
+    const FOREIGN_HARNESS_MARKERS = ["CLAUDE_CODE_ENTRYPOINT", "CLAUDE_CODE_SESSION_ID", "CODEX_SANDBOX", "CODEX_SANDBOX_NETWORK_DISABLED", "CODEX_SESSION_ID", "CODEX_THREAD_ID", "CODEX_CI", "GROK_AGENT", "GROK_SESSION_ID", "CURSOR_AGENT", "CURSOR_CONVERSATION_ID", "OPENCODE_TERMINAL"]
+    const entry = (model: string, role?: string) => JSON.stringify({ type: "model_change", model, ...(role ? { role } : {}) })
+    function ompRun(target: string, lines: string[] | null, extra: NodeJS.ProcessEnv = {}) {
+      const sb = sandbox([target])
+      const runDir = makeRunDir()
+      const env: NodeJS.ProcessEnv = { ...sb.env, CROSS_MODEL_HOST_HARNESS: "omp", ...Object.fromEntries(FOREIGN_HARNESS_MARKERS.map((k) => [k, ""])), ...extra }
+      if (lines) {
+        const file = path.join(temp("xmodel-doc-omp-session-"), "session.jsonl")
+        writeFileSync(file, lines.join("\n") + "\n")
+        env.PI_SESSION_FILE = file
+      }
+      return { sb, r: run(["unknown", target, "adversarial", makeDoc(), "plan", "none", runDir], runDir, env), runDir }
+    }
+
+    test.each([
+      ["anthropic/claude-sonnet-5-5", "codex"],
+      ["openai/gpt-5.4", "claude"],
+      ["openai-codex/gpt-6.1-terra", "claude"],
+      ["xai-oauth/grok-4.20-0309-reasoning", "codex"],
+    ])("%s attests a family that lets a different-family peer publish", (model, target) => {
+      const { r } = ompRun(target, [entry(model)])
+      expect(r.files).toContain(`adversarial-${target}.json`)
+    })
+
+    test("the attested family is excluded as a peer", () => {
+      const { sb, r } = ompRun("claude", [entry("anthropic/claude-sonnet-5-5")])
+      expect(r.files).not.toContain("adversarial-claude.json")
+      expect(calls(sb)).toBe(0)
+    })
+
+    test("an openai-served host excludes the codex peer", () => {
+      const { sb, r } = ompRun("codex", [entry("openai/gpt-5.4")])
+      expect(r.files).not.toContain("adversarial-codex.json")
+      expect(calls(sb)).toBe(0)
+    })
+
+    test.each([
+      ["a gateway-served model", [entry("openrouter/anthropic/claude-sonnet-5-5")]],
+      ["a malformed trailing line", [entry("anthropic/claude-sonnet-5-5"), '{"type":"model_change","mod']],
+      ["a latest entry that is a retry fallback", [entry("anthropic/claude-sonnet-5-5"), entry("openai/gpt-5.4", "fallback")]],
+      ["a latest entry with the undocumented temporary role", [entry("anthropic/claude-sonnet-5-5"), entry("openai/gpt-5.4", "temporary")]],
+      ["no session file", null],
+    ])("%s stays unattested and skips", (_name, lines) => {
+      const { sb, r } = ompRun("codex", lines)
+      expect(r.files).not.toContain("adversarial-codex.json")
+      expect(r.stderr).toContain("host serving family unattested")
+      expect(calls(sb)).toBe(0)
+    })
+
+    test.each([
+      ["CODEX_THREAD_ID", "t-1"],
+      ["CLAUDE_CODE_ENTRYPOINT", "cli"],
+      ["GROK_AGENT", "1"],
+    ])("a nested harness marker %s leaves the inherited session unattested", (marker, value) => {
+      const { sb, r } = ompRun("codex", [entry("anthropic/claude-sonnet-5-5")], { [marker]: value })
+      expect(r.files).not.toContain("adversarial-codex.json")
+      expect(r.stderr).toContain("host serving family unattested")
+      expect(calls(sb)).toBe(0)
+    })
+
+    test("a non-omp harness never reads the session file", () => {
+      const { sb, r } = ompRun("codex", [entry("anthropic/claude-sonnet-5-5")], { CROSS_MODEL_HOST_HARNESS: "cursor" })
+      expect(r.files).not.toContain("adversarial-codex.json")
+      expect(calls(sb)).toBe(0)
+    })
+  })
+
+  describe("pi host family resolved from the model of the session's latest reply", () => {
+    const FOREIGN_HARNESS_MARKERS = ["CLAUDECODE", "OMPCODE", "CLAUDE_CODE_ENTRYPOINT", "CLAUDE_CODE_SESSION_ID", "CODEX_SANDBOX", "CODEX_SANDBOX_NETWORK_DISABLED", "CODEX_SESSION_ID", "CODEX_THREAD_ID", "CODEX_CI", "GROK_AGENT", "GROK_SESSION_ID", "CURSOR_AGENT", "CURSOR_CONVERSATION_ID", "OPENCODE_TERMINAL"]
+    const reply = (provider: string, model: string) => JSON.stringify({ type: "message", message: { role: "assistant", provider, model } })
+    function piRun(target: string, lines: string[] | null, extra: NodeJS.ProcessEnv = {}) {
+      const sb = sandbox([target])
+      const runDir = makeRunDir()
+      const env: NodeJS.ProcessEnv = { ...sb.env, CROSS_MODEL_HOST_HARNESS: "pi", PI_PROVIDER: "", PI_MODEL: "", ...Object.fromEntries(FOREIGN_HARNESS_MARKERS.map((k) => [k, ""])), ...extra }
+      if (lines) {
+        const file = path.join(temp("xmodel-doc-pi-session-"), "session.jsonl")
+        writeFileSync(file, lines.join("\n") + "\n")
+        env.PI_SESSION_FILE = file
+      }
+      return { sb, r: run(["unknown", target, "adversarial", makeDoc(), "plan", "none", runDir], runDir, env) }
+    }
+
+    test("a first-party reply attests a family that lets a different-family peer publish", () => {
+      const { r } = piRun("codex", [reply("anthropic", "claude-sonnet-5-5")])
+      expect(r.files).toContain("adversarial-codex.json")
+    })
+
+    test("the attested family is excluded as a peer", () => {
+      const { sb, r } = piRun("codex", [reply("openai-codex", "gpt-6.1-terra")])
+      expect(r.files).not.toContain("adversarial-codex.json")
+      expect(calls(sb)).toBe(0)
+    })
+
+    test("an ephemeral session with no file falls back to the model Pi names", () => {
+      const { r } = piRun("codex", null, { PI_PROVIDER: "anthropic", PI_MODEL: "claude-opus-5-5" })
+      expect(r.files).toContain("adversarial-codex.json")
+    })
+
+    test.each([
+      ["a gateway-served model", [reply("openrouter", "anthropic/claude-sonnet-5-5")]],
+      ["a malformed trailing line", [reply("anthropic", "claude-sonnet-5-5"), '{"type":"message","mess']],
+      ["no session file and no named model", null],
+    ])("%s stays unattested and skips with the Pi-specific reason", (_name, lines) => {
+      const { sb, r } = piRun("codex", lines)
+      expect(r.files).not.toContain("adversarial-codex.json")
+      expect(r.stderr).toContain("host serving family unattested; Pi names no first-party model for this session's latest reply")
+      expect(calls(sb)).toBe(0)
+    })
+
+    test("a nested Claude Code marker leaves the inherited session unattested", () => {
+      const { sb, r } = piRun("codex", [reply("anthropic", "claude-sonnet-5-5")], { CLAUDECODE: "1" })
+      expect(r.files).not.toContain("adversarial-codex.json")
+      expect(r.stderr).toContain("another harness's environment marker is set beside Pi's")
+      expect(calls(sb)).toBe(0)
+    })
   })
 })
 
@@ -945,7 +1077,7 @@ describe("cross-model-doc-review normalization (R18, KTD5)", () => {
   })
 
   test.each([
-    ["codex", "claude", { quota: { model_usage: [{ model: "gpt-6.1-sol", token_count: { totalTokens: 1200 } }] } }, "gpt-6.1-sol", false],
+    ["codex", "claude", { quota: { model_usage: [{ model: "gpt-6.1-terra", token_count: { totalTokens: 1200 } }] } }, "gpt-6.1-terra", false],
     ["codex", "claude", { quota: { model_usage: [{ model: "gpt-6-luna", token_count: { totalTokens: 1200 } }] } }, "gpt-6-luna", true],
     ["claude", "codex", { quota: { model_usage: [
       { model: "claude-haiku-4-5", token_count: { totalTokens: 5000 } },

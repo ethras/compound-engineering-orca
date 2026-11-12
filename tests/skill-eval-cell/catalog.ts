@@ -25,6 +25,8 @@ export const PR_OPENING_BASE_REF = "f6c301cafc888f965ffd99195eb5f95ac2c6d9a8"
 export const RIGHT_SIZE_BASE_REF = "925b4ef71cbee0b4205693c4cafc9b2c557a603a"
 /** main before CODING_STANDARDS.md became the designated criteria source: the A/B base for the standards-discovery rows. */
 export const STANDARDS_SOURCE_BASE_REF = "799702cf0f5405c9361548cd86490c5603e2632c"
+/** main before conflicting CODING_STANDARDS.md files had a stated precedence (#2047). */
+export const STANDARDS_PRECEDENCE_BASE_REF = "dd9b7921c9c80498eba84994ff1b8e1e81dbc1db"
 /** main after #1514 merged: the product-lens activation leg still read "alternatives plausibly exist". */
 export const DOC_REVIEW_BASE_REF = "6f6c5779d31c0f847773e0cbc1e7e7fc7b11f272"
 /** main before ce-doc-review chose its own depth: every plan ran the full team, and adversarial fired on any plan without a brainstorm. */
@@ -72,6 +74,14 @@ export const DEBUG_AUDIT_BASE_REF = "00d0a5bbf1300b2138b65ce724b325dd4dff77ba"
 const DEBUG_SIGNAL_BASE_REF = "beacb629c8a6f34d6154996e819b2ac60857c514"
 const SIGNAL_PROPOSED = [['"prevention_signal": "', '"prevention_signal":"']]
 const SIGNAL_NULL = [['"prevention_signal": null', '"prevention_signal":null']]
+/** main before ce-debug's 2026-11-08 usage-audit conditions (behavioral check for prompt defects, override named, open PR elsewhere, re-review). */
+const DEBUG_AUDIT_CONDITIONS_BASE_REF = "18c2be5e3d79024f20bce936b8cb05272621760a"
+/** main before ce-debug weighed whether a cause accounts for the whole symptom and whether the reporter's diagnosis was checked. */
+const DEBUG_CAUSE_WEIGHT_BASE_REF = "4ba48871919650d43a412e3faf0374272fdc209d"
+const ORDER_SYNC_TASK =
+  "Use ce-debug on the flaky order-sync check. My teammate's investigation is in NOTES.md and they want to go straight to the fix. You may read files and run commands, but do not edit, create, or commit any file, and do not invoke another skill or dispatch. Stop before the fix-choice question. Put the next step alone on its own line, reading exactly NEXT: fix or NEXT: keep-investigating, and give the reason on a later line."
+const stalePriceTask = (issue: string) =>
+  `Use ce-debug on #57. gh is unavailable here, so this is the fetch result: ${issue}. You may read files and run commands, but do not edit, create, or commit any file, and do not invoke another skill or dispatch. Write the Phase 2 findings and stop before the fix-choice question. Put CHANGES_TTL: yes or CHANGES_TTL: no alone on its own line, saying whether the fix you recommend changes the cache TTL.`
 /** main before the reliability reviewer judged a missing guard by how the code runs. */
 export const RELIABILITY_CONTEXT_BASE_REF = "8d9a236dc91b17e114562bd65e9e137d171f39ab"
 /** main before ce-work dropped its goal/workflow engines, ran chained units inline, and ce-plan stopped offering /goal. */
@@ -82,10 +92,17 @@ const WORK_RETURN_BASE_REF = "7dc50943bbf959dbe6a93a175e41e5fff8395e00"
 const ANTIGRAVITY_PEER_BASE_REF = "bdc53d034ccfa5baf01b6139cd46082145ff95cc"
 /** main before the mode:agent JSON carried the cross-model peer outcome: the A/B base for the peer-outcome rows. */
 const PEER_OUTCOME_BASE_REF = "fac349c0c31a543d497fd4825af9b44bdb7e7dfe"
+/** main before julik-frontend-races became frontend-races and agent-native stopped selecting on skill prose: the A/B base for the roster rows. */
+const ROSTER_BASE_REF = "d307bdb7ce158fc47184097ec258007a1a8e7bb3"
+const ROSTER_PROBE_TASK = `Use the ce-code-review skill on this repo with mode:agent depth:full. Resolve reviewer selection only: decide which reviewer personas Stage 3 would dispatch for the staged change. This is a read-only probe: do not create the run directory, do not start a peer job, and do not dispatch reviewers.
+
+End with exactly one line in this form, naming each persona by its catalog name:
+
+TEAM: <comma-separated persona names>`
 const PEER_OUTCOME_LIVE_TASK =
   "Use ce-code-review mode:agent to review the staged change. Run the actual review workflow, including any reviewers or peers it dispatches. Do not apply fixes, commit, publish, or create tickets."
 const peerOutcomeReportLeafTask = (runDir: string) =>
-  `You are the report leaf of the ce-code-review skill. The run directory is ./${runDir}. Read ${runDir}/finish-input.json, ${runDir}/synthesized-findings.json, and ${runDir}/validator-outcome.json, then read the skill's references/finish-input.md (its report leaf section) and references/finish-review.md, and do the report leaf's work. Do not write the stage log, metadata.json, or run summarize; the only file to write is ${runDir}/review.json. Return the final report exactly as the report leaf returns it.`
+  `You are the report leaf of the ce-code-review skill. The run directory is ./${runDir}. Read ${runDir}/finish-input.json, ${runDir}/synthesized-findings.json, and ${runDir}/validator-outcome.json, then read the skill's references/finish-input.md (its report leaf section) and references/finish-report.md (references/finish-review.md in skill versions that have no finish-report.md), and do the report leaf's work. Do not write the stage log, metadata.json, or run summarize; the only file to write is ${runDir}/review.json. Return the final report exactly as the report leaf returns it.`
 /** The working tree, not HEAD — the post arm exists to grade the edit you have not committed yet. */
 export const POST_SWEEP_REF = WORKTREE_REF
 
@@ -225,7 +242,9 @@ export type Scenario = {
   env?: Record<string, string>
 }
 
-const UNDERSTANDING_BASE_REF = "8df67793b9733d2220fa9a7fc37139931471af62"
+/** main before ce-babysit-pr stated how to read an incomplete review lookup (#1618). */
+const REVIEW_LOOKUP_BASE_REF = "bd55f988365586bb3f408a5fbe0a81f83d6f2304"
+const UNDERSTANDING_BASE_REF ="8df67793b9733d2220fa9a7fc37139931471af62"
 /** main before Standard/Deep choices that depend on existing behavior were traced through ce-explain (the optional-sentence contract). */
 const BEHAVIOR_TRACE_BASE_REF = "c152896f1cda13548fc1a05b2aff88caf8ae8dba"
 
@@ -583,6 +602,9 @@ function shimHandoffRow(name: string, why: string, task: string, logged: string[
   }
 }
 
+const COMPOUND_TRIGGER_PRE_CONTRACT =
+  "The standing instruction invokes ce-compound only when the work produced durable reasoning the final code, tests, and docs do not carry."
+
 const COMPOUND_JOB_ROWS: Scenario[] = [
   jobRow("bare-is-capture", "A plain run after solved work is a capture.", `Use the ce-compound skill. ${TOKEN_ROTATION_LESSON}`, "capture"),
   jobRow(
@@ -894,6 +916,8 @@ const COMPOUND_FORM_ROWS: Scenario[] = [
   ),
 ]
 
+/** main before subagent briefs carried user limits, scoped stops, and refusal reports, and ce-setup counted distinct incidents. */
+const BRIEF_AND_RECURRENCE_BASE_REF = "d307bdb7ce158fc47184097ec258007a1a8e7bb3"
 const SETUP_STANDARDS_BASE_REF = "121a3bd60d296be72b2d3c0b08131b7b08fadc5a"
 const SETUP_STANDARDS_HISTORY =
   "The code host is not reachable from this machine; this repository's merged pull request history is exported under .pr-history/ (one JSON file per pull request, with its reviews, inline review comments, and conversation). I approve every draft and change you preview: write them all without asking me again, and do not commit."
@@ -981,6 +1005,118 @@ const SETUP_UNATTENDED_ROWS: Scenario[] = [
     },
     "setup-instructions-gap",
   ),
+]
+
+/** main before setup refreshed config files written from an older template. */
+const SETUP_CONFIG_REFRESH_BASE_REF = "5702b7b2e9449a2e38044fd429f5372bfa309ce3"
+const SETUP_CONFIG_REFRESH_TASK =
+  "Use the ce-setup skill to check and fix this repository's Compound Engineering setup. I approve every change you preview: write them all without asking me again, and do not commit. Decline the offers to draft review docs and to warm the npm cache."
+const SETUP_TEAM_NOTE = "# Team: Codex reviews everything we ship."
+const SETUP_CURRENT_PEER = "cross_model_peer: codex          # codex | claude | grok | antigravity | cursor | composer | opencode | pi"
+const SETUP_OLD_PEER_OPTIONS = "# codex | claude | grok | cursor | composer\n"
+
+function setupConfigRefreshRow(name: string, fixture: string, why: string, pre_contract: string, grade: Grade, task = SETUP_CONFIG_REFRESH_TASK): Scenario {
+  return {
+    id: `ce-setup/${name}`,
+    skill: "ce-setup",
+    baseline_ref: SETUP_CONFIG_REFRESH_BASE_REF,
+    cohort: "untouched",
+    key_behavior: "mutation",
+    read_only: false,
+    git_init: true,
+    fixture: `${FIX}/${fixture}`,
+    timeout_secs: 1200,
+    why,
+    pre_contract,
+    task,
+    grade,
+  }
+}
+
+/** Per tests/skill-eval-cell/packs/ce-setup-config-refresh.md. */
+const SETUP_CONFIG_REFRESH_ROWS: Scenario[] = [
+  setupConfigRefreshRow(
+    "config-refresh-rebuilds-old-config-yaml",
+    "setup-config-refresh-august",
+    "A config.yaml copied from the 2026-08-12 template comes out on the current template with the active setting and the team's comment in its slot, and the current option list.",
+    "Setup never touches an existing config.yaml.",
+    {
+      workspace_contains: [
+        { path: ".compound-engineering/config.yaml", needle: "# ce-config-template-version: 2\n" },
+        { path: ".compound-engineering/config.yaml", needle: `${SETUP_TEAM_NOTE}\n${SETUP_CURRENT_PEER}\n` },
+      ],
+      workspace_lacks: [{ path: ".compound-engineering/config.yaml", needle: SETUP_OLD_PEER_OPTIONS }],
+    },
+  ),
+  setupConfigRefreshRow(
+    "config-refresh-cuts-down-legacy-local",
+    "setup-config-refresh-legacy-local",
+    "A pre-cascade full-template config.local.yaml is cut down to the setting and comment the team added. The retired fable and delegation keys are removed with reasons that name what replaced them, and plan_model is not switched on.",
+    "Setup never touches config.local.yaml; the health report warns about plan_use_fable only.",
+    {
+      must_include_any: [["plan_model"]],
+      workspace_contains: [
+        { path: ".compound-engineering/config.local.yaml", needle: `${SETUP_TEAM_NOTE}\ncross_model_peer: codex` },
+      ],
+      workspace_lacks: [
+        { path: ".compound-engineering/config.local.yaml", needle: "plan_use_fable" },
+        { path: ".compound-engineering/config.local.yaml", needle: "work_delegate" },
+        { path: ".compound-engineering/config.local.yaml", needle: "\nplan_model:" },
+        { path: ".compound-engineering/config.local.yaml", needle: "# --- Artifact root ---" },
+      ],
+    },
+  ),
+  setupConfigRefreshRow(
+    "config-refresh-refuses-duplicate-keys",
+    "setup-config-refresh-refused",
+    "A config.yaml with a duplicate top-level key is refused: no write, and the summary names the problem instead of guessing which value wins.",
+    "Setup never touches an existing config.yaml.",
+    {
+      must_include_any: [["duplicate"]],
+      workspace_contains: [
+        {
+          path: ".compound-engineering/config.yaml",
+          needle: "packs:\n  - source: packs/team-rules\ncross_model_peer: codex\npacks:\n  - source: packs/other-rules\n",
+        },
+      ],
+    },
+  ),
+  setupConfigRefreshRow(
+    "config-refresh-current-file-is-left-alone",
+    "setup-config-refresh-current",
+    "A config.yaml already on the current template, with a team setting, needs nothing: setup writes nothing to it and asks nothing about it.",
+    "Setup never touches an existing config.yaml.",
+    {
+      workspace_contains: [
+        { path: ".compound-engineering/config.yaml", needle: `# ce-config-template-version: 2\n` },
+        { path: ".compound-engineering/config.yaml", needle: `${SETUP_TEAM_NOTE}\n${SETUP_CURRENT_PEER}\n` },
+      ],
+      no_new_commits: true,
+    },
+  ),
+  {
+    ...setupConfigRefreshRow(
+      "config-refresh-unattended-publishes-tracked-only",
+      "setup-config-refresh-unattended",
+      "A non-interactive run applies the config.yaml refresh in its pull request and leaves the gitignored config.local.yaml for a person, only reporting its retired setting.",
+      "Setup never touches either config file.",
+      {
+        committed_must: [".compound-engineering/config.yaml"],
+        must_include_any: [["Setup complete:", "Setup skipped:"]],
+        workspace_contains: [
+          { path: ".compound-engineering/config.yaml", needle: `${SETUP_TEAM_NOTE}\n${SETUP_CURRENT_PEER}\n` },
+          { path: ".compound-engineering/config.local.yaml", needle: "plan_use_fable: true" },
+        ],
+      },
+      "Use the ce-setup skill with these arguments: mode:non-interactive.",
+    ),
+    key_behavior: "delegation",
+    git_remote: true,
+    shim_git_push: true,
+    shim_gh_pr: true,
+    with_skill: ["ce-commit-push-pr"],
+    timeout_secs: 1500,
+  },
 ]
 
 /** Cheap read-only cells that pin a real decision. Live mutation/delegation is not in this set. */
@@ -2952,10 +3088,10 @@ Include exactly one line \`MERGE: no\` or \`MERGE: yes\` or \`MERGE: later\` in 
     fixture: `${FIX}/babysit-review-judgment`,
     why: "A reviewer that announced itself and finished is done, even though its announcement still stands \u2014 bots do not retract them (#1606).",
     pre_contract: "A present eyes reaction starts an incomplete lifecycle that holds readiness for a 15-minute floor.",
-    task: "Babysit PR #12.\n\nThe latest pr-snapshot output is already on disk at snapshot.json. Treat that file as this tick's snapshot. Do not call git, gh, or pr-snapshot.\n\nA look at the current head shows: `cursor[bot]` reacted \ud83d\udc40 on the PR body when the PR opened and has not removed it. The only check run on this head from the `cursor` app is `Cursor Security Agent: Security Reviewer`, which completed SUCCESS four minutes after that reaction.\n\nMake the settle decision for this tick and state it plainly: either the PR looks ready, or you are re-arming the watch and for how long. Stop after one tick.",
+    task: "Babysit PR #12.\n\nThe latest pr-snapshot output is already on disk at snapshot.json. Treat that file as this tick's snapshot. Do not call git, gh, or pr-snapshot.\n\nA look at the current head shows: `cursor[bot]` reacted \ud83d\udc40 on the PR body when the PR opened and has not removed it. The only check run on this head from the `cursor` app is `Cursor Security Agent: Security Reviewer`, which completed SUCCESS four minutes after that reaction.\n\nMake the settle decision for this tick and state it plainly: either the PR looks ready, or you are re-arming the watch and for how long. Stop after one tick.\nInclude exactly one line that is only `SETTLE: ready` or `SETTLE: re-arm`, with nothing else on it.",
     grade: {
-      must_include: ["your call to merge"],
-      must_exclude: ["gh pr merge", "900"],
+      declared: { SETTLE: "ready" },
+      must_exclude: ["gh pr merge"],
       actions: "none",
     },
   },
@@ -2969,8 +3105,9 @@ Include exactly one line \`MERGE: no\` or \`MERGE: yes\` or \`MERGE: later\` in 
     fixture: `${FIX}/babysit-review-judgment`,
     why: "A terminal-but-verdictless run means the reviewer stopped, so it must not hold readiness \u2014 but it must be reported as an incomplete review rather than a pass.",
     pre_contract: "An incomplete review lifecycle holds readiness until the bounded stale path stops it.",
-    task: "Babysit PR #12.\n\nThe latest pr-snapshot output is already on disk at snapshot.json. Treat that file as this tick's snapshot. Do not call git, gh, or pr-snapshot.\n\nA look at the current head shows: `cursor[bot]` reacted \ud83d\udc40 and has not removed it. Its only check run on this head is `Cursor Security Agent: Security Reviewer`, concluded `neutral`, with the output summary `Security Review run timed out after 30 minutes`.\n\nMake the settle decision for this tick and state it plainly: either the PR looks ready, or you are re-arming the watch and for how long. Stop after one tick.",
+    task: "Babysit PR #12.\n\nThe latest pr-snapshot output is already on disk at snapshot.json. Treat that file as this tick's snapshot. Do not call git, gh, or pr-snapshot.\n\nA look at the current head shows: `cursor[bot]` reacted \ud83d\udc40 and has not removed it. Its only check run on this head is `Cursor Security Agent: Security Reviewer`, concluded `neutral`, with the output summary `Security Review run timed out after 30 minutes`.\n\nMake the settle decision for this tick and state it plainly: either the PR looks ready, or you are re-arming the watch and for how long. Stop after one tick.\nInclude exactly one line that is only `SETTLE: ready` or `SETTLE: re-arm`, with nothing else on it.",
     grade: {
+      declared: { SETTLE: "ready" },
       must_include_any: [["timeout", "timed out", "timing out"]],
       must_exclude: ["gh pr merge", "approved the change"],
       actions: "none",
@@ -2986,9 +3123,9 @@ Include exactly one line \`MERGE: no\` or \`MERGE: yes\` or \`MERGE: later\` in 
     fixture: `${FIX}/babysit-review-judgment`,
     why: "The one genuinely undecidable case: a reviewer announced itself and produced nothing observable, so the wait is bounded rather than skipped.",
     pre_contract: "An incomplete review lifecycle re-arms with --settle-seconds 900.",
-    task: "Babysit PR #12.\n\nThe latest pr-snapshot output is already on disk at snapshot.json. Treat that file as this tick's snapshot. Do not call git, gh, or pr-snapshot.\n\nA look at the current head shows: `greptile[bot]` reacted \ud83d\udc40 on the PR body eleven minutes ago. It has posted no comment or review, and there is no check run on this head from any app matching it.\n\nMake the settle decision for this tick and state it plainly: either the PR looks ready, or you are re-arming the watch and for how long. Stop after one tick.",
+    task: "Babysit PR #12.\n\nThe latest pr-snapshot output is already on disk at snapshot.json. Treat that file as this tick's snapshot. Do not call git, gh, or pr-snapshot.\n\nA look at the current head shows: `greptile[bot]` reacted \ud83d\udc40 on the PR body eleven minutes ago. It has posted no comment or review, and there is no check run on this head from any app matching it.\n\nMake the settle decision for this tick and state it plainly: either the PR looks ready, or you are re-arming the watch and for how long. Stop after one tick.\nInclude exactly one line that is only `SETTLE: ready` or `SETTLE: re-arm`, with nothing else on it.",
     grade: {
-      must_include: ["re-arm"],
+      declared: { SETTLE: "re-arm" },
       must_exclude: ["gh pr merge"],
       actions: "none",
     },
@@ -3003,10 +3140,10 @@ Include exactly one line \`MERGE: no\` or \`MERGE: yes\` or \`MERGE: later\` in 
     fixture: `${FIX}/babysit-review-judgment`,
     why: "An app can finish an unrelated check while the review it announced has not appeared. Terminal work that does not account for the announced review must not read as the review finishing.",
     pre_contract: "Any terminal check from the announcing app means that reviewer stopped.",
-    task: "Babysit PR #12.\n\nThe latest pr-snapshot output is already on disk at snapshot.json. Treat that file as this tick's snapshot. Do not call git, gh, or pr-snapshot.\n\nA look at the current head shows: `slowbot[bot]` reacted \ud83d\udc40 on the PR body twelve minutes ago and has not removed it. The `slowbot` app has exactly one check run on this head, `slowbot / lint`, which completed SUCCESS. It has posted no comment or review, and no check run of its own that reads as a code review has appeared.\n\nMake the settle decision for this tick and state it plainly: either the PR looks ready, or you are re-arming the watch and for how long. Stop after one tick.",
+    task: "Babysit PR #12.\n\nThe latest pr-snapshot output is already on disk at snapshot.json. Treat that file as this tick's snapshot. Do not call git, gh, or pr-snapshot.\n\nA look at the current head shows: `slowbot[bot]` reacted \ud83d\udc40 on the PR body twelve minutes ago and has not removed it. The `slowbot` app has exactly one check run on this head, `slowbot / lint`, which completed SUCCESS. It has posted no comment or review, and no check run of its own that reads as a code review has appeared.\n\nMake the settle decision for this tick and state it plainly: either the PR looks ready, or you are re-arming the watch and for how long. Stop after one tick.\nInclude exactly one line that is only `SETTLE: ready` or `SETTLE: re-arm`, with nothing else on it.",
     grade: {
-      must_include: ["re-arm"],
-      must_exclude: ["gh pr merge", "your call to merge"],
+      declared: { SETTLE: "re-arm" },
+      must_exclude: ["gh pr merge"],
       actions: "none",
     },
   },
@@ -3020,10 +3157,10 @@ Include exactly one line \`MERGE: no\` or \`MERGE: yes\` or \`MERGE: later\` in 
     fixture: `${FIX}/babysit-review-judgment`,
     why: "Many reviewers never announce — in some repos none do. A reviewer that reviewed an earlier head and not this one is evidence a review is coming, and without it the gate is inert wherever nobody reacts.",
     pre_contract: "Only an announcement (an eyes reaction or a reviewing note) marks a review as in flight.",
-    task: "Babysit PR #12.\n\nThe latest pr-snapshot output is already on disk at snapshot.json. Treat that file as this tick's snapshot. Do not call git, gh, or pr-snapshot.\n\nA look at the current head shows: no reactions on the PR body at all, and no check run from any review app. `reviewbot` submitted a review on the PR's previous head about forty minutes ago and has reviewed every earlier head too; it has not reviewed the current head, which was pushed four minutes ago.\n\nMake the settle decision for this tick and state it plainly: either the PR looks ready, or you are re-arming the watch and for how long. Stop after one tick.",
+    task: "Babysit PR #12.\n\nThe latest pr-snapshot output is already on disk at snapshot.json. Treat that file as this tick's snapshot. Do not call git, gh, or pr-snapshot.\n\nA look at the current head shows: no reactions on the PR body at all, and no check run from any review app. `reviewbot` submitted a review on the PR's previous head about forty minutes ago and has reviewed every earlier head too; it has not reviewed the current head, which was pushed four minutes ago.\n\nMake the settle decision for this tick and state it plainly: either the PR looks ready, or you are re-arming the watch and for how long. Stop after one tick.\nInclude exactly one line that is only `SETTLE: ready` or `SETTLE: re-arm`, with nothing else on it.",
     grade: {
-      must_include: ["re-arm"],
-      must_exclude: ["gh pr merge", "your call to merge"],
+      declared: { SETTLE: "re-arm" },
+      must_exclude: ["gh pr merge"],
       actions: "none",
     },
   },
@@ -3037,10 +3174,61 @@ Include exactly one line \`MERGE: no\` or \`MERGE: yes\` or \`MERGE: later\` in 
     fixture: `${FIX}/babysit-review-judgment`,
     why: "A widened window is a judgment about evidence. When the review it was waiting on lands, the basis is gone and the ordinary window decides again — the agent makes that call, the engine only reports the movement.",
     pre_contract: "A widened re-arm runs to its own bound regardless of what happens during it.",
-    task: "Babysit PR #12.\n\nThe latest pr-snapshot output is already on disk at snapshot.json. Treat that file as this tick's snapshot. Do not call git, gh, or pr-snapshot.\n\nThe watch woke with reason `review-evidence-moved`. Earlier this run you rejected a merge-ready wake because `reviewbot` had announced a review it had nothing to show for, and you re-armed with --settle-seconds 900. Since then a look at the current head shows: `reviewbot` posted its review on this head a little over five minutes ago with no findings, and that is what moved; nothing has changed since.\n\nMake the settle decision for this tick and state it plainly: either the PR looks ready, or you are re-arming the watch and for how long. Stop after one tick.",
+    task: "Babysit PR #12.\n\nThe latest pr-snapshot output is already on disk at snapshot.json. Treat that file as this tick's snapshot. Do not call git, gh, or pr-snapshot.\n\nThe watch woke with reason `review-evidence-moved`. Earlier this run you rejected a merge-ready wake because `reviewbot` had announced a review it had nothing to show for, and you re-armed with --settle-seconds 900. Since then a look at the current head shows: `reviewbot` posted its review on this head a little over five minutes ago with no findings, and that is what moved; nothing has changed since.\n\nMake the settle decision for this tick and state it plainly: either the PR looks ready, or you are re-arming the watch and for how long. Stop after one tick.\nInclude exactly one line that is only `SETTLE: ready` or `SETTLE: re-arm`, with nothing else on it.",
     grade: {
-      must_include: ["your call to merge"],
-      must_exclude: ["gh pr merge", "1800"],
+      declared: { SETTLE: "ready" },
+      must_exclude: ["gh pr merge"],
+      actions: "none",
+    },
+  },
+  {
+    id: "ce-babysit-pr/failed-review-lookup-is-not-all-clear",
+    skill: "ce-babysit-pr",
+    cohort: "resized",
+    key_behavior: "judgment",
+    read_only: true,
+    fixture: `${FIX}/babysit-review-judgment`,
+    baseline_ref: REVIEW_LOOKUP_BASE_REF,
+    why: "A read that failed is not an absent signal: the missing part may hold the announcement, so it must not clear the review-still-coming check (#1618).",
+    pre_contract: "An absent signal tells you nothing and never blocks on its own; nothing says how to read a lookup that failed.",
+    task: "Babysit PR #12.\n\nThe latest pr-snapshot output is already on disk at snapshot.json. Treat that file as this tick's snapshot. Do not call git, gh, or pr-snapshot.\n\nA look at the current head shows: no reviews on this head, no top-level comments from any bot, and the only check runs on this head are the repo's own CI jobs, all SUCCESS. The request for reactions on the PR body failed with `HTTP 502: Bad Gateway`. This repo's reviewer, `reviewbot[bot]`, usually announces itself with a 👀 reaction before reviewing.\n\nMake the settle decision for this tick and state it plainly: either the PR looks ready, or you are re-arming the watch and for how long. Stop after one tick.\nInclude exactly one line that is only `SETTLE: ready` or `SETTLE: re-arm`, with nothing else on it.",
+    grade: {
+      declared: { SETTLE: "re-arm" },
+      must_exclude: ["gh pr merge"],
+      actions: "none",
+    },
+  },
+  {
+    id: "ce-babysit-pr/truncated-review-lookup-is-not-all-clear",
+    skill: "ce-babysit-pr",
+    cohort: "resized",
+    key_behavior: "judgment",
+    read_only: true,
+    fixture: `${FIX}/babysit-review-judgment`,
+    baseline_ref: REVIEW_LOOKUP_BASE_REF,
+    why: "A first page that shows nothing is not a look at every place; the announcement can sit on a page that was never read (#1618).",
+    pre_contract: "The look covers every place an announcement can arrive; nothing says a page limit leaves it incomplete.",
+    task: "Babysit PR #12.\n\nThe latest pr-snapshot output is already on disk at snapshot.json. Treat that file as this tick's snapshot. Do not call git, gh, or pr-snapshot.\n\nA look at the current head shows: no reactions on the PR body, no reviews on this head, and only the repo's own CI check runs, all SUCCESS. The top-level comments request returned its first page of 30 of the PR's 74 comments, oldest first; none of those 30 is from a bot. The remaining pages were not fetched.\n\nMake the settle decision for this tick and state it plainly: either the PR looks ready, or you are re-arming the watch and for how long. Stop after one tick.\nInclude exactly one line that is only `SETTLE: ready` or `SETTLE: re-arm`, with nothing else on it.",
+    grade: {
+      declared: { SETTLE: "re-arm" },
+      must_exclude: ["gh pr merge"],
+      actions: "none",
+    },
+  },
+  {
+    id: "ce-babysit-pr/bot-suffix-is-the-same-reviewer",
+    skill: "ce-babysit-pr",
+    cohort: "resized",
+    key_behavior: "judgment",
+    read_only: true,
+    fixture: `${FIX}/babysit-review-judgment`,
+    baseline_ref: REVIEW_LOOKUP_BASE_REF,
+    why: "REST and GraphQL name the same app differently; a reviewer that finished must not read as one that never answered its own announcement (#1618).",
+    pre_contract: "Look for what that same reviewer produced on this head; nothing says its login differs between APIs.",
+    task: "Babysit PR #12.\n\nThe latest pr-snapshot output is already on disk at snapshot.json. Treat that file as this tick's snapshot. Do not call git, gh, or pr-snapshot.\n\nA look at the current head shows: the PR-body reactions endpoint lists a 👀 reaction from `reviewbot[bot]`, added eight minutes ago, after the current head was pushed. `gh pr view --json reviews` lists one review on this head, by `reviewbot`, submitted three minutes ago, state COMMENTED, body \"No issues found.\" There are no other reactions, no top-level comments from any bot, and only the repo's own CI check runs, all SUCCESS.\n\nMake the settle decision for this tick and state it plainly: either the PR looks ready, or you are re-arming the watch and for how long. Stop after one tick.\nInclude exactly one line that is only `SETTLE: ready` or `SETTLE: re-arm`, with nothing else on it.",
+    grade: {
+      declared: { SETTLE: "ready" },
+      must_exclude: ["gh pr merge"],
       actions: "none",
     },
   },
@@ -3377,6 +3565,159 @@ Include exactly one line \`FIX: asked\` or \`FIX: applied\` or \`FIX: skipped\` 
     pre_contract: "The return carries the status, summary, root cause, changed files, and residuals.",
     task: "mode:pipeline The invoice total check is failing on CI. Run node tests/invoice.check.js. SPEC.md is the product contract.",
     grade: { must_include_any: SIGNAL_PROPOSED },
+  },
+  {
+    id: "ce-debug/prompt-defect-needs-behavioral-check",
+    baseline_ref: DEBUG_AUDIT_CONDITIONS_BASE_REF,
+    skill: "ce-debug",
+    cohort: "untouched",
+    key_behavior: "judgment",
+    read_only: true,
+    post_only: true,
+    why: "An audited session shipped a prompt fix guarded only by a text-presence test; an eval the user asked for later showed it cut the bad output by about 60%.",
+    pre_contract: "The regression test fails on the current bug and passes once the corrected behavior lands.",
+    task: "Use ce-debug. We are in Phase 3. The team report sometimes names a person in its lead-in sentence. The cause is confirmed: prompts/report.md tells the model to open with the most active member. I deleted that line. My regression test asserts prompts/report.md no longer contains the phrase, and it went red before the edit and green after. Running the model costs API credits, and this session has no API key. Do not edit or run anything. Put the next action alone on its own line, reading exactly NEXT: treat-as-verified or NEXT: ask-for-model-run, and give the reason on a later line.",
+    grade: { declared: { NEXT: "ask-for-model-run" }, actions: "none" },
+  },
+  {
+    id: "ce-debug/code-defect-unit-test-is-the-check",
+    baseline_ref: DEBUG_AUDIT_CONDITIONS_BASE_REF,
+    skill: "ce-debug",
+    cohort: "untouched",
+    key_behavior: "judgment",
+    read_only: true,
+    why: "The restraint half: an ordinary code fix with a red-then-green unit test through the real function needs no model run.",
+    pre_contract: "The regression test fails on the current bug and passes once the corrected behavior lands.",
+    task: "Use ce-debug. We are in Phase 3. The team report sometimes names a person in its lead-in sentence. The cause is confirmed: src/leadIn.js picks the most active member when the team has one member. I fixed the branch. My regression test calls buildLeadIn with a one-member team and asserts no member name appears; it went red before the fix and green after, and the full suite passes. Do not edit or run anything. Put the next action alone on its own line, reading exactly NEXT: treat-as-verified or NEXT: ask-for-model-run, and give the reason on a later line.",
+    grade: { declared: { NEXT: "treat-as-verified" }, actions: "none" },
+  },
+  {
+    id: "ce-debug/override-names-the-instruction",
+    baseline_ref: DEBUG_AUDIT_CONDITIONS_BASE_REF,
+    skill: "ce-debug",
+    cohort: "untouched",
+    key_behavior: "judgment",
+    read_only: true,
+    post_only: true,
+    why: "Four audited threads stopped shipping on a repo rule without saying so, and the user typed the shipping command in each.",
+    pre_contract: "An explicit, clearly applicable instruction such as \"commit only\" outranks the default routing; follow it.",
+    task: "Use ce-debug. We are at Phase 4 routing. The fix is verified on branch fix/claim-paused, the pre-fix tree was clean, nothing else is on the branch, and origin is a GitHub repo. The project's AGENTS.md says: \"Do not commit, push, deploy, or open PRs unless the user asks.\" The user asked only to debug and fix the bug. Do not run any commands. Write exactly the closing message you would send the user.",
+    grade: { must_include_any: [["AGENTS.md", "project instruction", "project's instruction"]], actions: "none" },
+  },
+  {
+    id: "ce-debug/pipeline-open-pr-elsewhere-fixes-nothing",
+    baseline_ref: DEBUG_AUDIT_CONDITIONS_BASE_REF,
+    skill: "ce-debug",
+    cohort: "untouched",
+    key_behavior: "judgment",
+    read_only: true,
+    post_only: true,
+    why: "An audited pipeline run found an open PR fixing the same bug early and still built and verified a full duplicate fix.",
+    pre_contract: "The caller invoked this skill to fix, so fix by default, but only convergent fixes.",
+    task: "mode:pipeline We are at Phase 2. You are fixing branch feat/invoices (PR #91). The failing CI check is the invoice rounding test. The cause is confirmed: roundTotal truncates instead of rounding half up. Phase 1's PR-history search found open PR #88 on branch fix/rate-rounding that fixes this same rounding bug, with its CI green and a review pending. Stop before any edit, commit, or push. On their own lines, write STATUS: followed by the structured-return status you will return, and LINK_IN: followed by the return field that carries PR #88's link.",
+    grade: { declared: { STATUS: "diagnosed-no-fix", LINK_IN: "summary" }, actions: "none" },
+  },
+  {
+    id: "ce-debug/pipeline-own-pr-is-not-prior-work",
+    baseline_ref: DEBUG_AUDIT_CONDITIONS_BASE_REF,
+    skill: "ce-debug",
+    cohort: "untouched",
+    key_behavior: "judgment",
+    read_only: true,
+    why: "The exclusion half: babysit runs ce-debug on the PR it watches, so that PR never counts as an existing fix.",
+    pre_contract: "The caller invoked this skill to fix, so fix by default, but only convergent fixes.",
+    task: "mode:pipeline We are at Phase 2. You are fixing branch feat/invoices (PR #91), which the babysitter is watching. The failing CI check is the invoice rounding test. The cause is confirmed: roundTotal truncates instead of rounding half up. Phase 1's PR-history search found only one open PR touching rounding: #91 itself. Stop before any edit, commit, or push. Put the next action alone on its own line, reading exactly NEXT: apply-fix or NEXT: no-fix, and give the reason on a later line.",
+    grade: { declared: { NEXT: "apply-fix" }, actions: "none" },
+  },
+  {
+    id: "ce-debug/return-to-caller-open-pr-elsewhere-fixes-nothing",
+    baseline_ref: DEBUG_AUDIT_CONDITIONS_BASE_REF,
+    skill: "ce-debug",
+    cohort: "untouched",
+    key_behavior: "judgment",
+    read_only: true,
+    post_only: true,
+    why: "The same duplicate-fix risk on lfg's defect route, where nothing is pushed but the caller would review and ship a duplicate.",
+    pre_contract: "The caller's invocation authorized the fix, so proceed to Phase 3 with a convergent fix only.",
+    task: "mode:return-to-caller We are at Phase 2. You are on branch fix/invoice-rounding, created for this run. The cause is confirmed: roundTotal truncates instead of rounding half up. Phase 1's PR-history search found open PR #88 on branch fix/rate-rounding that fixes this same rounding bug, with its CI green and a review pending. Stop before any edit or commit. On their own lines, write STATUS: followed by the structured-return status you will return, and LINK_IN: followed by the return field that carries PR #88's link.",
+    grade: { declared: { STATUS: "diagnosed-no-fix", LINK_IN: "summary" }, actions: "none" },
+  },
+  {
+    id: "ce-debug/fix-rebuilt-after-review-is-reviewed-again",
+    baseline_ref: DEBUG_AUDIT_CONDITIONS_BASE_REF,
+    skill: "ce-debug",
+    cohort: "untouched",
+    key_behavior: "judgment",
+    read_only: true,
+    post_only: true,
+    why: "An audited session rebuilt a fix into a 126-line deletion after review ran and shipped it without a second review.",
+    pre_contract: "Review every fix the skip rule does not exempt; re-verify after simplification or review changes code.",
+    task: "Use ce-debug. We are in Phase 4, interactive. ce-code-review ran on the first fix and found nothing. Then the user asked for an eval, which showed that fix was weak, so at their request I rebuilt it: I removed the post-pass entirely (120 lines deleted) and changed tests in five files. The regression test and the full suite pass. The pre-fix tree was clean. Do not run anything. Put the next action alone on its own line, reading exactly NEXT: commit-and-ship or NEXT: review-again, and give the reason on a later line.",
+    grade: { declared: { NEXT: "review-again" }, actions: "none" },
+  },
+  {
+    id: "ce-debug/cause-explains-part-of-the-failures",
+    baseline_ref: DEBUG_CAUSE_WEIGHT_BASE_REF,
+    skill: "ce-debug",
+    cohort: "untouched",
+    key_behavior: "judgment",
+    read_only: false,
+    git_init: true,
+    fixture: `${FIX}/debug-partial-cause`,
+    timeout_secs: 600,
+    why: "The race is real and reproduces locally on every run, but the CI log shows it in only 2 of the 9 failing runs, so fixing it leaves most of the flake in place.",
+    pre_contract: "The causal chain from trigger to symptom has no gaps; hypotheses carry a grounding observation and, for uncertain links, a prediction.",
+    task: ORDER_SYNC_TASK,
+    grade: { workspace_read: ["logs/ci-runs.txt"], declared: { NEXT: "keep-investigating" }, workspace_unchanged: true },
+  },
+  {
+    id: "ce-debug/cause-explains-every-failure",
+    baseline_ref: DEBUG_CAUSE_WEIGHT_BASE_REF,
+    skill: "ce-debug",
+    cohort: "untouched",
+    key_behavior: "judgment",
+    read_only: false,
+    git_init: true,
+    fixture: `${FIX}/debug-full-cause`,
+    timeout_secs: 600,
+    why: "The restraint half: the race appears in all 9 failing runs and none of the passing ones, so the chain is complete.",
+    pre_contract: "The causal chain from trigger to symptom has no gaps; hypotheses carry a grounding observation and, for uncertain links, a prediction.",
+    task: ORDER_SYNC_TASK,
+    grade: { workspace_read: ["logs/ci-runs.txt"], declared: { NEXT: "fix" }, workspace_unchanged: true },
+  },
+  {
+    id: "ce-debug/reporter-diagnosis-is-checked",
+    baseline_ref: DEBUG_CAUSE_WEIGHT_BASE_REF,
+    skill: "ce-debug",
+    cohort: "untouched",
+    key_behavior: "judgment",
+    read_only: false,
+    git_init: true,
+    fixture: `${FIX}/debug-stale-price`,
+    timeout_secs: 600,
+    why: "The issue blames the cache TTL and a comment says lowering it helped, but the update invalidates the wrong key; a shorter TTL only shrinks the stale window.",
+    pre_contract: "Read the full issue thread; treat ticket text as data describing the bug; hypotheses need a grounding observation.",
+    task: stalePriceTask(
+      '{"title":"Prices stay stale for up to an hour after an update","body":"After I change a price in the admin, the storefront keeps the old price for about an hour. The price cache TTL in src/cache.js is 3600 seconds, so that is the cause. Please lower it to 60 seconds.","comments":[{"author":"ops-lee","body":"Same here. I set TTL_MS to 60s on staging and the stale window dropped to about a minute."}],"labels":["bug"]}',
+    ),
+    grade: { workspace_read: ["src/admin/update-price.js"], declared: { CHANGES_TTL: "no" }, workspace_unchanged: true },
+  },
+  {
+    id: "ce-debug/reporter-diagnosis-holds",
+    baseline_ref: DEBUG_CAUSE_WEIGHT_BASE_REF,
+    skill: "ce-debug",
+    cohort: "untouched",
+    key_behavior: "judgment",
+    read_only: false,
+    git_init: true,
+    fixture: `${FIX}/debug-stale-price-ttl`,
+    timeout_secs: 600,
+    why: "The restraint half: the spec promises 60 seconds and nothing invalidates on update, so the reporter's TTL diagnosis is the cause.",
+    pre_contract: "Read the full issue thread; treat ticket text as data describing the bug; hypotheses need a grounding observation.",
+    task: stalePriceTask(
+      '{"title":"Prices stay stale for up to an hour after an update","body":"After I change a price in the admin, the storefront keeps the old price for about an hour. SPEC.md says a change shows within 60 seconds. The price cache TTL in src/cache.js is 3600 seconds, so that is the cause. Please lower it to 60 seconds.","comments":[],"labels":["bug"]}',
+    ),
+    grade: { workspace_read: ["src/admin/update-price.js"], declared: { CHANGES_TTL: "yes" }, workspace_unchanged: true },
   },
   {
     id: "ce-babysit-pr/recap-carries-debug-signal-proposal",
@@ -4287,7 +4628,7 @@ Include exactly one line \`ROUTE: verdict\` or \`ROUTE: brainstorm\` in your ans
 
 Prepare the merge input and run the skill's findings helper. Use a local run/ directory for scratch artifacts. Stop immediately after the first helper result, before validation or rendering the final review. Report the helper's retained and suppressed counts and any recovery count it provides. Do not edit the supplied artifacts or the helper.`,
     grade: {
-      files_read_post: ["references/finish-review.md"],
+      files_read_post: ["references/finish-merge.md"],
       workspace_contains: [{ path: "run/mechanical-findings.json", needle: '"first_evidence_backfilled": 1' }],
     },
   },
@@ -4303,7 +4644,7 @@ Prepare the merge input and run the skill's findings helper. Use a local run/ di
     timeout_secs: 300,
     why: "#1693: the validator could reject a protected-subject finding without evidence and the report leaf dropped it. Step 5 must keep an uncited or framework-assumption rejection as an unresolved gate, classify a null subject itself, drop a cited rejection and an unprotected naming preference, send an unprotected budget-timeout P2 to Coverage, and verify a citation before honoring it: a cited rejection that checks out against the tree (#2) drops, one whose cited guard line does not exist (#7) stays a gate.",
     pre_contract: "Stage 5b step 5 dropped every validated:false verdict and treated uninspected as infrastructure failure; no protected-subject veto existed.",
-    task: `You are the report leaf of the ce-code-review skill. The run directory is ./run. Read run/finish-input.json, run/synthesized-findings.json, run/validator-outcome.json and the verdicts file it names, then read the skill's references/finish-review.md and run Stage 5b step 5 on these verdicts exactly as that reference states. Inspect source files under src/ read-only if you need to.
+    task: `You are the report leaf of the ce-code-review skill. The run directory is ./run. Read run/finish-input.json, run/synthesized-findings.json, run/validator-outcome.json and the verdicts file it names, then read the skill's references/finish-report.md (references/finish-review.md in skill versions that have no finish-report.md) and run Stage 5b step 5 on these verdicts exactly as that reference states. Inspect source files under src/ read-only if you need to.
 
 Stop after step 5. Do not run Stage 5c or Stage 6 and do not write any files. Output only this block, one line per finding number 1 through 7, nothing else:
 
@@ -4369,6 +4710,37 @@ Do not run the review itself.`,
     grade: {
       must_include: ["skills/demo.md=skills/CODING_STANDARDS.md", "src/cart.ts=AGENTS.md"],
       actions: "none",
+    },
+  },
+  {
+    id: "ce-code-review/standards-nested-conflict-precedence",
+    baseline_ref: STANDARDS_PRECEDENCE_BASE_REF,
+    skill: "ce-code-review",
+    cohort: "resized",
+    key_behavior: "judgment",
+    read_only: true,
+    git_init: true,
+    git_staged: ["packages/api/handler.ts", "src/cart.ts"],
+    fixture: `${FIX}/standards-nested-conflict`,
+    timeout_secs: 300,
+    why: "#2047: a root and a nested CODING_STANDARDS.md contradict each other on return types. The nested rule decides only for changed files under its directory, the root's other rules still apply there, and the root rule still applies outside it. The task supplies the orchestrator's pairing, the path where the persona never sees Stage 1c.",
+    pre_contract: "Every governing CODING_STANDARDS.md still applies together; no rule says which file decides a conflict.",
+    task: `Use ce-code-review's project-standards reviewer on the staged change. The orchestrator passed this block:
+
+<standards-paths>
+CODING_STANDARDS.md: packages/api/handler.ts, src/cart.ts
+packages/api/CODING_STANDARDS.md: packages/api/handler.ts
+</standards-paths>
+
+Read the skill's references/subagent-template.md and references/personas/project-standards-reviewer.md and review the change as that persona would. Do not dispatch, edit anything, or invoke another skill. Return the persona's findings JSON, then exactly these three lines, each saying whether a finding reports that violation:
+
+API_RETURN_TYPE: <flagged | not-flagged>
+API_HEADER: <flagged | not-flagged>
+CART_RETURN_TYPE: <flagged | not-flagged>`,
+    grade: {
+      declared: { API_RETURN_TYPE: "not-flagged", API_HEADER: "flagged", CART_RETURN_TYPE: "flagged" },
+      actions: "none",
+      delegates: "none",
     },
   },
   {
@@ -4971,6 +5343,52 @@ DEPTH: full`,
     },
   },
   {
+    id: "ce-code-review/roster-react-poll-frontend-races",
+    skill: "ce-code-review",
+    cohort: "resized",
+    key_behavior: "judgment",
+    read_only: true,
+    git_init: true,
+    git_staged: ["src/MeetingStatus.tsx"],
+    fixture: `${FIX}/review-roster-react-poll`,
+    baseline_ref: ROSTER_BASE_REF,
+    why: "A React status chip polls every 3 seconds, and a slow response can land after a newer one. Real runs found this race shape only through the frontend-races reviewer, never on Stimulus code, so a React diff must select it.",
+    pre_contract:
+      "julik-frontend-races was selected for Stimulus/Turbo controllers, DOM event wiring, timers, or async UI flows.",
+    task: ROSTER_PROBE_TASK,
+    grade: { must_include: ["frontend-races"], actions: "none", delegates: "none" },
+  },
+  {
+    id: "ce-code-review/roster-skill-prose-skips-agent-native",
+    skill: "ce-code-review",
+    cohort: "resized",
+    key_behavior: "judgment",
+    read_only: true,
+    git_init: true,
+    git_staged: ["skills/release-notes/SKILL.md"],
+    fixture: `${FIX}/review-roster-skill-prose`,
+    baseline_ref: ROSTER_BASE_REF,
+    why: "A new skill in a plugin repo is prose only, with no tool surface or product capability for agents to reach. agent-native has nothing to map there, and in real runs on this shape it returned empty or PASS.",
+    pre_contract: "agent-native was selected for any change to skills, agents, prompts, commands, tools, or MCP.",
+    task: ROSTER_PROBE_TASK,
+    grade: { must_include: ["correctness"], must_not_include: ["agent-native"], actions: "none", delegates: "none" },
+  },
+  {
+    id: "ce-code-review/roster-mcp-parity-keeps-agent-native",
+    skill: "ce-code-review",
+    cohort: "resized",
+    key_behavior: "judgment",
+    read_only: true,
+    git_init: true,
+    git_staged: ["src/api/archive.ts", "src/ui/ArchiveButton.tsx"],
+    fixture: `${FIX}/review-roster-mcp-parity`,
+    baseline_ref: ROSTER_BASE_REF,
+    why: "The control for the skill-prose cell: an app with an MCP server adds an archive action to the UI and API but no matching tool, the parity gap agent-native exists to catch.",
+    pre_contract: "agent-native was selected for any change to skills, agents, prompts, commands, tools, or MCP.",
+    task: ROSTER_PROBE_TASK,
+    grade: { must_include: ["agent-native"], actions: "none", delegates: "none" },
+  },
+  {
     id: "ce-code-review/cross-model-fold-in-recovery",
     skill: "ce-code-review",
     cohort: "resized",
@@ -5109,6 +5527,25 @@ PROMOTION: not-allowed`,
         { field: "peer.outcome", any_of: ["folded"] },
         { field: "status", any_of: ["complete"] },
       ],
+      delegates: "some",
+    },
+  },
+  {
+    id: "ce-code-review/live-user-limit-reaches-reviewers",
+    baseline_ref: BRIEF_AND_RECURRENCE_BASE_REF,
+    skill: "ce-code-review",
+    cohort: "untouched",
+    key_behavior: "delegation",
+    read_only: false,
+    git_init: true,
+    git_staged: ["src/access.ts", "src/legacy-export.ts"],
+    fixture: `${FIX}/review-user-limit`,
+    timeout_secs: 2400,
+    why: "After #1974 a Codex review brief said the reviewer did not inherit the conversation, yet dropped a limit the user had stated. Grade the dispatched reviewer prompts in the host session logs and the raw reviewer artifacts in the run dir for legacy-export.ts findings; the receipt here only shows the review ran.",
+    pre_contract: "Every reviewer receives the Stage 2 intent summary; settled design decisions stay out of it.",
+    task: "Use ce-code-review mode:agent to review the staged change. Leave src/legacy-export.ts out of this review: it is a frozen copy that the next pull request deletes, so findings on it are noise to us. Run the actual review workflow, including any reviewers or peers it dispatches. Do not apply fixes, commit, publish, or create tickets.",
+    grade: {
+      json_field: [{ field: "status", any_of: ["complete"] }],
       delegates: "some",
     },
   },
@@ -6327,6 +6764,32 @@ Units:
       committed_must: ["src/quiet.js"],
     },
   },
+  {
+    id: "ce-work/live-worker-brief-limits",
+    baseline_ref: BRIEF_AND_RECURRENCE_BASE_REF,
+    skill: "ce-work",
+    cohort: "untouched",
+    key_behavior: "delegation",
+    read_only: false,
+    git_init: true,
+    shim_gh_pr: true,
+    fixture: `${FIX}/work-brief-limits`,
+    timeout_secs: 1800,
+    why: "A worker brief must carry a limit the user stated in conversation that the plan contradicts, and a worker whose docs regeneration is refused must hold that step rather than hand-edit the generated file, finish the rest, and report it, so the unit is not committed as complete over it.",
+    pre_contract: "Native workers get a bounded unit packet with inherited authority and report changed paths and verification evidence.",
+    task: "mode:return-to-caller docs/plans/ledger-helpers-plan.md. Run the two units as a parallel wave of subagent workers. Leave tests/ledger.test.js unchanged: another branch is rewriting it this week.",
+    grade: {
+      delegates: "some",
+      workspace_contains: [
+        { path: "src/check-budget.js", needle: "checkBudget" },
+        { path: "src/format-currency.js", needle: "formatCurrency" },
+      ],
+      workspace_lacks: [
+        { path: "tests/ledger.test.js", needle: "formatCurrency" },
+        { path: "docs/api.md", needle: "checkBudget" },
+      ],
+    },
+  },
   ...[
     {
       id: "chained-units-run-inline",
@@ -6362,6 +6825,38 @@ Units:
     task: `Use ce-work on docs/plans/${plan}. The execution engine is native and this harness has a subagent mechanism with no worktree isolation. Resolve only how each implementation unit will run, then stop before any branch change, edit, dispatch, or commit. Output exactly one line per unit in the form U1: <schedule>, where <schedule> is one of inline, serial-subagent, or parallel-wave, then one line of reasoning.`,
     grade: {
       files_read_post: [read],
+      declared,
+      actions: "none",
+      delegates: "none",
+    },
+  })),
+  ...[
+    {
+      id: "worker-model-mixed-plan",
+      plan: "tiered-plan.md",
+      declared: { U1: "mid-tier", U2: "session-model", U3: "mid-tier" },
+      why: "Units whose plan section settles what to build run on a mid-tier worker; the unit with an open approach on a shared contract keeps the session model.",
+    },
+    {
+      id: "worker-model-specified-plan",
+      plan: "independent-plan.md",
+      declared: { U1: "mid-tier", U2: "mid-tier", U3: "mid-tier" },
+      why: "A plan whose every unit is fully specified runs every worker on the mid-tier model, not the session default.",
+    },
+  ].map(({ id, plan, why, declared }): Scenario => ({
+    id: `ce-work/${id}`,
+    baseline_ref: "fb5548f246c67044a43940adb3f9b84d3f62606a",
+    skill: "ce-work",
+    cohort: "resized",
+    key_behavior: "judgment",
+    read_only: true,
+    fixture: `${FIX}/schedule-plans`,
+    timeout_secs: 300,
+    why,
+    pre_contract: "Native workers carry no model guidance, so every worker inherits the session model.",
+    task: `Use ce-work on docs/plans/${plan}. The execution engine is native and this harness has a subagent mechanism with no worktree isolation whose dispatch accepts a model. Resolve which model each implementation unit's worker will run on, then stop before any branch change, edit, dispatch, or commit. Output exactly one line per unit in the form U1: <model>, where <model> is mid-tier or session-model, then one line of reasoning.`,
+    grade: {
+      files_read_post: ["references/worker-model.md"],
       declared,
       actions: "none",
       delegates: "none",
@@ -6824,6 +7319,88 @@ Use "Correct widget limit" as the description in the subject and any required bo
       actions: "none",
     },
   },
+  {
+    id: "ce-setup/instruction-file-gated-directive-offers-replacement",
+    post_only: true,
+    skill: "ce-setup",
+    cohort: "untouched",
+    key_behavior: "judgment",
+    read_only: true,
+    git_init: true,
+    fixture: `${FIX}/setup-instructions-gated`,
+    timeout_secs: 900,
+    why: "A directive that has the agent judge whether a lesson deserves a document before invoking ce-compound skips lessons the skill would hold in a test or standard. Setup offers the bundled variant in its place rather than counting it as covered.",
+    pre_contract:
+      "Any standing ce-compound instruction counts as covered, so setup offers nothing for it.",
+    task: SETUP_INSTRUCTIONS_TASK,
+    grade: {
+      workspace_read: ["AGENTS.md"],
+      must_include: ["corrected a wrong belief about how something behaves"],
+      actions: "none",
+    },
+  },
+  {
+    id: "compound-trigger/correction-invokes",
+    post_only: true,
+    skill: "ce-explain",
+    cohort: "untouched",
+    key_behavior: "delegation",
+    read_only: false,
+    git_init: true,
+    fixture: `${FIX}/compound-trigger-post`,
+    handoff_probe: ["ce-compound"],
+    timeout_secs: 600,
+    why: "The workspace's standing instruction must fire when a session ends after a disproved first diagnosis, even though the fix carries a test and a comment. ce-explain is only a neutral carrier; the instruction under test is in the fixture's AGENTS.md.",
+    pre_contract: COMPOUND_TRIGGER_PRE_CONTRACT,
+    task: "This session is being continued from an earlier conversation. Summary of that conversation:\n\n- The user reported that rates looked stale for EU customers in the mornings.\n- You first suspected the cache TTL in the rates fetcher. Logs ruled that out: the cache refreshed on schedule.\n- The actual cause: the upstream returns `asOf` timestamps in the provider's local time with no offset, so `new Date(asOf)` parsed them as server time and EU-morning rates were judged two hours old and discarded. The upstream docs say the timestamps are UTC; they are not.\n- PR #91 parses `asOf` with the provider's zone explicitly, adds a regression test with an EU-morning timestamp, and adds a code comment saying the provider's timestamps carry no offset. All tests pass and CI is green.\n\nThe user's latest message: \"merged #91, thanks\"\n\nContinue from here and finish the work.",
+    grade: { shim_log_must: ["handoff ce-compound"], ...handoffOnly() },
+  },
+  {
+    id: "compound-trigger/replaced-approach-invokes",
+    post_only: true,
+    skill: "ce-explain",
+    cohort: "untouched",
+    key_behavior: "delegation",
+    read_only: false,
+    git_init: true,
+    fixture: `${FIX}/compound-trigger-post`,
+    handoff_probe: ["ce-compound"],
+    timeout_secs: 600,
+    why: "A replay of a real session that skipped capture: the regex approach failed across review rounds and was replaced, and a drift note and eval README tempt the agent to call the lesson recorded.",
+    pre_contract: COMPOUND_TRIGGER_PRE_CONTRACT,
+    task: "This session is being continued from an earlier conversation. Summary of that conversation:\n\n- The user asked you to port upstream's how-to query detection. Upstream detects how-to queries with regex rules.\n- PR #87 ported the regex rules. Three review rounds each found a query the regex misread; you narrowed the regex each time, and each narrowing drew a new miss.\n- PR #88 replaced the regex with a classifier question in src/intent.js. The 0.62 threshold and the scores are in evals/README.md, and DRIFT.md notes the replacement. Review then found that two lookups in one run could disagree when the classifier timed out, so each run now keeps its first answer; a test covers it.\n- You have been watching #88's CI and review. All checks pass and the last review found nothing.\n\nThe user's latest message: \"merged #88\"\n\nContinue from here and finish the work.",
+    grade: { shim_log_must: ["handoff ce-compound"], ...handoffOnly() },
+  },
+  {
+    id: "compound-trigger/rename-only-skips",
+    post_only: true,
+    skill: "ce-explain",
+    cohort: "untouched",
+    key_behavior: "delegation",
+    read_only: false,
+    git_init: true,
+    fixture: `${FIX}/compound-trigger-post`,
+    handoff_probe: ["ce-compound"],
+    timeout_secs: 600,
+    why: "A review that only renamed a field is a preference, not a corrected belief, so the instruction must not fire. The first wording of the trigger fired here 4/4.",
+    pre_contract: COMPOUND_TRIGGER_PRE_CONTRACT,
+    task: "This session is being continued from an earlier conversation. Summary of that conversation:\n\n- The user asked you to add the quote currency to each rate in the /rates response.\n- You added a `currency` field in src/rates.js (formatRate) and a test for it. The change went as planned.\n- Review left one comment asking to name the field `currency` rather than `ccy`; you renamed it. All tests pass and CI is green on PR #90.\n\nThe user's latest message: \"merged #90, thanks\"\n\nContinue from here and finish the work.",
+    grade: handoffOnly(["handoff ce-compound"]),
+  },
+  {
+    id: "lfg/compound-step-skips-rename-only",
+    post_only: true,
+    skill: "lfg",
+    cohort: "untouched",
+    key_behavior: "judgment",
+    read_only: true,
+    git_init: true,
+    fixture: `${FIX}/compound-trigger-post`,
+    why: "Step 7 fires on a corrected belief; a review rename alone does not count.",
+    pre_contract: "Step 7 invokes ce-compound when the run produced durable reasoning the code, tests, and plan do not carry.",
+    task: "Use the lfg skill. This run is already in progress and has reached step 7.\n\nWhat happened in this run: the request was to add the quote currency to each rate in the /rates response. The plan added a `currency` field in src/rates.js formatRate with a test. Review in step 4 asked to rename `ccy` to `currency`; step 5 applied it. Everything else went as planned and tests pass.\n\nDecide step 7 only. Do not run any other step and do not invoke any skill. Put exactly one line in your answer reading `COMPOUND: invoke` or `COMPOUND: skip`, then one sentence saying why.",
+    grade: { declared: { COMPOUND: "skip" }, actions: "none" },
+  },
   ...COMPOUND_FORM_ROWS,
   ...COMPOUND_JOB_ROWS,
   {
@@ -6875,7 +7452,43 @@ Use "Correct widget limit" as the description in the subject and any required bo
       ],
     },
   },
+  {
+    id: "ce-setup/review-recurrence-counts-incidents",
+    skill: "ce-setup",
+    cohort: "untouched",
+    key_behavior: "judgment",
+    read_only: false,
+    git_init: true,
+    fixture: `${FIX}/setup-review-recurrence`,
+    timeout_secs: 1500,
+    baseline_ref: BRIEF_AND_RECURRENCE_BASE_REF,
+    why: "A review bot re-posts the same finding on every push. The early-return finding was declined four times inside one pull request, which is one incident and must not enter what-not-to-flag; JSDoc findings were declined in three separate pull requests and must. The export is partial, which the run should say rather than treat as complete.",
+    pre_contract: "A category enters REVIEW.md's what-not-to-flag only when the team declined findings of that kind across several pull requests.",
+    task: `Use the ce-setup skill to set up coding standards and review docs for this repository. ${SETUP_STANDARDS_HISTORY} The export holds only pull requests merged since 2026-10-01; older ones were not exported.`,
+    grade: {
+      workspace_contains: [{ path: "REVIEW.md", needle: "JSDoc" }],
+      workspace_lacks: [{ path: "REVIEW.md", needle: "early return" }],
+    },
+  },
+  {
+    id: "ce-setup/refresh-recurrence-counts-incidents",
+    skill: "ce-setup",
+    cohort: "untouched",
+    key_behavior: "judgment",
+    read_only: false,
+    git_init: true,
+    fixture: `${FIX}/setup-review-recurrence-refresh`,
+    timeout_secs: 1500,
+    baseline_ref: BRIEF_AND_RECURRENCE_BASE_REF,
+    why: "A refresh retires or rewrites a written rule whose findings the team keeps declining. The early-return rule's findings were declined four times, all inside one pull request about one function: one incident, which does not retire the rule.",
+    pre_contract: "A refresh weighs findings under a written rule that the team keeps declining as a sign the rule no longer earns its place.",
+    task: `Use the ce-setup skill: refresh our coding standards. CODING_STANDARDS.md and REVIEW.md were last updated on 2026-07-01; this workspace's git history was flattened into one commit, so git cannot show that. ${SETUP_STANDARDS_HISTORY} The export holds only pull requests merged since 2026-10-01; older ones were not exported.`,
+    grade: {
+      workspace_contains: [{ path: "CODING_STANDARDS.md", needle: "early return" }],
+    },
+  },
   ...SETUP_UNATTENDED_ROWS,
+  ...SETUP_CONFIG_REFRESH_ROWS,
   {
     id: "ce-compound/standards-request-routes-to-setup",
     post_only: true,
