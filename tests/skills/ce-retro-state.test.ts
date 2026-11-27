@@ -1,4 +1,6 @@
 import { describe, expect, setDefaultTimeout, test } from "bun:test"
+import { Database } from "bun:sqlite"
+import { pathToFileURL } from "node:url"
 import { spawn, spawnSync } from "node:child_process"
 import {
   chmodSync,
@@ -10,6 +12,7 @@ import {
   realpathSync,
   statSync,
   symlinkSync,
+  utimesSync,
   writeFileSync,
 } from "node:fs"
 import { tmpdir } from "node:os"
@@ -402,6 +405,95 @@ describe("retro-state ledger", () => {
     ])
 
     expect(run(sealed, main, ["extract", "--out", out, "99999999"]).code).toBe(EXIT_INVALID)
+  })
+
+  test("finds and extracts Antigravity alongside Claude and Codex across worktrees", () => {
+    const { root, env } = sandbox()
+    const main = repo(env, root)
+    const wt = path.join(root, "work tree")
+    git(env, main, "worktree", "add", "-q", "-b", "side", wt)
+    const home = env.HOME!
+    const sealed = {
+      HOME: home, PATH: process.env.PATH, USERPROFILE: home, SystemRoot: process.env.SystemRoot,
+      CLAUDE_CONFIG_DIR: path.join(home, ".claude"), CODEX_HOME: path.join(home, ".codex"),
+    }
+    const write = (file: string, contents: string) => {
+      mkdirSync(path.dirname(file), { recursive: true })
+      writeFileSync(file, contents)
+    }
+    for (const [harness, store] of [["claude", ".claude/projects/repo"], ["codex", ".codex/sessions"]]) {
+      const fixture = readFileSync(path.join(__dirname, `../fixtures/session-history/${harness}-session.jsonl`), "utf8")
+      write(path.join(home, store, "session.jsonl"), fixture.replaceAll("/Users/test/Code/my-repo", main))
+    }
+
+    const steps = [
+      { type: "USER_INPUT", content: "Check the build" },
+      { type: "PLANNER_RESPONSE", content: "Checking", thinking: "omit private reasoning", tool_calls: [{ name: "run_command" }] },
+      { type: "RUN_COMMAND", status: "ERROR", content: "Build failed" },
+    ].map((step, step_index) => JSON.stringify({ step_index, ...step })).join("\n")
+    const t3 = path.join(home, ".t3", "userdata")
+    const profiles = [
+      path.join(home, ".gemini", "antigravity-cli"),
+      path.join(home, ".gemini", "antigravity-ide"),
+      path.join(t3, "providers", "antigravity", "profile", "antigravity-acp"),
+    ]
+    for (const [index, dir] of profiles.entries()) {
+      mkdirSync(dir, { recursive: true })
+      const db = new Database(path.join(dir, "conversation_summaries.db"), { create: true })
+      db.exec("CREATE TABLE conversation_summaries(conversation_id TEXT, workspace_uris TEXT, parent_conversation_id TEXT)")
+      const insert = db.prepare("INSERT INTO conversation_summaries VALUES (?, ?, ?)")
+      const session = (id: string, cwds: string[], parent = "", filename = "transcript.jsonl") => {
+        insert.run(id, JSON.stringify(cwds.map((cwd) => pathToFileURL(cwd).href)), parent)
+        const transcript = path.join(dir, "brain", id, ".system_generated/logs", filename)
+        write(transcript, steps)
+        return transcript
+      }
+      if (index < 2) session("ag-parent", [wt]) // Same conversation in both stores counts once.
+      if (index === 0) {
+        session("ag-child", [], "ag-parent", "transcript_full.jsonl")
+        write(path.join(dir, "history.jsonl"), JSON.stringify({ conversationId: "ag-child", workspace: wt }))
+        session("other", [wt + "-other"])
+        utimesSync(session("old", [wt]), 1, 1)
+        insert.run("opaque", JSON.stringify([pathToFileURL(main).href]), "")
+        write(path.join(dir, "conversations/opaque.pb"), "unreadable binary")
+      }
+      if (index === 2) {
+        const attachments = path.join(t3, "attachments")
+        session("t3-antigravity", [attachments, wt])
+        session("t3-other-project", [attachments, wt + "-other"])
+        session("t3-mixed-workspaces", [attachments, wt, wt + "-other"])
+        session("t3-attachments-only", [attachments])
+      }
+      db.close()
+    }
+    const out = mkdtempSync(path.join(root, "run-"))
+    const found = run(sealed, main, ["sessions", "--days", "7", "--out", out])
+    expect(found.code).toBe(0)
+    expect(found.json.by_harness).toEqual({
+      antigravity: { sessions: 2, subagents: 1 }, claude: { sessions: 1, subagents: 0 }, codex: { sessions: 1, subagents: 0 },
+    })
+    const rows = readFileSync(path.join(out, "sessions.jsonl"), "utf8").trim().split("\n").map((line) => JSON.parse(line))
+    expect(rows.filter((row) => row.session.startsWith("t3-")).map(({ session, cwd }) => ({ session, cwd }))).toEqual([
+      { session: "t3-antigravity", cwd: wt },
+    ])
+    expect(found.json.warnings).toHaveLength(1)
+    expect(found.json.warnings[0]).toContain("no recent JSONL transcript")
+    const ex = run(sealed, main, ["extract", "--out", out, "ag-parent", "t3-antigravity"])
+    expect(ex.json.failed).toEqual([])
+    expect(ex.json.unrecognized).toEqual([])
+    expect(ex.json.sessions["ag-parent"].files).toBe(2)
+    expect(ex.json.sessions["t3-antigravity"].files).toBe(1)
+    expect(readFileSync(path.join(out, "extracts/t3-antigravity/t3-antigravity.transcript.jsonl.skeleton.txt"), "utf8"))
+      .toContain("Check the build")
+    const folder = path.join(out, "extracts/ag-parent")
+    for (const [sid, name] of [["ag-parent", "transcript"], ["ag-child", "transcript_full"]]) {
+      const base = path.join(folder, `${sid}.${name}.jsonl`)
+      const skeleton = readFileSync(base + ".skeleton.txt", "utf8")
+      expect(skeleton).toContain("Check the build")
+      expect(skeleton).toContain("run_command")
+      expect(skeleton).not.toContain("omit private reasoning")
+      expect(readFileSync(base + ".errors.txt", "utf8")).toContain("Build failed")
+    }
   })
 
   test("extract includes a subagent's own subagents under the top-level session", () => {

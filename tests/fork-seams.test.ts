@@ -11,6 +11,10 @@ const REPO_ROOT = path.join(import.meta.dir, "..")
 const SKILLS_ROOT = path.join(REPO_ROOT, "skills")
 
 const SEAMS = [
+  { file: "skills/ce-retro/references/sessions-and-window.md", id: "antigravity" },
+  ...["antigravity-reader", "antigravity-discovery", "antigravity-extract"].map((id) => ({
+    file: "skills/ce-retro/scripts/retro-state.py", id,
+  })),
   { file: "skills/ce-simplify-code/SKILL.md", id: "fork" },
   { file: "skills/ce-compound/references/research.md", id: "placement" },
   { file: "skills/ce-code-review/references/dispatch-reviewers.md", id: "t3" },
@@ -25,6 +29,7 @@ const T3_COPIES = [
   "skills/ce-work/references/t3-subagents.md",
 ]
 const FORK_ONLY_FILES = [
+  "skills/ce-retro/scripts/antigravity.py",
   T3_CANONICAL,
   ...T3_COPIES,
   "skills/ce-simplify-code/references/placement.md",
@@ -91,11 +96,13 @@ describe("fork seams", () => {
       const { start, end } = markers(seam.id)
       expect(content.split(start).length).toBe(2)
       expect(content.split(end).length).toBe(2)
-      expect(stripSeam(content, seam.id)).toBe(upstreamContent(seam.file))
+      const siblings = SEAMS.filter(({ file }) => file === seam.file)
+      expect(siblings.reduce((text, { id }) => stripSeam(text, id), content)).toBe(upstreamContent(seam.file))
+      if (seam.file.endsWith(".py")) return
 
       const block = content.slice(content.indexOf(start), content.indexOf(end))
       const skillDir = path.join(REPO_ROOT, ...seam.file.split("/").slice(0, 2))
-      const targets = [...block.matchAll(/`(references\/[^`]+\.md)`/g)].map((match) => match[1])
+      const targets = [...block.matchAll(/`((?:references\/[^`]+\.md|scripts\/[^`]+\.py))`/g)].map((match) => match[1])
       expect(targets.length).toBeGreaterThan(0)
       for (const target of targets) expect(existsSync(path.join(skillDir, target))).toBe(true)
     })

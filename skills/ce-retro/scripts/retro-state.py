@@ -415,6 +415,12 @@ SESSIONS_FILE = "sessions.jsonl"
 METADATA_CHUNK = 400
 
 
+# ce-fork-hook:start antigravity-reader
+# Load the bundled adapter by path so isolated Python (-I) works too.
+from runpy import run_path
+antigravity = run_path(os.path.join(os.path.dirname(HISTORY), "antigravity.py"))
+# ce-fork-hook:end antigravity-reader
+
 def run_dir(path):
     out = os.path.realpath(path)
     if not os.path.isdir(out):
@@ -472,6 +478,10 @@ def cmd_sessions(args):
             else:
                 rows.append(obj)
 
+    # ce-fork-hook:start antigravity-discovery
+    rows.extend(antigravity["discover"](paths, args.days, warnings, files, totals))
+    # ce-fork-hook:end antigravity-discovery
+
     roots_by_row = session_roots(rows)
     children = [row for row in rows if row.get("parent_session")]
     sessions = [row for row in rows if not row.get("parent_session")]
@@ -497,6 +507,11 @@ def cmd_sessions(args):
 
 def extract_one(job):
     script, source, dest = job
+    # ce-fork-hook:start antigravity-extract
+    if antigravity["is_transcript"](source):
+        return antigravity["extract"](script, source, dest)
+    # ce-fork-hook:end antigravity-extract
+
     with open(source, "rb") as fin:
         r = subprocess.run([sys.executable, "-I", os.path.join(HISTORY, script), "--output", dest], stdin=fin, capture_output=True, text=True)
     try:
