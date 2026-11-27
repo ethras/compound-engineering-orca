@@ -2,6 +2,8 @@
 
 Read this at Stage 0, before scope is resolved. It defines how to parse the arguments, which argument combinations stop the review, the quick-review short-circuit, and what each mode returns.
 
+Give each file you read its own tool call, so its output comes back on its own, never several files in one command or one script. A read counts only when the whole file came back. Some hosts cut the middle out of a long tool output and leave a truncation marker in its place, so when a read comes back shortened, read the missing lines in smaller ranges before you act on that file. That applies to every file you read during this review, not only to references.
+
 ## Argument Parsing
 
 Parse the arguments you were invoked with for optional tokens. Strip each recognized token before interpreting the remainder as a PR number, GitHub URL, or branch name.
@@ -128,7 +130,6 @@ Minimum shape:
   "pre_existing_findings": [],
   "requirements_completeness": null,
   "learnings": [],
-  "agent_native_gaps": [],
   "deployment_notes": [],
   "residual_risks": [],
   "testing_gaps": [],
@@ -148,7 +149,7 @@ On the full path, copy `outcome` and `coverage` verbatim from the `peer` record 
 
 When Stage 1d staged a review policy, every path adds `coverage.review_policy`: `sources` (the policy file paths read), `removed` and `regraded` (counts), and `not_applied` (policy files the change edited, whose new version this review did not apply).
 
-Lite fills `findings`, `actionable_findings`, `testing_gaps`, `residual_risks`, and `requirements_completeness` (`null` only when no plan was found) from its own review. The arrays owned by reviewers it did not run (`learnings`, `agent_native_gaps`, `deployment_notes`, `pre_existing_findings`, `triage_groups`) are `[]`, and Coverage names them as not assessed. `reviewers` is `["correctness"]` and `coverage.depth` is `"lite"`. Focused fills the same fields from its merged findings, lists its two reviewers, and sets `coverage.depth` to `"focused"`; the full path's finish leaf fills every field and sets `coverage.depth` to `"full"`.
+Lite fills `findings`, `actionable_findings`, `testing_gaps`, `residual_risks`, and `requirements_completeness` (`null` only when no plan was found) from its own review. The arrays owned by reviewers it did not run (`learnings`, `deployment_notes`, `pre_existing_findings`, `triage_groups`) are `[]`, and Coverage names them as not assessed. `reviewers` is `["correctness"]` and `coverage.depth` is `"lite"`. Focused fills the same fields from its merged findings, lists its two reviewers, and sets `coverage.depth` to `"focused"`; the full path's finish leaf fills every field and sets `coverage.depth` to `"full"`.
 
 Each object in `findings` uses the merged finding fields: `#`, `title`, `severity`, `file`, `line`, `confidence`, `autofix_class`, `owner`, `requires_verification`, `pre_existing`, `suggested_fix`, `first_evidence`, `why_it_matters`, `evidence`, `reviewers`, `independent_reviewers`. A finding Stage 5b left unresolved, or confirmed with an unmeasured-incidence reason, also carries `validation_status` and `validation_reason`, and carries `protected_subject` when one applies. Each object in `learnings` is a Known Pattern note: `type` (`known_pattern`), `title`, `citation` (a `<root>/solutions/` path or `(pack: <id>, <path within the pack>)`), and `note` (one line on how it bears on the change); contradicted pack rules are findings, never `learnings` entries. When Compound Packs were resolved, on any path, `coverage.compound_packs` carries `roots` as the list of pack ids (strings — never the resolver's absolute `dir` paths) plus the resolver's `warnings` and `errors` arrays verbatim, so a consumer can tell a declared pack that loaded from one that was skipped. The helper derives `independent_reviewers`; synthesis may preserve or union that list but must not infer it from `reviewers`.
 
@@ -160,4 +161,4 @@ Each object in `triage_groups` carries `{ "title", "findings": [<stable #s>], "c
 
 On failure before review completes, set `"status": "failed"` and `"reason": "<one sentence>"`. When all reviewers fail, use `"status": "degraded"` with a reason. When a PR skip rule applies (closed/merged/trivial), use `"status": "skipped"` with the skip reason. Do not emit markdown tables when `mode:agent` is active.
 
-After Stage 6 on the full path, the review ends with the actionable summary, the run artifacts, and the point where the run stops. `references/finish-review.md` defines that ending for the full spine.
+After Stage 6 on the full path, the review ends with the actionable summary, the run artifacts, and the point where the run stops. `references/finish-report.md` defines that ending for the full spine.

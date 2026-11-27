@@ -5,7 +5,7 @@ import { describe, expect, setDefaultTimeout, test } from "bun:test"
 
 setDefaultTimeout(20_000)
 
-const UPSTREAM_BASELINE = "2921168fc84b4070308a9ef6d115063cf62198cf"
+const UPSTREAM_BASELINE = "d8f8e03237bded06e77bcb3930b43ef841e7eeda"
 
 const REPO_ROOT = path.join(import.meta.dir, "..")
 const SKILLS_ROOT = path.join(REPO_ROOT, "skills")
