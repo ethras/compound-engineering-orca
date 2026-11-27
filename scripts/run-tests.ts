@@ -192,7 +192,9 @@ export function passOutcome(end: {
 }): PassOutcome {
   const killed = end.lostExit || end.stalled
   if (end.interrupted) {
-    const status = killed ? signalStatus(end.interrupted) : end.code ?? signalStatus(end.signal ?? end.interrupted)
+    const status = killed || end.interrupted === "SIGQUIT"
+      ? signalStatus(end.interrupted)
+      : end.code ?? signalStatus(end.signal ?? end.interrupted)
     return { kind: "interrupted", status }
   }
   if (end.lostExit) return { kind: "lostExit" }
@@ -250,16 +252,20 @@ function runPass(args: string[], limitMs: number | null, lostMs: number): Promis
     let interrupted: NodeJS.Signals | null = null
     // Registered before the spawn: an interrupt that lands before the pass exists is
     // held and forwarded once it does, so the detached pass cannot outlive the runner.
+    const stopPass = () => {
+      // SIGQUIT requests a core dump. Use SIGTERM to stop the pass and keep the caller's quit status.
+      if (child && interrupted) killPass(child, interrupted === "SIGQUIT" ? "SIGTERM" : interrupted)
+    }
     const forward = (signal: NodeJS.Signals) => {
       interrupted = signal
-      if (child) killPass(child, signal)
+      stopPass()
     }
     // The detached pass receives none of the signals a terminal sends the runner.
     const forwarded: NodeJS.Signals[] = process.platform === "win32" ? ["SIGINT", "SIGTERM"] : ["SIGINT", "SIGTERM", "SIGHUP", "SIGQUIT"]
     const handlers = forwarded.map((signal) => [signal, () => forward(signal)] as const)
     for (const [signal, handler] of handlers) process.on(signal, handler)
     child = spawn(process.execPath, ["test", ...args], { stdio: "inherit", detached: process.platform !== "win32" })
-    if (interrupted) killPass(child, interrupted)
+    stopPass()
     const stop = (reason: string) => {
       const members = child.pid === undefined ? [] : passProcesses(child.pid)
       console.error(

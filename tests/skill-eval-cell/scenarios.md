@@ -93,8 +93,8 @@ bun run test:skill-eval-pack -- --wave1 --arm ab
 | `ce-work/incremental-message-recent-log` | Without project conventions, incremental commits follow the recent log |
 | `ce-work/incremental-message-fallback` | Without conventions or history, incremental commits use conventional commits |
 | `ce-work/incremental-message-user-override` | An explicit user format overrides the project convention |
-| `ce-work/incremental-message-literal-message` | A literal user-specified subject and required body use file-based commit transport |
-| `ce-work/incremental-message-required-attribution` | Required attribution survives plugin-branding omission and uses outside-repo message transport |
+| `ce-work/incremental-message-literal-message` | A literal user-specified subject and required body pass the message to git on stdin |
+| `ce-work/incremental-message-required-attribution` | Required attribution survives plugin-branding omission and passes the message to git on stdin |
 | `ce-prototype/batch-conflict-asks` | Conflicting annotation notes stay in chat instead of guessing an edit |
 | `ce-prototype/clear-batch-applies-in-place` | A clear annotation batch iterates in place; conversation does not swallow it |
 | `ce-prototype/question-stays-in-chat` | A question pin is answered in chat, not treated as an edit or a next variant |
@@ -202,4 +202,9 @@ bun run test:skill-eval-pack -- --skill ce-noslop --arm post
 | `ce-noslop/figurative-verbs-become-literal` | Figurative verbs and code credited with intent go; literal verbs and all numbers stay |
 | `ce-noslop/single-figure-becomes-literal` | One figurative verb among plain sentences goes; the plain sentences stay byte for byte |
 | `ce-noslop/expected-fragments-stay` | Table cells and changelog lines stay byte for byte |
+| `ce-noslop/passing-sentences-beside-slop-stay` | A/B (#2065): passing sentences next to rewritten ones come back verbatim; the excited opener and stock closer go |
+| `ce-noslop/clean-letter-returns-unchanged` | A/B (#2065): a letter with no tell returns byte for byte |
+| `ce-noslop/title-and-closer-keep-the-request` | A/B (#2065): unmarked title loses its emoji, stock closers go, the request inside a closer stays |
+| `ce-noslop/sycophant-opener-keeps-the-name` | A/B (#2065): praise goes, the answer still addresses the reader by name |
+| `ce-noslop/intensifiers-go-unless-they-carry-the-claim` | A/B: empty intensifiers go; "deliberately skipped, not lost" stays because it carries the claim |
 | `ce-noslop/detect-uses-plain-labels` | Detect names the patterns without grammar-term labels |

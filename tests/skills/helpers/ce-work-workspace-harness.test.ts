@@ -71,7 +71,8 @@ describe("ce-work workspace harness: process-group timeout", () => {
       cwd: dir,
       stdio: "ignore",
     })
-    const exited = new Promise<void>((resolve) => helper.on("exit", () => resolve()))
+    const exited = new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((resolve) =>
+      helper.on("exit", (code, signal) => resolve({ code, signal })))
     const deadline = Date.now() + 15_000
     while (!(existsSync(path.join(dir, "grandchild.pid")) && existsSync(path.join(dir, "child.pid"))) && Date.now() < deadline) {
       await Bun.sleep(50)
@@ -79,7 +80,7 @@ describe("ce-work workspace harness: process-group timeout", () => {
     const pids = ["child.pid", "grandchild.pid"].map((name) => Number(readFileSync(path.join(dir, name), "utf8")))
     try {
       helper.kill(signal)
-      await exited
+      expect(await exited).toEqual(signal === "SIGQUIT" ? { code: 131, signal: null } : { code: null, signal })
       expect(await survivors(pids)).toEqual([])
     } finally {
       for (const pid of pids) if (alive(pid)) process.kill(pid, "SIGKILL")
