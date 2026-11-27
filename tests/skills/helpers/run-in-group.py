@@ -42,14 +42,16 @@ def main() -> int:
             pending.append(signum)
             return
         kill_group(child)
+        # An explicit quit stops this helper without generating a crash report.
+        if signum == signal.SIGQUIT:
+            sys.exit(128 + signum)
         die_of(signum)
 
     for signum in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP, signal.SIGQUIT):
         signal.signal(signum, on_interrupt)
     child = subprocess.Popen(sys.argv[2:], start_new_session=True)
     if pending:
-        kill_group(child)
-        die_of(pending[0])
+        on_interrupt(pending[0], None)
     try:
         code = child.wait(timeout=timeout)
     except subprocess.TimeoutExpired:

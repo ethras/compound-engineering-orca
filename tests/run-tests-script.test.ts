@@ -258,7 +258,15 @@ test("leaves an orphan behind", () => { spawnSync("sh", ["-c", "sleep 300 >/dev/
     ["SIGHUP", 129],
     ["SIGQUIT", 131],
   ] as const)("%s to the runner stops the pass it started", async (signal, status) => {
-    const dir = fixture(HANG)
+    const dir = fixture(signal === "SIGQUIT" ? HANG + `
+// Record which signal reached the pass without letting either signal crash this fixture.
+for (const signal of ["SIGTERM", "SIGQUIT"] as const) {
+  process.on(signal, () => {
+    writeFileSync("received", signal)
+    process.exit(signal === "SIGTERM" ? 143 : 131)
+  })
+}
+` : HANG)
     const runner = spawn(process.execPath, [RUNNER, "./fixture.test.ts"], {
       cwd: dir,
       env: { ...process.env, CE_TEST_PASS_TIMEOUT_SECONDS: "120" },
@@ -273,6 +281,7 @@ test("leaves an orphan behind", () => { spawnSync("sh", ["-c", "sleep 300 >/dev/
       runner.kill(signal)
       // The signal's conventional status, so an interrupt is not mistaken for a test failure.
       expect(await exited).toBe(status)
+      if (signal === "SIGQUIT") expect(readFileSync(path.join(dir, "received"), "utf8")).toBe("SIGTERM")
       expect(await survivors([worker, orphan])).toEqual([])
     } finally {
       for (const pid of [worker, orphan]) if (alive(pid)) process.kill(pid, "SIGKILL")
