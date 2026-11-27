@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.1.1](https://github.com/ethras/compound-engineering-orca/compare/cursor-marketplace-v1.1.0...cursor-marketplace-v1.1.1) (2026-11-27)
+
+
+### Bug Fixes
+
+* **upstream:** sync 3.38.1 and preserve T3 delegation ([7af521f](https://github.com/ethras/compound-engineering-orca/commit/7af521f37b3ee40ecd346cb94674672cbb02d08c))
+* **upstream:** sync 3.38.1 while preserving T3 fork seams ([5de64cc](https://github.com/ethras/compound-engineering-orca/commit/5de64cca7e8aee0c5a1e353c6c81a43d34f8eb7e))
+* **upstream:** sync 3.38.3 and keep test interrupts quiet ([bc43d4f](https://github.com/ethras/compound-engineering-orca/commit/bc43d4f386253b348728987f3c0611659704e826))
+* **upstream:** sync 3.38.3 and preserve T3 support ([18f53f9](https://github.com/ethras/compound-engineering-orca/commit/18f53f97b4a14eb1b430365f8004356f8ae92b94))
+
 ## [1.1.0](https://github.com/ethras/compound-engineering-orca/compare/cursor-marketplace-v1.0.2...cursor-marketplace-v1.1.0) (2026-11-07)
 
 
