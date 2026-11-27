@@ -66,6 +66,10 @@ Leave out the session this run is in. Match it by the harness session id or its 
 
 The bundled scripts recognize the session file shapes and folder layouts that Claude, Codex, Cursor, Pi, and oh-my-pi use today, and a harness update can change them. A file is not recognized when its skeleton comes back empty or the skeleton's `_meta` carries a `warning`; `extract` lists such files under `unrecognized`. A harness whose store holds recent files that `sessions` keeps none of may have changed format too. The search's `files_without_metadata` count alone does not mean that: it spans every project on the machine and is mostly stub files with no user turn. Then work from the raw JSONL instead; it is plain text. Raw session logs often run to tens of megabytes, mostly tool output and repeated context, so never read one whole: search it for the user's turns, the commands run, and the failures, and write what you find to the run's scratch directory as that session's extract.
 
+<!-- ce-fork-hook:start antigravity -->
+The bundled `scripts/antigravity.py` reader searches local Antigravity stores, including T3 Code's Antigravity profiles. It uses each store's workspace index to match transcripts to this repo. Sessions without a readable transcript cannot be extracted.
+<!-- ce-fork-hook:end antigravity -->
+
 For a scope wider than one session, record a status for every harness: **searched** (found N), **present but not read** (a store exists that the scripts do not read, such as Codex archived sessions), or **absent**. List an unrecognized file as present with its format not recognized, never as clean. When a harness's store exists but discovery finds nothing in it, say so rather than reporting zero sessions. A thin search must not read as a clean one.
 
 ## Wide scopes

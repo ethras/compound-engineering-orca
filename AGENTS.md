@@ -102,6 +102,8 @@ cat .claude-plugin/plugin.json | jq .
 
 Upstream owns `skills/`. This fork differs from it only by:
 
+- the Antigravity reader in `skills/ce-retro/scripts/antigravity.py` and its marked seams in `retro-state.py` and `references/sessions-and-window.md`;
+
 - marked seams (`<!-- ce-fork-hook:start <id> -->` … `<!-- ce-fork-hook:end <id> -->`) in `skills/ce-simplify-code/SKILL.md`, `skills/ce-compound/references/research.md`, `skills/ce-code-review/references/dispatch-reviewers.md`, `skills/ce-doc-review/references/dispatch.md` and `skills/ce-work/references/execution-engines.md`;
 - the fork-only files `references/placement.md` (in `ce-simplify-code` and `ce-compound`) and `references/t3-subagents.md` (in `ce-code-review`, `ce-doc-review`, `ce-simplify-code` and `ce-work`). `skills/ce-code-review/references/t3-subagents.md` is the canonical copy; edit it and copy it to the others.
 
