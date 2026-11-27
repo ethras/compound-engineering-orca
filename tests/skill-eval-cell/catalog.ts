@@ -37,6 +37,8 @@ const docReviewFindingsTask = (args: string) =>
   `Use ce-doc-review with the arguments: mode:non-interactive ${args}. End your final message with these lines and nothing after them: "FINDINGS:" followed by one line per finding the review raised or fixed, each starting with "- ", or the line "- none", then "TEAM: <comma-separated reviewer names you dispatched>".`
 const docReviewPersonaTask = (persona: string, plan: string) =>
   `Use ce-doc-review's ${persona} reviewer on ${plan}. Read the skill's references/subagent-template.md, references/findings-schema.json, and references/personas/${persona}.md, then review the document as that reviewer would, reading the repository code as the template allows. Do not dispatch, edit anything, or invoke another skill. Return the reviewer's findings JSON, then end your final message with these lines and nothing after them: "FINDINGS:" followed by one line per finding in that JSON, each starting with "- " and giving its title, then " — ", then the input and the harm it names in a few words, or the line "- none".`
+/** main before #2083: ce-compound cited code by `file:line` and checked it against the working tree. */
+export const COMPOUND_CITATION_BASE_REF = "8f7614639e7f3792a6f9337d8742a80a232bd596"
 export const CODE_REVIEW_PRE_EXISTING_BASE_REF = "4fb543be706b19b4df14fbf69a58e458bed037e6"
 /** main after #2013: a stub on a traced money path still read to Codex as something that might block the harm. */
 export const DOC_REVIEW_UNSTATED_BLOCKER_BASE_REF = "4fb543be706b19b4df14fbf69a58e458bed037e6"
@@ -70,6 +72,8 @@ export const RESOLVER_PUBLICATION_BASE_REF = "bb5899b36c133a8441fa79af7cf60420c8
 export const STRUCTURAL_FIX_BASE_REF = "2b4cacd32d3e8c19a91e1c50c318172ec1d2f160"
 /** main before the ce-debug session-audit changes (other affected places, behavior-based review skip, findings-shaped options). */
 export const DEBUG_AUDIT_BASE_REF = "00d0a5bbf1300b2138b65ce724b325dd4dff77ba"
+/** main before ce-debug made every other site of the root-cause mistake part of the minimal fix. */
+export const SIBLING_SITES_BASE_REF = "8d2a49cd8ab3a12e11ee2822f56cd57a106f01e1"
 /** main before ce-debug named measurement bounds, ticket titles, always-on signal proposals, induced-failure checks, and what a test seam misses. */
 const DEBUG_SIGNAL_BASE_REF = "beacb629c8a6f34d6154996e819b2ac60857c514"
 const SIGNAL_PROPOSED = [['"prevention_signal": "', '"prevention_signal":"']]
@@ -343,6 +347,10 @@ const IDEATE_RUN_SCALING: Scenario[] = IDEATE_RUN_SCALING_ROWS.map(({ merge, ...
 }))
 /** main before ce-noslop named claim certainty and ruled out semicolons as em dash substitutes. */
 const NOSLOP_FIX_LIMITS_BASE_REF = "67035e931c5cb26e80f198a7019a4502a9788273"
+/** main before ce-noslop bounded what an edit may change (#2065). */
+const NOSLOP_EDIT_SCOPE_BASE_REF = "d8f8e03237bded06e77bcb3930b43ef841e7eeda"
+/** main before ce-noslop restored the intensifier rule ce-plan and ce-brainstorm handed off. */
+const NOSLOP_INTENSIFIER_BASE_REF = "41216b7ec84816397f7d3d621bad2373f2fca974"
 
 /**
  * A handoff-probe row runs live, so it loses the read-only `actions: "none"` restraint.
@@ -1389,9 +1397,74 @@ function boundaryDiagnosticScenarios(): Scenario[] {
   ]
 }
 
+/** main before a check or test proving a property that rests on several guards had to be shown failing with each guard broken alone. Per tests/skill-eval-cell/packs/multi-guard-proof.md. */
+const MULTI_GUARD_BASE_REF = "8d2a49cd8ab3a12e11ee2822f56cd57a106f01e1"
+const NEGATIVE_TOTAL_BUG = "A 150% discount produced a negative order total. The fix, already in the tree, added percent range checks in src/discount.js."
+const NAN_TOTAL_BUG = "A non-numeric manual discount such as \"abc\" produced a NaN order total. The fix, already in the tree, added the Number.isFinite check in parsePercent in src/discount.js."
+const NO_ACTION = "Do not edit, run, or commit anything, and do not invoke another skill or dispatch."
+const multiGuardRow = (skill: string, name: string, why: string, task: string, answer: Record<string, string>): Scenario => ({
+  id: `${skill}/${name}`,
+  baseline_ref: MULTI_GUARD_BASE_REF,
+  skill,
+  cohort: "untouched",
+  key_behavior: "judgment",
+  read_only: true,
+  git_init: true,
+  fixture: `${FIX}/multi-guard-discount`,
+  why,
+  pre_contract: "A check or regression test counts as proven once it is seen failing on the defect and passing without it.",
+  task,
+  grade: { declared: answer, actions: "none" },
+})
+const MULTI_GUARD_ROWS: Scenario[] = [
+  multiGuardRow(
+    "ce-compound",
+    "check-two-guards-one-break",
+    "The no-negative-total property rests on two range checks, and the check was only seen failing with one removed; deleting applyCoupon's check leaves it green.",
+    `Use the ce-compound skill mode:non-interactive on this solved, verified problem from this session. ${NEGATIVE_TOTAL_BUG} We are choosing the form, and a check fits: you wrote tests/discount.check.js, saw npm test pass on the current tree, and in a throwaway copy of the tree deleted the range check in parsePercent and saw it fail. ${NO_ACTION} Put PROVEN: yes or PROVEN: no alone on its own line, saying whether those results are enough under this skill's rule to keep the check, and give the reason on a later line.`,
+    { PROVEN: "no" },
+  ),
+  multiGuardRow(
+    "ce-compound",
+    "check-one-guard-one-break",
+    "The restraint half: rejecting a non-numeric percent rests on one guard, so one break proves the check.",
+    `Use the ce-compound skill mode:non-interactive on this solved, verified problem from this session. ${NAN_TOTAL_BUG} We are choosing the form, and a check fits: you wrote tests/percent-input.check.js, saw npm test pass on the current tree, and in a throwaway copy of the tree deleted the Number.isFinite check in parsePercent and saw it fail. ${NO_ACTION} Put PROVEN: yes or PROVEN: no alone on its own line, saying whether those results are enough under this skill's rule to keep the check, and give the reason on a later line.`,
+    { PROVEN: "yes" },
+  ),
+  multiGuardRow(
+    "ce-debug",
+    "regression-test-two-guards",
+    "A red-then-green regression test covers only the manual-discount path; the fix's coupon guard can be removed with every test green.",
+    `Use ce-debug. We are in Phase 3. ${NEGATIVE_TOTAL_BUG} The cause is confirmed: nothing checked the percent range. My regression test tests/discount.check.js went red before the fix and green after, and npm test passes. ${NO_ACTION} Put VERIFIED: yes or VERIFIED: no alone on its own line, saying whether the fix is verified as this skill requires, and give the reason on a later line.`,
+    { VERIFIED: "no" },
+  ),
+  multiGuardRow(
+    "ce-debug",
+    "regression-test-one-guard",
+    "The restraint half: one guard, a red-then-green test through the real function, nothing more to break.",
+    `Use ce-debug. We are in Phase 3. ${NAN_TOTAL_BUG} The cause is confirmed: parsePercent passed NaN through. My regression test tests/percent-input.check.js went red before the fix and green after, and npm test passes. ${NO_ACTION} Put VERIFIED: yes or VERIFIED: no alone on its own line, saying whether the fix is verified as this skill requires, and give the reason on a later line.`,
+    { VERIFIED: "yes" },
+  ),
+  multiGuardRow(
+    "ce-work",
+    "proof-first-two-guards",
+    "Proof-first red before implementation shows nothing about which of the two new guards the test depends on.",
+    `Use ce-work. I am executing this unit: "Reject discount percents outside 0-100, so no order total goes negative." Working proof-first, I wrote tests/discount.check.js and saw it fail, then added the range checks in src/discount.js. The test passes now and npm test is green. ${NO_ACTION} Put VERIFIED: yes or VERIFIED: no alone on its own line, saying whether this unit's proof meets this skill's bar to mark it done, and give the reason on a later line.`,
+    { VERIFIED: "no" },
+  ),
+  multiGuardRow(
+    "ce-work",
+    "proof-first-one-guard",
+    "The restraint half: one guard, proof-first red then green, the unit is done.",
+    `Use ce-work. I am executing this unit: "Reject non-numeric manual discount percents, so no order total becomes NaN." Working proof-first, I wrote tests/percent-input.check.js and saw it fail, then added the Number.isFinite check in parsePercent in src/discount.js. The test passes now and npm test is green. ${NO_ACTION} Put VERIFIED: yes or VERIFIED: no alone on its own line, saying whether this unit's proof meets this skill's bar to mark it done, and give the reason on a later line.`,
+    { VERIFIED: "yes" },
+  ),
+]
+
 export const SCENARIOS: Scenario[] = [
   ...proportionalDelegationScenarios,
   ...VISUAL_EVIDENCE_ROWS,
+  ...MULTI_GUARD_ROWS,
   ...["md", "html"].map((format): Scenario => ({
     id: `ce-prototype/local-source-${format}`,
     baseline_ref: "d400846211b6c708f73311f9e7b35cb57d863543",
@@ -2114,6 +2187,103 @@ Report NEXT: handoff if babysit should be invoked, NEXT: continue if the active 
     pre_contract: "A sentence that passes stays as written; every fact survives.",
     task: "Use the ce-noslop skill to edit fragments.md for a repo document. Return the full result text in chat between the markers RESULT-START and RESULT-END, then one summary line. Do not write files.",
     grade: { workspace_read: ["fragments.md"], result_must_include: ["| retries | 3 | per request |\n| timeout | 30 s | read only |\n", "- Fix crash on empty config\n- Add retry backoff\n", "migrate", "restart", "downtime"], actions: "none" },
+  },
+  {
+    id: "ce-noslop/passing-sentences-beside-slop-stay",
+    skill: "ce-noslop",
+    cohort: "untouched",
+    key_behavior: "judgment",
+    read_only: true,
+    baseline_ref: NOSLOP_EDIT_SCOPE_BASE_REF,
+    fixture: `${FIX}/noslop-drafts`,
+    why: "Issue #2065: on Haiku 5.5, edit mode reworded passing sentences that sat next to failing ones (\"sits on\" to \"is on\", \"has room for 45 desks\" to \"has 45 desks\", a sentence merged into its rewritten neighbor). Run with ANTHROPIC_MODEL=claude-haiku-5-5 to reach the tier that drifts.",
+    pre_contract: "Rewrite only the sentences a test fails on; a sentence that passes stays as written.",
+    task: "Use the ce-noslop skill to edit edit-scope.md before I send it to the team. Return the full result text in chat between the markers RESULT-START and RESULT-END, then one summary line. Do not write files.",
+    grade: {
+      workspace_read: ["edit-scope.md"],
+      result_must_include: [
+        "The night shift will keep using the old pick lists until the dry run is signed off by Shifza.",
+        "The building sits on Fehi Hingun Road and has room for 45 desks across two floors.",
+        "Dr. Mohamed Zahir will lead the field team, and the first survey window runs from 11 January to 29 January 2027.",
+        "Hi team,",
+        "Aishath",
+      ],
+      result_must_not_include: ["thrilled", "pivotal", "Let me know if you have any questions"],
+      actions: "none",
+    },
+  },
+  {
+    id: "ce-noslop/clean-letter-returns-unchanged",
+    skill: "ce-noslop",
+    cohort: "untouched",
+    key_behavior: "judgment",
+    read_only: true,
+    baseline_ref: NOSLOP_EDIT_SCOPE_BASE_REF,
+    fixture: `${FIX}/noslop-drafts`,
+    why: "Issue #2065: on Haiku 5.5, clean text came back edited (\"Thank you for\" to \"Thanks for\", \"will stop\" to \"stop\"). A letter with no tell returns byte for byte. Only Haiku 5.5 failed it before the fix (1 of 10 runs; Claude and Codex at default tier passed), so run with ANTHROPIC_MODEL=claude-haiku-5-5 to see red.",
+    pre_contract: "A sentence that passes stays as written, so a second pass on the returned text changes nothing.",
+    task: "Use the ce-noslop skill to edit clean-reply.md before I send it. Return the full result text in chat between the markers RESULT-START and RESULT-END, then one summary line. Do not write files.",
+    grade: {
+      workspace_read: ["clean-reply.md"],
+      result_must_include: [
+        "Hi Ibrahim,\n\nThank you for sending the screenshots. The export job will stop at 14:00 on Friday while we move the database. It will restart by 18:00, and any export queued in that window will run then.\n\nIf the restart slips past 18:00, I will post the new time in #ops before 17:00.\n\nThanks,\nMariyam",
+      ],
+      actions: "none",
+    },
+  },
+  {
+    id: "ce-noslop/title-and-closer-keep-the-request",
+    skill: "ce-noslop",
+    cohort: "untouched",
+    key_behavior: "judgment",
+    read_only: true,
+    baseline_ref: NOSLOP_EDIT_SCOPE_BASE_REF,
+    fixture: `${FIX}/noslop-drafts`,
+    why: "Issue #2065: a title line with no # marker kept its Title Case and emoji, and stock closers survived. The greeting stays, the closers go, and the real request inside a closer survives. The grader is case-insensitive, so read the title's case in the transcript.",
+    pre_contract: "Title Case headings become sentence case; decorative emoji go; chatbot closers go; every fact survives; a heading or sign-off in a letter is never flagged.",
+    task: "Use the ce-noslop skill to edit title-closer.md before I send it to the office. Return the full result text in chat between the markers RESULT-START and RESULT-END, then one summary line. Do not write files.",
+    grade: {
+      workspace_read: ["title-closer.md"],
+      result_must_include: ["Hi all,", "extra boxes", "3 March", "08:00", "17:00", "2 March", "Friday"],
+      result_must_not_include: ["\u{1F69A}", "Hope this helps", "Don't hesitate"],
+      actions: "none",
+    },
+  },
+  {
+    id: "ce-noslop/sycophant-opener-keeps-the-name",
+    skill: "ce-noslop",
+    cohort: "untouched",
+    key_behavior: "judgment",
+    read_only: true,
+    baseline_ref: NOSLOP_EDIT_SCOPE_BASE_REF,
+    fixture: `${FIX}/noslop-drafts`,
+    why: "Issue #2065: deleting \"You're absolutely right, Hassan!\" also dropped the reader's name. The praise goes and the answer still addresses Hassan. Only Haiku 5.5 failed it before the fix (2 of 10 runs; Claude and Codex at default tier passed), so run with ANTHROPIC_MODEL=claude-haiku-5-5 to see red.",
+    pre_contract: "Sycophancy before the answer goes; every name in the input survives.",
+    task: "Use the ce-noslop skill to edit sycophant-reply.md, my reply on a PR. Return the full result text in chat between the markers RESULT-START and RESULT-END, then one summary line. Do not write files.",
+    grade: {
+      workspace_read: ["sycophant-reply.md"],
+      result_must_include: ["Hassan", "locale", "purge the cache"],
+      result_must_not_include: ["absolutely right", "Great catch"],
+      actions: "none",
+    },
+  },
+  {
+    id: "ce-noslop/intensifiers-go-unless-they-carry-the-claim",
+    skill: "ce-noslop",
+    cohort: "untouched",
+    key_behavior: "judgment",
+    read_only: true,
+    baseline_ref: NOSLOP_INTENSIFIER_BASE_REF,
+    fixture: `${FIX}/noslop-drafts`,
+    why: "The intensifier list ce-plan and ce-brainstorm dropped when ce-noslop took over (#1653) never reached the catalog. Empty intensifiers go; \"deliberately skipped, not lost\" carries the claim and stays. Claude, Codex, and Grok at default tier passed before the rule; Haiku 5.5 failed 4 of 6 runs, mostly by cutting \"deliberately\", so run with ANTHROPIC_MODEL=claude-haiku-5-5 to see red.",
+    pre_contract: "Every fact survives; nothing is added; a sentence that passes stays as written.",
+    task: "Use the ce-noslop skill to edit intensifiers.md for a repo document. Return the full result text in chat between the markers RESULT-START and RESULT-END, then one summary line. Do not write files.",
+    grade: {
+      workspace_read: ["intensifiers.md"],
+      result_must_include: ["manifest", "line number", "3", "90 days", "deliberately skipped", "archive job"],
+      result_must_not_include: ["actually", "simply", "genuinely", "Critically"],
+      actions: "none",
+    },
   },
   {
     id: "ce-noslop/detect-uses-plain-labels",
@@ -3456,6 +3626,31 @@ Include exactly one line \`FIX: asked\` or \`FIX: applied\` or \`FIX: skipped\` 
     },
   },
   {
+    id: "ce-debug/fix-covers-unreported-sibling-sites",
+    baseline_ref: SIBLING_SITES_BASE_REF,
+    skill: "ce-debug",
+    cohort: "untouched",
+    key_behavior: "mutation",
+    read_only: false,
+    git_init: true,
+    fixture: `${FIX}/debug-sibling-sites`,
+    timeout_secs: 900,
+    why: "Agents fixed only the site a report named and offered the other instances of the same mistake as follow-up, so known copies of the bug stayed in the code. Spec: tests/skill-eval-cell/packs/ce-debug-sibling-sites.md.",
+    pre_contract: "Other sites that repeat the root-cause mistake are an optional structural fix after the minimal fix; otherwise they are named as follow-up in the summary's Prevention line.",
+    task: "Use ce-debug. Page 1 of the admin orders list starts at order 21, so the first 20 orders never show. `node tests/orders.check.js` reproduces it. Fix it. Then, instead of Phase 4, commit every file the fix changed with git (one commit, no push) and stop. Do not invoke another skill or dispatch.",
+    grade: {
+      committed_must: ["orders.js", "customers-csv.js", "invoice-sync.js"],
+      workspace_lacks: [
+        { path: "src/api/orders.js", needle: "= page * pageSize" },
+        { path: "src/exports/customers-csv.js", needle: "offset: size * batch," },
+        { path: "src/sync/invoice-sync.js", needle: "skip = pageNo * perPage" },
+      ],
+      // audit.js pages from 0 on purpose: the same expression is correct there.
+      workspace_contains: [{ path: "src/api/audit.js", needle: "const offset = page * pageSize" }],
+      committed_must_not: ["audit.js"],
+    },
+  },
+  {
     id: "ce-debug/perf-unbounded-number-is-inconclusive",
     baseline_ref: DEBUG_SIGNAL_BASE_REF,
     skill: "ce-debug",
@@ -4339,6 +4534,44 @@ Return the completion result to the coordinator.`,
     task: `Use the ce-compound skill mode:refresh. Audit the learning in docs/solutions/seat-helper.md against the code. Tell me what you would change.`,
     grade: {
       must_include: ["greet"],
+      actions: "none",
+    },
+  },
+  {
+    id: "ce-compound/refresh-moved-line-cites-by-name",
+    skill: "ce-compound",
+    cohort: "resized",
+    baseline_ref: COMPOUND_CITATION_BASE_REF,
+    key_behavior: "judgment",
+    read_only: true,
+    git_init: true,
+    fixture: `${FIX}/compound-citation-moved`,
+    why: "#2083: a refresh that rewrites moved line numbers to new line numbers produces the same churn on every later refresh.",
+    pre_contract: "A line citation that no longer points at what the learning describes is drift, and the refresh fixes it.",
+    task: "Use the ce-compound skill mode:refresh and fix drift only. Audit the learning in docs/solutions/runtime/session-ttl-seconds.md against the repository. Stop before writes. State the result on a `Classification: <outcome>` line, then put the exact edits you would make to the doc between lines reading RESULT-START and RESULT-END.",
+    grade: {
+      classification: "Update",
+      result_must_include: ["sessionTtl"],
+      result_must_not_include: ["session.js:12", "session.js:8"],
+      actions: "none",
+    },
+  },
+  {
+    id: "ce-compound/refresh-unmerged-shift-is-not-drift",
+    skill: "ce-compound",
+    cohort: "resized",
+    baseline_ref: COMPOUND_CITATION_BASE_REF,
+    key_behavior: "judgment",
+    read_only: true,
+    git_init: true,
+    fixture: `${FIX}/compound-citation-workspace`,
+    fixture_omit: ["patches"],
+    git_change: { patch: "patches/region-work.patch", branch: "feature/region", message: "Add per-user region lookup" },
+    why: "#2083: unmerged work on the checked-out branch shifts the cited lines, but the citations still match main, where the learning lives.",
+    pre_contract: "A learning's code claims are checked against the repository.",
+    task: "Use the ce-compound skill mode:refresh and fix drift only. Audit the learning in docs/solutions/runtime/session-ttl-seconds.md against the repository. Stop before writes. State the result on a `Classification: <outcome>` line, then list the exact edits you would make to the doc, if any.",
+    grade: {
+      classification: "Keep",
       actions: "none",
     },
   },
@@ -6881,13 +7114,13 @@ Units:
     why: "Issue #1808: incremental commits prescribed conventional messages instead of resolving project, history, and fallback precedence.",
     pre_contract: "Use project commit conventions, else the recent log pattern, else conventional commits. User override wins.",
     task: `Use ce-work to decide the next incremental commit for a completed logical unit that fixes an off-by-one widget limit. The selected execution engine is native. Only widget.ts belongs to it; tests have passed. The recent git log snapshot is in COMMIT_HISTORY.md; use that snapshot instead of running git. Read the incremental commit guidance and resolve the message format from the available project context. ${override}
-Use "Correct widget limit" as the description in the subject and any required body, adding only the formatting required by the selected convention. If conventional commits apply, this is a fix in scope widget. Output exactly one SUBJECT: line with the resolved subject, one BODY: line with the resolved body (or none), one FOOTER: line with the resolved footer (or none), and one COMMAND: line with the path-scoped commit command. Use a concrete path under /tmp if the command needs a file. Stop at this decision: do not change files, commit, invoke other skills, or run the rest of the workflow.`,
+Use "Correct widget limit" as the description in the subject and any required body, adding only the formatting required by the selected convention. If conventional commits apply, this is a fix in scope widget. Output exactly one SUBJECT: line with the resolved subject, one BODY: line with the resolved body (or none), one FOOTER: line with the resolved footer (or none), and one COMMAND: line with the path-scoped commit command. Stop at this decision: do not change files, commit, invoke other skills, or run the rest of the workflow.`,
     grade: {
       files_read_post: ["references/implementation-loop.md"],
       declared: { SUBJECT: subject, BODY: fixture === "project" ? "- Correct widget limit" : "none", FOOTER: footer },
       must_include_field: "COMMAND",
-      must_include: ["-- widget.ts"],
-      must_include_any: [["git commit -F /tmp/", 'git commit -F "/tmp/', "git commit -F '/tmp/"]],
+      must_include: ["git commit -F - -- widget.ts"],
+      must_include_any: [["<<'", '<<"', "| git commit -F -"]],
       actions: "none",
       delegates: "none",
     },
